@@ -58,9 +58,9 @@ export default class AuthService {
         if (!auth) {
             auth = await this.authRepository.create(user.id)
         }
-        if (!auth.twitch_refresh_token || (auth.twitch_token_expires_at && now > auth.twitch_token_expires_at)) {
+        if (!auth.twitch_refresh_token) {
             await this.logout(user.id)
-            throw new UnauthorizedError("Refresh token not found or expired");
+            throw new UnauthorizedError("Refresh token not found");
         }
         const newToken = await refreshUserToken(
             this.cfg.twitch.clientId,

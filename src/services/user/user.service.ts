@@ -228,7 +228,9 @@ export default class UserService {
             throw new Error("WidgetService is not initialized");
         }
         const user = await this.get(userId)
+        console.log('user', user)
         const tier = await this.getTierFromTwitch(user.twitch_id)
+        console.log('tier', tier)
         const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
         this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
         if (activeWidgets > 1 && tier < 1) {
@@ -238,10 +240,15 @@ export default class UserService {
             await redis.del(`user:tier:${userId}`)
         }
         const tierExpireDate = generateTierExpireDate()
+        console.log("update", {
+            tier: tier,
+            tier_expire_at: tier === 0 ? null : tierExpireDate
+        })
         await this.update(userId, {
             tier: tier,
             tier_expire_at: tier === 0 ? null : tierExpireDate
         })
+        console.log("===========================")
     }
 
     async bulkAdjustTierAndWidgets() {
@@ -251,19 +258,37 @@ export default class UserService {
             throw new Error("WidgetService is not initialized");
         }
 
+        let page = 1
         const limit = 10;
 
         try {
             this.logger.info({ message: "Starting bulk user tier adjustment" });
 
+            const processedIds: string[] = [];
             while (true) {
                 // Since adjusting the tier removes the user from the "expired" list,
                 // we continually query page 1 until no more expired users remain.
-                const users = await this.userRepository.listExpired({ page: 1, limit });
+                // We exclude processedIds to avoid infinite loops if some persistent failures occur.
+                const users = await this.userRepository.listExpired({ page, limit }, processedIds);
+                console.log("users", users.map(u => u.id))
                 if (users.length === 0) {
                     break;
                 }
-                await Promise.all(users.map(u => this.adjustTierAndWidgets(u.id)))
+                page++
+                await Promise.all(users.map(async (u) => {
+                    try {
+                        console.log("Processing", u.id)
+                        await this.adjustTierAndWidgets(u.id);
+                    } catch (err) {
+                        this.logger.error({
+                            message: "Failed to adjust tier for user during bulk adjustment",
+                            data: { userId: u.id },
+                            error: err as Error
+                        });
+                        console.log("Failed", u.id, err)
+                        processedIds.push(u.id);
+                    }
+                }))
             }
             this.logger.info({ message: "Completed bulk adjustment" });
         } catch (error) {
