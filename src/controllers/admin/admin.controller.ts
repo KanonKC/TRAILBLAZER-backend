@@ -47,4 +47,29 @@ export default class AdminController {
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
+
+    async bulkAdjustTierAndWidgets(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.admin.bulkAdjustTierAndWidgets");
+        this.logger.info({ message: "Bulk adjust tier and widgets request received" });
+
+        try {
+            const valid = authenticateAdmin(req)
+            if (!valid) {
+                this.logger.warn({ message: "Invalid admin key" });
+                return res.status(401).send({ message: "Invalid admin key" });
+            }
+
+            await this.userService.bulkAdjustTierAndWidgets();
+
+            this.logger.info({ message: "Bulk adjustment completed successfully" });
+            res.send({ message: "Bulk adjustment completed successfully" });
+        } catch (err) {
+            if (err instanceof TError) {
+                this.logger.error({ message: "Failed during bulk adjustment", error: err });
+                return res.status(err.status).send({ message: err.message });
+            }
+            this.logger.error({ message: "Failed during bulk adjustment", error: err as Error });
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
 }

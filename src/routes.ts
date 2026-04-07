@@ -131,6 +131,7 @@ server.register(cookie, {
 server.get("/health", systemController.health.bind(systemController))
 
 server.put("/api/v1/admin/users/:id", adminController.updateUser.bind(adminController))
+server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndWidgets.bind(adminController))
 
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))
