@@ -12,6 +12,7 @@ export default class ClipShoutoutRepository {
         return prisma.clipShoutout.create({
             data: {
                 reply_message: request.reply_message,
+                delay_ms: request.delay_ms,
                 enabled_clip: request.enabled_clip,
                 enabled_highlight_only: request.enabled_highlight_only,
                 widget: {

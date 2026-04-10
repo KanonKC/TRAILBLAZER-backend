@@ -87,7 +87,6 @@ export default class DropImageService {
                 throw new NotFoundError("Drop Image config not found");
             }
 
-            await this.widgetService.authorizeTierUsage(userId, dropImage.widget.id);
             await this.widgetService.authorizeOwnership(userId, dropImage.widget.id);
 
             await this.subscribeToRedemptionEvents(dropImage.widget.twitch_id, userId);

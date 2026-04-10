@@ -43,11 +43,17 @@ import SystemService from "./services/system/system.service";
 import TwitchService from "./services/twitch/twitch";
 import Sightengine from "./providers/sightengine";
 import AuthController from "./controllers/auth/auth.controller";
+import LinkedAccountController from "./controllers/linkedAccount/linkedAccount.controller";
+import LinkedAccountRepository from "./repositories/linkedAccount/linkedAccount.repository";
+import LinkedAccountService from "./services/linkedAccount/linkedAccount.service";
+import { Google, Discord } from "arctic";
 import TbCron from "./cron";
 
 // Providers
 const twitchGql = new TwitchGql(config);
 const sightengine = new Sightengine(config);
+const googleOAuth = new Google(config.youtube.clientId, config.youtube.clientSecret, config.youtube.redirectUrl);
+const discordOAuth = new Discord(config.discord.clientId, config.discord.clientSecret, config.discord.redirectUrl);
 
 // Repository Layer
 const userRepository = new UserRepository();
@@ -60,6 +66,7 @@ const dropImageRepository = new DropImageRepository();
 const randomDbdPerkRepository = new RandomDbdPerkRepository();
 const widgetRepository = new WidgetRepository();
 const uploadedFileRepository = new UploadedFileRepository();
+const linkedAccountRepository = new LinkedAccountRepository();
 
 // Service Layer
 const systemService = new SystemService();
@@ -75,6 +82,7 @@ const dropImageService = new DropImageService(dropImageRepository, userRepositor
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
 const uploadedFileService = new UploadedFileService(uploadedFileRepository);
 const twitchService = new TwitchService(authService);
+const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
@@ -92,6 +100,7 @@ const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService
 const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
+const linkedAccountController = new LinkedAccountController(linkedAccountService);
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService)
@@ -122,6 +131,7 @@ server.register(cookie, {
 server.get("/health", systemController.health.bind(systemController))
 
 server.put("/api/v1/admin/users/:id", adminController.updateUser.bind(adminController))
+server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndWidgets.bind(adminController))
 
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))
@@ -176,6 +186,10 @@ server.delete("/api/v1/uploaded-files/:id", uploadedFileController.delete.bind(u
 
 server.get("/api/v1/twitch/channel-rewards", twitchController.listChannelRewards.bind(twitchController));
 server.get("/api/v1/twitch/user", twitchController.getUser.bind(twitchController));
+
+server.get("/api/v1/linked-accounts", linkedAccountController.list.bind(linkedAccountController));
+server.post("/api/v1/linked-accounts/:platform/bind", linkedAccountController.bind.bind(linkedAccountController));
+server.delete("/api/v1/linked-accounts/:platform", linkedAccountController.unbind.bind(linkedAccountController));
 
 server.register(FastifySSEPlugin);
 server.get("/api/v1/events/first-word/:userId", firstWordEventController.sse.bind(firstWordEventController));

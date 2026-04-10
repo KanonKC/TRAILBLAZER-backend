@@ -22,4 +22,14 @@ export default interface Configurations {
     admin: {
         apiKey: string;
     }
+    youtube: {
+        clientId: string;
+        clientSecret: string;
+        redirectUrl: string;
+    }
+    discord: {
+        clientId: string;
+        clientSecret: string;
+        redirectUrl: string;
+    }
 }

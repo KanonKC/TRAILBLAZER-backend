@@ -44,8 +44,7 @@ export default class WidgetService {
             if (isEnabling === false) return; // Disabling is always allowed
 
             const tier = await this.userService.getTier(userId);
-            const limit = tier === UserTier.PRO_TIER ? 9999 : 1;
-
+            const limit = tier >= UserTier.PRO_TIER ? 9999 : 1;
 
             let otherActiveWidgetsCount = 0;
 
@@ -98,6 +97,7 @@ export default class WidgetService {
 
     async updateEnable(id: string, userId: string, value: boolean, options: UpdateEnableOptions) {
         this.logger.setContext("service.widget.updateEnable");
+        this.logger.info({ message: "Updating widget enabled status", data: { id, userId, value, options } });
 
         if (options.forceUpdate && value === true) {
             await this.disableAll(userId)
@@ -105,6 +105,7 @@ export default class WidgetService {
             try {
                 await this.authorizeTierUsage(userId, id, value);
             } catch (error) {
+                this.logger.error({ message: "Error authorizing tier usage", error: error as Error });
                 if (error instanceof ForbiddenError) {
                     throw new WidgetQuotaLimitError();
                 }

@@ -26,6 +26,16 @@ const config: Configurations = {
     },
     admin: {
         apiKey: process.env.ADMIN_API_KEY || ""
+    },
+    youtube: {
+        clientId: process.env.YOUTUBE_CLIENT_ID || "",
+        clientSecret: process.env.YOUTUBE_CLIENT_SECRET || "",
+        redirectUrl: process.env.YOUTUBE_REDIRECT_URL || ""
+    },
+    discord: {
+        clientId: process.env.DISCORD_CLIENT_ID || "",
+        clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
+        redirectUrl: process.env.DISCORD_REDIRECT_URL || ""
     }
 }
 

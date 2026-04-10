@@ -8,3 +8,7 @@ node_modules
 dev.db
 
 *.log
+
+login.txt
+
+coverage

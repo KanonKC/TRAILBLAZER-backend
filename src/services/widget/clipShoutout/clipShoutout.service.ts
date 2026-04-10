@@ -92,6 +92,11 @@ export default class ClipShoutoutService {
 
         await redis.set(cacheKey, JSON.stringify(csConfig), TTL.TWO_HOURS)
 
+        if (csConfig.delay_ms > 0) {
+            this.logger.debug({ message: "Delaying shoutout", data: { delay_ms: csConfig.delay_ms } });
+            await new Promise(resolve => setTimeout(resolve, csConfig.delay_ms));
+        }
+
         const senderId = csConfig.twitch_bot_id || this.cfg.twitch.defaultBotId
         this.logger.info({ message: "shouting out", data: { channel: csConfig.widget.twitch_id, raider: event.raid.user_id } });
         try {
@@ -117,9 +122,15 @@ export default class ClipShoutoutService {
             const filters: HelixPaginatedClipFilter = {
                 isFeatured: csConfig.enabled_highlight_only
             }
-            const clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
+
+            let clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
+            if (clips.data.length === 0 && filters.isFeatured) {
+                clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id)
+            }
+
             if (clips.data.length > 0) {
                 const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
+                this.logger.info({ message: "Playing video clip", data: { title: selectedClip.title, id: selectedClip.id } });
                 const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
                 this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
                 this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
@@ -150,7 +161,6 @@ export default class ClipShoutoutService {
             throw new NotFoundError("Clip shoutout config not found");
         }
 
-        await this.widgetService.authorizeTierUsage(userId, existing.widget.id);
         await this.widgetService.authorizeOwnership(userId, existing.widget.id);
 
         const res = await this.clipShoutoutRepository.update(id, {

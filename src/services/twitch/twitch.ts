@@ -4,6 +4,7 @@ import AuthService from "../auth/auth.service";
 import { HelixUserData } from "@twurple/api/lib/interfaces/endpoints/user.external";
 import { NotFoundError, TError } from "@/errors";
 import { HelixErrorResponse } from "./response";
+import { ListChannelRewardsOptions } from "./request";
 
 export default class TwitchService {
     private readonly authService: AuthService;
@@ -21,12 +22,15 @@ export default class TwitchService {
         })
     }
 
-    async listChannelRewards(channelId: string): Promise<{
+    async listChannelRewards(channelId: string, options?: ListChannelRewardsOptions): Promise<{
         data: HelixCustomRewardData[];
     }> {
         try {
             const twitchUserAPI = await this.authService.createTwitchUserAPI(channelId)
             let res = await twitchUserAPI.channelPoints.getCustomRewards(channelId)
+            if (options?.userInputRequired) {
+                res = res.filter(r => r.userInputRequired)
+            }
             res = res.sort((a, b) => a.cost - b.cost)
             return { data: res.map(r => r[rawDataSymbol]) }
         } catch (error) {

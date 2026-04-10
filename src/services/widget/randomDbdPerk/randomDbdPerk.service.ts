@@ -82,7 +82,6 @@ export default class RandomDbdPerkService {
         if (!existing) {
             throw new NotFoundError("Widget not found");
         }
-        await this.widgetService.authorizeTierUsage(userId, existing.widget.id);
         await this.widgetService.authorizeOwnership(userId, existing.widget.id);
 
         const updated = await this.randomDbdPerkRepository.update(id, request);

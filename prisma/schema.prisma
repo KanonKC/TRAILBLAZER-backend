@@ -24,7 +24,8 @@ model User {
   workflows      Workflow[]
   triggers       Trigger[]
   widgets        Widget[]
-  uploaded_files UploadedFile[]
+  uploaded_files  UploadedFile[]
+  linked_accounts LinkedAccount[]
 }
 
 model Auth {
@@ -95,12 +96,12 @@ model Widget {
 
 // TODO: Rename displayName, createdAt, updatedAt to snake_case (display_name, created_at, updated_at)
 model WidgetType {
-  id            Int      @id @default(autoincrement())
-  slug          String   @unique
-  displayName   String
-  widgets       Widget[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  displayName String
+  widgets     Widget[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model FirstWord {
@@ -150,6 +151,7 @@ model FirstWordCustomReply {
 model ClipShoutout {
   id                     String   @id @default(uuid())
   twitch_bot_id          String?
+  delay_ms               Int      @default(0)
   reply_message          String?
   enabled_clip           Boolean  @default(true)
   enabled_highlight_only Boolean  @default(false)
@@ -180,6 +182,23 @@ model RandomDbdPerkClass {
   updated_at          DateTime      @updatedAt
 
   @@unique([random_dbd_perk_id, type])
+}
+
+model LinkedAccount {
+  id                  String   @id @default(cuid())
+  user_id             String
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  platform            String   // "youtube" | "discord"
+  platform_user_id    String
+  platform_username   String
+  platform_avatar_url String?
+  refresh_token       String?
+  token_expires_at    DateTime?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@unique([user_id, platform])
+  @@unique([platform, platform_user_id])
 }
 
 model DropImage {

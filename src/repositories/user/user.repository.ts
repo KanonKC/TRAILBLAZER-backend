@@ -49,12 +49,15 @@ export default class UserRepository {
         })
     }
 
-    async listExpired(pagination: Pagination): Promise<User[]> {
+    async listExpired(pagination: Pagination, excludeIds: string[] = []): Promise<User[]> {
         const now = new Date()
         return prisma.user.findMany({
             where: {
                 tier_expire_at: {
                     lt: now
+                },
+                id: {
+                    notIn: excludeIds
                 }
             },
             skip: (pagination.page - 1) * pagination.limit,

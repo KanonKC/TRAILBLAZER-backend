@@ -13,7 +13,7 @@ export default class TwitchController {
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
-    async listChannelRewards(req: FastifyRequest, res: FastifyReply) {
+    async listChannelRewards(req: FastifyRequest<{ Querystring: { user_input_required?: string } }>, res: FastifyReply) {
         this.logger.setContext("controller.twitch.getChannelRewards");
         const user = getUserFromRequest(req);
         if (!user) {
@@ -21,8 +21,12 @@ export default class TwitchController {
             return res.status(401).send({ message: "Unauthorized" });
         }
 
+        const { user_input_required } = req.query;
+
         try {
-            const response = await this.twitchService.listChannelRewards(user.twitchId);
+            const response = await this.twitchService.listChannelRewards(user.twitchId, {
+                userInputRequired: user_input_required === "true"
+            });
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
