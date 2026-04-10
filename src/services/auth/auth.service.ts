@@ -91,10 +91,6 @@ export default class AuthService {
         if (!user) {
             throw new NotFoundError("User not found");
         }
-        await this.authRepository.updateTwitchToken(user.id, {
-            twitch_refresh_token: null,
-            twitch_token_expires_at: null,
-        })
         const cacheKey = `auth:twitch_access_token:twitch_id:${user.twitch_id}`;
         await redis.del(cacheKey);
     }
