@@ -9,7 +9,7 @@ import { User } from "generated/prisma/client";
 import TLogger, { Layer } from "@/logging/logger";
 import { GetTierOptions, LoginRequest } from "./request";
 import { generateRefreshToken, signAccessToken } from "@/libs/jwt";
-import { NotFoundError, UnauthorizedError } from "@/errors";
+import { ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
 import { UserTier } from "./constant";
@@ -195,11 +195,18 @@ export default class UserService {
     }
 
     async getTierFromTwitch(twitchId: string): Promise<number> {
-        const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
-        const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
-        if (!subscription) return 0
-        const tier = parseInt(subscription.tier) / 1000
-        return tier
+        try {
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
+            const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
+            if (!subscription) return 0
+            const tier = parseInt(subscription.tier) / 1000
+            return tier
+        } catch (err) {
+            if (String(err).includes("user:read:subscriptions")) {
+                throw new ForbiddenError("This token does not have any of the requested scopes (user:read:subscriptions)")
+            }
+            throw err
+        }
     }
 
     createAccessToken(user: User): string {
@@ -220,28 +227,33 @@ export default class UserService {
             this.logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
         }
-        const user = await this.get(userId)
-        // console.log('user', user)
-        const tier = await this.getTierFromTwitch(user.twitch_id)
-        // console.log('tier', tier)
-        const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
-        this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
-        if (activeWidgets > 1 && tier < 1) {
-            this.logger.info({ message: "Disabling all widgets", data: { userId } });
-            await this.widgetService.disableAll(userId)
-
-            await redis.del(`user:tier:${userId}`)
+        try {
+            const user = await this.get(userId)
+            const tier = await this.getTierFromTwitch(user.twitch_id)
+            const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
+            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
+            if (activeWidgets > 1 && tier < 1) {
+                this.logger.info({ message: "Disabling all widgets", data: { userId } });
+                await this.widgetService.disableAll(userId)
+                await redis.del(`user:tier:${userId}`)
+            }
+            const tierExpireDate = generateTierExpireDate()
+            await this.update(userId, {
+                tier: tier,
+                tier_expire_at: tier === 0 ? null : tierExpireDate
+            })
+        } catch (err) {
+            if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
+                this.logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });
+                await this.widgetService.disableAll(userId)
+                await this.update(userId, {
+                    tier: 0,
+                    tier_expire_at: null
+                })
+            } else {
+                throw err
+            }
         }
-        const tierExpireDate = generateTierExpireDate()
-        // console.log("update", {
-        //     tier: tier,
-        //     tier_expire_at: tier === 0 ? null : tierExpireDate
-        // })
-        await this.update(userId, {
-            tier: tier,
-            tier_expire_at: tier === 0 ? null : tierExpireDate
-        })
-        // console.log("===========================")
     }
 
     async bulkAdjustTierAndWidgets() {
@@ -278,7 +290,8 @@ export default class UserService {
                             data: { userId: u.id },
                             error: err as Error
                         });
-                        console.log("Failed", u.id)
+                        console.log("Failed", u.id, err)
+                        console.log("============================")
                         processedIds.push(u.id);
                     }
                 }))
