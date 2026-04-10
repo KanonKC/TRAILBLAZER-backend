@@ -74,7 +74,7 @@ export default class ClipShoutoutService {
             this.logger.info({ message: "Shoutout cooldown was not expired", data: { event } });
             return
         }
-        await redis.set(cooldownCacheKey, "true", TTL.TEN_SECONDS)
+        await redis.set(cooldownCacheKey, "true", TTL.FIVE_MINUTES)
 
         let csConfig: ClipShoutoutWidget | null = null
         const cacheKey = `clip_shoutout:twitch_id:${event.broadcaster_user_id}`
