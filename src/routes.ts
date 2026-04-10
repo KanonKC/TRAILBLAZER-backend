@@ -88,7 +88,7 @@ const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, u
 const uploadedFileService = new UploadedFileService(uploadedFileRepository);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
-const exportVideoService = new ExportVideoService(exportVideoRepository, userRepository, widgetService, twitchGql);
+const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
