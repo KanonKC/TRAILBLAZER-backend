@@ -84,11 +84,13 @@ export default class AuthService {
     }
 
     async createTwitchUserAPI(userId: string): Promise<ApiClient> {
+        logger.setContext("service.auth.createTwitchUserAPI");
         const token = await this.getTwitchAccessToken(userId)
         return createTwitchUserAPI(token)
     }
 
     async logout(userId: string): Promise<void> {
+        logger.setContext("service.auth.logout");
         const user = await this.userRepository.get(userId);
         if (!user) {
             throw new NotFoundError("User not found");

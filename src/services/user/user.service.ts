@@ -90,6 +90,7 @@ export default class UserService {
     }
 
     async getByTwitchId(twitchId: string): Promise<User> {
+        this.logger.setContext("service.user.getByTwitchId");
         const cacheKey = `user:twitch_id:${twitchId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -104,6 +105,7 @@ export default class UserService {
     }
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+        this.logger.setContext("service.user.refreshToken");
         const userId = await redis.get(`refresh_token:${refreshToken}`);
 
         if (!userId) {
@@ -133,6 +135,7 @@ export default class UserService {
     }
 
     async get(userId: string): Promise<User> {
+        this.logger.setContext("service.user.get");
         const cacheKey = `user:id:${userId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -147,6 +150,7 @@ export default class UserService {
     }
 
     async update(id: string, request: Partial<User>) {
+        this.logger.setContext("service.user.update");
         try {
             const user = await this.userRepository.update(id, request)
             await redis.del(`user:id:${id}`)
@@ -162,6 +166,7 @@ export default class UserService {
     }
 
     async getTier(userId: string, options?: GetTierOptions): Promise<number> {
+        this.logger.setContext("service.user.getTier");
         const cacheKey = `user:tier:${userId}`;
         const cachedTier = await redis.get(cacheKey);
         const forceTwitch = options?.forceTwitch ?? false
@@ -195,6 +200,7 @@ export default class UserService {
     }
 
     async getTierFromTwitch(twitchId: string): Promise<number> {
+        this.logger.setContext("service.user.getTierFromTwitch");
         try {
             const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
             const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
@@ -210,6 +216,7 @@ export default class UserService {
     }
 
     createAccessToken(user: User): string {
+        this.logger.setContext("service.user.createAccessToken");
         const accessToken = signAccessToken({
             id: user.id,
             username: user.username,
@@ -263,7 +270,6 @@ export default class UserService {
             throw new Error("WidgetService is not initialized");
         }
 
-        let page = 1
         const limit = 10;
 
         try {
@@ -274,12 +280,11 @@ export default class UserService {
                 // Since adjusting the tier removes the user from the "expired" list,
                 // we continually query page 1 until no more expired users remain.
                 // We exclude processedIds to avoid infinite loops if some persistent failures occur.
-                const users = await this.userRepository.listExpired({ page, limit }, processedIds);
+                const users = await this.userRepository.listExpired({ page: 1, limit }, processedIds);
 
                 if (users.length === 0) {
                     break;
                 }
-                page++
                 await Promise.all(users.map(async (u) => {
                     try {
 
