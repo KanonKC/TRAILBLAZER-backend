@@ -75,6 +75,7 @@ export default class AuthService {
             })
         } catch (error) {
             logger.error({ message: "Error on updateTwitchToken", error: error as Error });
+            throw error
         }
         await redis.set(cacheKey, newToken.accessToken, TTL.QUARTER_HOUR)
         return newToken.accessToken

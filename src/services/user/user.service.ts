@@ -67,17 +67,10 @@ export default class UserService {
         this.logger.debug({ message: "Creating user request", data: cr });
         const user = await this.userRepository.upsert(cr)
         this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username } });
-        try {
-            await this.authRepository.create(user.id)
-        } catch (error) {
-            this.logger.error({ message: "Login failed" })
-        }
-        this.logger.debug({ message: "Updating twitch token", data: { userId: user.id } });
         await this.authRepository.updateTwitchToken(user.id, {
             twitch_refresh_token: token.refreshToken,
             twitch_token_expires_at: token.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
         })
-
 
         // Create access token
         const accessToken = signAccessToken({
@@ -228,9 +221,9 @@ export default class UserService {
             throw new Error("WidgetService is not initialized");
         }
         const user = await this.get(userId)
-        console.log('user', user)
+        // console.log('user', user)
         const tier = await this.getTierFromTwitch(user.twitch_id)
-        console.log('tier', tier)
+        // console.log('tier', tier)
         const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
         this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
         if (activeWidgets > 1 && tier < 1) {
@@ -240,15 +233,15 @@ export default class UserService {
             await redis.del(`user:tier:${userId}`)
         }
         const tierExpireDate = generateTierExpireDate()
-        console.log("update", {
-            tier: tier,
-            tier_expire_at: tier === 0 ? null : tierExpireDate
-        })
+        // console.log("update", {
+        //     tier: tier,
+        //     tier_expire_at: tier === 0 ? null : tierExpireDate
+        // })
         await this.update(userId, {
             tier: tier,
             tier_expire_at: tier === 0 ? null : tierExpireDate
         })
-        console.log("===========================")
+        // console.log("===========================")
     }
 
     async bulkAdjustTierAndWidgets() {
@@ -270,14 +263,14 @@ export default class UserService {
                 // we continually query page 1 until no more expired users remain.
                 // We exclude processedIds to avoid infinite loops if some persistent failures occur.
                 const users = await this.userRepository.listExpired({ page, limit }, processedIds);
-                console.log("users", users.map(u => u.id))
+                // console.log("users", users.map(u => u.id))
                 if (users.length === 0) {
                     break;
                 }
                 page++
                 await Promise.all(users.map(async (u) => {
                     try {
-                        console.log("Processing", u.id)
+                        // console.log("Processing", u.id)
                         await this.adjustTierAndWidgets(u.id);
                     } catch (err) {
                         this.logger.error({
@@ -285,7 +278,7 @@ export default class UserService {
                             data: { userId: u.id },
                             error: err as Error
                         });
-                        console.log("Failed", u.id, err)
+                        console.log("Failed", u.id)
                         processedIds.push(u.id);
                     }
                 }))
