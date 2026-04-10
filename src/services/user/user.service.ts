@@ -265,6 +265,8 @@ export default class UserService {
 
     async bulkAdjustTierAndWidgets() {
         this.logger.setContext("service.user.bulkAdjustTierAndWidgets");
+        // TODO: For very large user bases, consider implementing a queue-based system 
+        // or more optimized batching to prevent long-running process issues.
         if (!this.widgetService) {
             this.logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
