@@ -97,7 +97,7 @@ export default class WidgetService {
 
     async updateEnable(id: string, userId: string, value: boolean, options: UpdateEnableOptions) {
         this.logger.setContext("service.widget.updateEnable");
-        console.log("updateEnable", id, userId, value, options);
+        this.logger.info({ message: "Updating widget enabled status", data: { id, userId, value, options } });
 
         if (options.forceUpdate && value === true) {
             await this.disableAll(userId)
@@ -105,7 +105,7 @@ export default class WidgetService {
             try {
                 await this.authorizeTierUsage(userId, id, value);
             } catch (error) {
-                console.log("error", error);
+                this.logger.error({ message: "Error authorizing tier usage", error: error as Error });
                 if (error instanceof ForbiddenError) {
                     throw new WidgetQuotaLimitError();
                 }

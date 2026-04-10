@@ -9,7 +9,7 @@ import { User } from "generated/prisma/client";
 import TLogger, { Layer } from "@/logging/logger";
 import { GetTierOptions, LoginRequest } from "./request";
 import { generateRefreshToken, signAccessToken } from "@/libs/jwt";
-import { NotFoundError, UnauthorizedError } from "@/errors";
+import { ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
 import { UserTier } from "./constant";
@@ -67,17 +67,10 @@ export default class UserService {
         this.logger.debug({ message: "Creating user request", data: cr });
         const user = await this.userRepository.upsert(cr)
         this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username } });
-        try {
-            await this.authRepository.create(user.id)
-        } catch (error) {
-            this.logger.error({ message: "Login failed" })
-        }
-        this.logger.debug({ message: "Updating twitch token", data: { userId: user.id } });
         await this.authRepository.updateTwitchToken(user.id, {
             twitch_refresh_token: token.refreshToken,
             twitch_token_expires_at: token.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
         })
-
 
         // Create access token
         const accessToken = signAccessToken({
@@ -97,6 +90,7 @@ export default class UserService {
     }
 
     async getByTwitchId(twitchId: string): Promise<User> {
+        this.logger.setContext("service.user.getByTwitchId");
         const cacheKey = `user:twitch_id:${twitchId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -111,6 +105,7 @@ export default class UserService {
     }
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+        this.logger.setContext("service.user.refreshToken");
         const userId = await redis.get(`refresh_token:${refreshToken}`);
 
         if (!userId) {
@@ -140,6 +135,7 @@ export default class UserService {
     }
 
     async get(userId: string): Promise<User> {
+        this.logger.setContext("service.user.get");
         const cacheKey = `user:id:${userId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -154,6 +150,7 @@ export default class UserService {
     }
 
     async update(id: string, request: Partial<User>) {
+        this.logger.setContext("service.user.update");
         try {
             const user = await this.userRepository.update(id, request)
             await redis.del(`user:id:${id}`)
@@ -169,6 +166,7 @@ export default class UserService {
     }
 
     async getTier(userId: string, options?: GetTierOptions): Promise<number> {
+        this.logger.setContext("service.user.getTier");
         const cacheKey = `user:tier:${userId}`;
         const cachedTier = await redis.get(cacheKey);
         const forceTwitch = options?.forceTwitch ?? false
@@ -202,14 +200,23 @@ export default class UserService {
     }
 
     async getTierFromTwitch(twitchId: string): Promise<number> {
-        const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
-        const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
-        if (!subscription) return 0
-        const tier = parseInt(subscription.tier) / 1000
-        return tier
+        this.logger.setContext("service.user.getTierFromTwitch");
+        try {
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
+            const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
+            if (!subscription) return 0
+            const tier = parseInt(subscription.tier) / 1000
+            return tier
+        } catch (err) {
+            if (String(err).includes("user:read:subscriptions")) {
+                throw new ForbiddenError("This token does not have any of the requested scopes (user:read:subscriptions)")
+            }
+            throw err
+        }
     }
 
     createAccessToken(user: User): string {
+        this.logger.setContext("service.user.createAccessToken");
         const accessToken = signAccessToken({
             id: user.id,
             username: user.username,
@@ -227,21 +234,33 @@ export default class UserService {
             this.logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
         }
-        const user = await this.get(userId)
-        const tier = await this.getTierFromTwitch(user.twitch_id)
-        const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
-        this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
-        if (activeWidgets > 1 && tier < 1) {
-            this.logger.info({ message: "Disabling all widgets", data: { userId } });
-            await this.widgetService.disableAll(userId)
-
-            await redis.del(`user:tier:${userId}`)
+        try {
+            const user = await this.get(userId)
+            const tier = await this.getTierFromTwitch(user.twitch_id)
+            const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
+            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
+            if (activeWidgets > 1 && tier < 1) {
+                this.logger.info({ message: "Disabling all widgets", data: { userId } });
+                await this.widgetService.disableAll(userId)
+                await redis.del(`user:tier:${userId}`)
+            }
+            const tierExpireDate = generateTierExpireDate()
+            await this.update(userId, {
+                tier: tier,
+                tier_expire_at: tier === 0 ? null : tierExpireDate
+            })
+        } catch (err) {
+            if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
+                this.logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });
+                await this.widgetService.disableAll(userId)
+                await this.update(userId, {
+                    tier: 0,
+                    tier_expire_at: null
+                })
+            } else {
+                throw err
+            }
         }
-        const tierExpireDate = generateTierExpireDate()
-        await this.update(userId, {
-            tier: tier,
-            tier_expire_at: tier === 0 ? null : tierExpireDate
-        })
     }
 
     async bulkAdjustTierAndWidgets() {
@@ -256,14 +275,29 @@ export default class UserService {
         try {
             this.logger.info({ message: "Starting bulk user tier adjustment" });
 
+            const processedIds: string[] = [];
             while (true) {
                 // Since adjusting the tier removes the user from the "expired" list,
                 // we continually query page 1 until no more expired users remain.
-                const users = await this.userRepository.listExpired({ page: 1, limit });
+                // We exclude processedIds to avoid infinite loops if some persistent failures occur.
+                const users = await this.userRepository.listExpired({ page: 1, limit }, processedIds);
+
                 if (users.length === 0) {
                     break;
                 }
-                await Promise.all(users.map(u => this.adjustTierAndWidgets(u.id)))
+                await Promise.all(users.map(async (u) => {
+                    try {
+
+                        await this.adjustTierAndWidgets(u.id);
+                    } catch (err) {
+                        this.logger.error({
+                            message: "Failed to adjust tier for user during bulk adjustment",
+                            data: { userId: u.id },
+                            error: err as Error
+                        });
+                        processedIds.push(u.id);
+                    }
+                }))
             }
             this.logger.info({ message: "Completed bulk adjustment" });
         } catch (error) {

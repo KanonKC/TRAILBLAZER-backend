@@ -82,7 +82,6 @@ export default class FirstWordController {
             this.logger.info({ message: "Successfully created first word", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
-            console.log(error)
             this.logger.error({ message: "Failed to create first word", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });

@@ -58,9 +58,9 @@ export default class AuthService {
         if (!auth) {
             auth = await this.authRepository.create(user.id)
         }
-        if (!auth.twitch_refresh_token || (auth.twitch_token_expires_at && now > auth.twitch_token_expires_at)) {
+        if (!auth.twitch_refresh_token) {
             await this.logout(user.id)
-            throw new UnauthorizedError("Refresh token not found or expired");
+            throw new UnauthorizedError("Refresh token not found");
         }
         const newToken = await refreshUserToken(
             this.cfg.twitch.clientId,
@@ -69,31 +69,32 @@ export default class AuthService {
         )
         logger.info({ message: "newToken", data: newToken });
         try {
-            await this.authRepository.updateTwitchToken(auth.id, {
-                twitch_refresh_token: newToken.refreshToken,
-                twitch_token_expires_at: newToken.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
-            })
+            if (auth.twitch_refresh_token !== newToken.refreshToken) {
+                await this.authRepository.updateTwitchToken(auth.id, {
+                    twitch_refresh_token: newToken.refreshToken,
+                    twitch_token_expires_at: newToken.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
+                })
+            }
         } catch (error) {
             logger.error({ message: "Error on updateTwitchToken", error: error as Error });
+            throw error
         }
         await redis.set(cacheKey, newToken.accessToken, TTL.QUARTER_HOUR)
         return newToken.accessToken
     }
 
     async createTwitchUserAPI(userId: string): Promise<ApiClient> {
+        logger.setContext("service.auth.createTwitchUserAPI");
         const token = await this.getTwitchAccessToken(userId)
         return createTwitchUserAPI(token)
     }
 
     async logout(userId: string): Promise<void> {
+        logger.setContext("service.auth.logout");
         const user = await this.userRepository.get(userId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
-        await this.authRepository.updateTwitchToken(user.id, {
-            twitch_refresh_token: null,
-            twitch_token_expires_at: null,
-        })
         const cacheKey = `auth:twitch_access_token:twitch_id:${user.twitch_id}`;
         await redis.del(cacheKey);
     }

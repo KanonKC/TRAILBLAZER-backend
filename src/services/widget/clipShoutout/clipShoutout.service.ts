@@ -130,7 +130,7 @@ export default class ClipShoutoutService {
 
             if (clips.data.length > 0) {
                 const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
-                console.log("Play video", selectedClip.title)
+                this.logger.info({ message: "Playing video clip", data: { title: selectedClip.title, id: selectedClip.id } });
                 const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
                 this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
                 this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });

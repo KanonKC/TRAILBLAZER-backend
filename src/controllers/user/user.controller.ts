@@ -56,7 +56,6 @@ export default class UserController {
             res.redirect(this.cfg.frontendOrigin);
             this.logger.info({ message: "Login successful", data: user });
         } catch (err) {
-            console.log(err);
             if (err instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", data: req.query, error: err.message });
                 return res.status(400).send({ message: "Validation Error", errors: err.issues });
@@ -85,7 +84,6 @@ export default class UserController {
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
             res.send(decoded);
         } catch (err) {
-            console.log("me",err)
             this.logger.warn({ message: "Invalid token", error: err as string | Error });
             return res.status(401).send({ message: "Invalid token" });
         }
