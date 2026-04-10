@@ -275,14 +275,14 @@ export default class UserService {
                 // we continually query page 1 until no more expired users remain.
                 // We exclude processedIds to avoid infinite loops if some persistent failures occur.
                 const users = await this.userRepository.listExpired({ page, limit }, processedIds);
-                // console.log("users", users.map(u => u.id))
+
                 if (users.length === 0) {
                     break;
                 }
                 page++
                 await Promise.all(users.map(async (u) => {
                     try {
-                        // console.log("Processing", u.id)
+
                         await this.adjustTierAndWidgets(u.id);
                     } catch (err) {
                         this.logger.error({
@@ -290,8 +290,6 @@ export default class UserService {
                             data: { userId: u.id },
                             error: err as Error
                         });
-                        console.log("Failed", u.id, err)
-                        console.log("============================")
                         processedIds.push(u.id);
                     }
                 }))
