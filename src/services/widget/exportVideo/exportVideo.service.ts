@@ -52,6 +52,7 @@ export default class ExportVideoService {
 
         const res = await this.exportVideoRepository.create({
             ...request,
+            privacy_status: "UNLISTED"
         });
 
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
@@ -183,7 +184,7 @@ export default class ExportVideoService {
             title: video.title,
             description: config.description || "",
             tags: config.tags,
-            privacyStatus: (config.privacy_status as any) || "PRIVATE",
+            privacyStatus: (config.privacy_status as any) || "UNLISTED",
             doSplit: false
         }]
 
@@ -230,5 +231,28 @@ export default class ExportVideoService {
 
         const latestVideo = video.data[0]
         await this.exportTwitchVideoToYoutube(user.id, latestVideo)
+    }
+
+    async testExport(userId: string): Promise<void> {
+        this.logger.setContext("service.exportVideo.testExport");
+        const user = await this.userService.get(userId);
+        if (!user) {
+            this.logger.warn({ message: "User not found", data: { userId } });
+            throw new NotFoundError("User not found");
+        }
+
+        const videos = await twitchAppAPI.videos.getVideosByUser(user.twitch_id, {
+            limit: 1,
+            orderBy: "time"
+        });
+
+        if (videos.data.length === 0) {
+            this.logger.warn({ message: "No videos found for export", data: { userId, twitchId: user.twitch_id } });
+            throw new Error("ไม่พบวิดีโอล่าสุดบน Twitch สำหรับการส่งออก");
+        }
+
+        const latestVideo = videos.data[0];
+        this.logger.info({ message: "Manually triggering test export", data: { userId, videoId: latestVideo.id } });
+        await this.exportTwitchVideoToYoutube(userId, latestVideo);
     }
 }

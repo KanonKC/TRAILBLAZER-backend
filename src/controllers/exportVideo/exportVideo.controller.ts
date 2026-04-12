@@ -207,4 +207,23 @@ export default class ExportVideoController {
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
+
+    async test(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.exportVideo.test");
+        const user = getUserFromRequest(req);
+        if (!user) {
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        try {
+            await this.service.testExport(user.id);
+            res.status(200).send({ message: "Success" });
+        } catch (error) {
+            console.log("Failed", error)
+            if (error instanceof TError) {
+                return res.status(error.status).send(error.toJSON());
+            }
+            res.status(500).send({ message: error instanceof Error ? error.message : "Internal Server Error" });
+        }
+    }
 }

@@ -221,7 +221,7 @@ model DropImage {
 model ExportVideo {
   id                   String               @id @default(uuid())
   enabled              Boolean              @default(true)
-  privacy_status        String               @default("PRIVATE")
+  privacy_status       String               @default("UNLISTED")
   tags                 String[]             @default([])
   description          String?              @default("")
   widget_id            String               @unique

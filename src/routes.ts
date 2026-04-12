@@ -188,6 +188,7 @@ server.post("/api/v1/export-video/history", exportVideoController.createHistory.
 server.get("/api/v1/export-video/history", exportVideoController.listHistory.bind(exportVideoController));
 server.get("/api/v1/export-video/history/:historyId", exportVideoController.getHistory.bind(exportVideoController));
 server.delete("/api/v1/export-video/history/:historyId", exportVideoController.deleteHistory.bind(exportVideoController));
+server.post("/api/v1/export-video/test", exportVideoController.test.bind(exportVideoController));
 
 server.get("/api/v1/widgets", widgetController.list.bind(widgetController));
 server.get("/api/v1/widgets/first-enabled", widgetController.getFirstEnabled.bind(widgetController));
