@@ -1,7 +1,6 @@
 export interface CreateExportVideo {
     twitch_id: string;
     owner_id: string;
-    overlay_key: string;
     enabled?: boolean;
     privacy_status?: string;
     tags?: string[];
@@ -10,7 +9,6 @@ export interface CreateExportVideo {
 
 export interface UpdateExportVideo {
     enabled?: boolean;
-    overlay_key?: string;
     privacy_status?: string;
     tags?: string[];
     description?: string | null;

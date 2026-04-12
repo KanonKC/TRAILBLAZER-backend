@@ -2,6 +2,7 @@ import { prisma } from "@/libs/prisma";
 import { CreateExportVideo, UpdateExportVideo, CreateExportVideoHistory } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { ExportVideoWithWidget, ExportVideoHistoryResponse } from "./response";
+import { Pagination } from "@/services/response";
 
 export default class ExportVideoRepository {
 
@@ -19,7 +20,6 @@ export default class ExportVideoRepository {
                     create: {
                         twitch_id: request.twitch_id,
                         owner_id: request.owner_id,
-                        overlay_key: request.overlay_key,
                         widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
                     }
                 }
@@ -31,15 +31,8 @@ export default class ExportVideoRepository {
     }
 
     async update(id: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
-        const { overlay_key, privacy_status, tags, description, ...exportVideoData } = request;
+        const { privacy_status, tags, description, ...exportVideoData } = request;
         const updateData: any = { ...exportVideoData };
-        if (overlay_key !== undefined) {
-            updateData.widget = {
-                update: {
-                    overlay_key: overlay_key
-                }
-            };
-        }
 
         if (privacy_status !== undefined) updateData.privacy_status = privacy_status;
         if (tags !== undefined) updateData.tags = tags;
@@ -97,10 +90,12 @@ export default class ExportVideoRepository {
 
     async getByTwitchId(twitchId: string): Promise<ExportVideoWithWidget | null> {
         const widget = await prisma.widget.findUniqueOrThrow({
-            where:{ twitch_id_widget_type_slug: {
-                twitch_id: twitchId,
-                widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
-            }}
+            where: {
+                twitch_id_widget_type_slug: {
+                    twitch_id: twitchId,
+                    widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
+                }
+            }
         });
         return prisma.exportVideo.findUnique({
             where: { widget_id: widget.id },
@@ -109,7 +104,7 @@ export default class ExportVideoRepository {
             }
         });
     }
-                
+
 
     // ExportVideoHistory CRUD
     async createHistory(request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
@@ -124,11 +119,18 @@ export default class ExportVideoRepository {
         });
     }
 
-    async listHistoryByExportVideoId(exportVideoId: string): Promise<ExportVideoHistoryResponse[]> {
-        return prisma.exportVideoHistory.findMany({
-            where: { export_video_id: exportVideoId },
-            orderBy: { created_at: "desc" }
+    async listHistoryByExportVideoId(exportVideoId: string, pagination: Pagination): Promise<[ExportVideoHistoryResponse[], number]> {
+        const where = { export_video_id: exportVideoId };
+        const data = await prisma.exportVideoHistory.findMany({
+            where,
+            orderBy: { created_at: "desc" },
+            skip: (pagination.page - 1) * pagination.limit,
+            take: pagination.limit,
         });
+        const total = await prisma.exportVideoHistory.count({
+            where
+        });
+        return [data, total];
     }
 
     async getHistory(id: number): Promise<ExportVideoHistoryResponse | null> {

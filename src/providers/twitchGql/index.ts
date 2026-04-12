@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import Configurations from "@/config/index";
-import { TwitchClipResponse } from "./response";
+import { ExportVideoToYoutubeResponse, TwitchClipResponse } from "./response";
 import { ExportVideoToYoutubeRequest } from "./request";
 
 export default class TwitchGql {
@@ -54,9 +54,9 @@ export default class TwitchGql {
         }
     }
 
-    async exportVideosToYoutube(req: ExportVideoToYoutubeRequest[]) {
+    async exportVideosToYoutube(req: ExportVideoToYoutubeRequest[]): Promise<ExportVideoToYoutubeResponse[]> {
         const body = req.map(r => ({
-            "operationName": "VideoAccessToken_Clip",
+            "operationName": "YoutubeExportModal_ExportVideoToYoutube",
             "variables": {
                 "input": {
                     "videoID": r.videoId,
@@ -70,15 +70,16 @@ export default class TwitchGql {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": this.cfg.twitchGql.sha256Hash
+                    "sha256Hash": this.cfg.twitchGql.exportVideo.sha256Hash
                 }
             }
         }))
         const response = await this.api.post("/", body, {
             headers: {
-                "Authorization": "OAuth upyekv4llnb8824qp966t0ydz7m5jp"
+                "Authorization": `OAuth ${this.cfg.twitchGql.exportVideo.oAuth}`
             }
         });
+
         return response.data;
     }
 }

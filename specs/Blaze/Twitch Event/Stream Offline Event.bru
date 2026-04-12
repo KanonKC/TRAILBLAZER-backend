@@ -1,0 +1,27 @@
+meta {
+  name: Stream Offline Event
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BaseURL}}/webhook/v1/twitch/event-sub/stream-offline
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "subscription": {
+      "status": "enabled"
+    },
+    "event": {
+      "broadcaster_user_id": "135783794"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

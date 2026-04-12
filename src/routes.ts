@@ -4,6 +4,7 @@ import ClipShoutoutController from "./controllers/clipShoutout/clipShoutout.cont
 import FirstWordController from "./controllers/firstWord/firstWord.controller";
 import RandomDbdPerkController from "./controllers/randomDbdPerk/randomDbdPerk.controller";
 import UserController from "./controllers/user/user.controller";
+import ExportVideoController from "./controllers/exportVideo/exportVideo.controller";
 import AdminController from "./controllers/admin/admin.controller";
 import WidgetController from "./controllers/widget/widget.controller";
 import DropImageController from "./controllers/dropImage/dropImage.controller";
@@ -108,6 +109,7 @@ const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
 const linkedAccountController = new LinkedAccountController(linkedAccountService);
 const twitchGqlController = new TwitchGqlController(twitchGql);
+const exportVideoController = new ExportVideoController(exportVideoService);
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService)
@@ -177,6 +179,15 @@ server.get("/api/v1/drop-image", dropImageController.get.bind(dropImageControlle
 server.put("/api/v1/drop-image", dropImageController.update.bind(dropImageController));
 server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bind(dropImageController));
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
+
+server.post("/api/v1/export-video", exportVideoController.create.bind(exportVideoController));
+server.get("/api/v1/export-video", exportVideoController.get.bind(exportVideoController));
+server.put("/api/v1/export-video", exportVideoController.update.bind(exportVideoController));
+server.delete("/api/v1/export-video", exportVideoController.delete.bind(exportVideoController));
+server.post("/api/v1/export-video/history", exportVideoController.createHistory.bind(exportVideoController));
+server.get("/api/v1/export-video/history", exportVideoController.listHistory.bind(exportVideoController));
+server.get("/api/v1/export-video/history/:historyId", exportVideoController.getHistory.bind(exportVideoController));
+server.delete("/api/v1/export-video/history/:historyId", exportVideoController.deleteHistory.bind(exportVideoController));
 
 server.get("/api/v1/widgets", widgetController.list.bind(widgetController));
 server.get("/api/v1/widgets/first-enabled", widgetController.getFirstEnabled.bind(widgetController));

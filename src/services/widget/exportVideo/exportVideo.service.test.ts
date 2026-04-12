@@ -1,6 +1,6 @@
 import ExportVideoService from "./exportVideo.service";
 import ExportVideoRepository from "@/repositories/exportVideo/exportVideo.repository";
-import UserRepository from "@/repositories/user/user.repository";
+import UserService from "@/services/user/user.service";
 import WidgetService from "../widget.service";
 import { NotFoundError } from "@/errors";
 import TwitchGql from "@/providers/twitchGql";
@@ -14,7 +14,7 @@ jest.mock("crypto", () => ({
 describe("ExportVideoService", () => {
     let service: ExportVideoService;
     let mockExportVideoRepo: jest.Mocked<ExportVideoRepository>;
-    let mockUserRepo: jest.Mocked<UserRepository>;
+    let mockUserService: jest.Mocked<UserService>;
     let mockWidgetService: jest.Mocked<WidgetService>;
     let mockTwitchGql: jest.Mocked<TwitchGql>;
 
@@ -30,7 +30,7 @@ describe("ExportVideoService", () => {
             getHistory: jest.fn(),
             deleteHistory: jest.fn(),
         } as any;
-        mockUserRepo = {
+        mockUserService = {
             get: jest.fn(),
         } as any;
         mockWidgetService = {
@@ -43,7 +43,7 @@ describe("ExportVideoService", () => {
 
         service = new ExportVideoService(
             mockExportVideoRepo,
-            mockUserRepo,
+            mockUserService,
             mockWidgetService,
             mockTwitchGql
         );
@@ -54,19 +54,18 @@ describe("ExportVideoService", () => {
         const request = { 
             owner_id: "user_1", 
             twitch_id: "twitch_1", 
-            overlay_key: "key_1",
             privacy_status: "UNLISTED",
             tags: ["test"],
             description: "test description"
         };
 
         it("should create export video successfully", async () => {
-            mockUserRepo.get.mockResolvedValue({ id: "user_1" } as any);
+            mockUserService.get.mockResolvedValue({ id: "user_1" } as any);
             mockExportVideoRepo.create.mockResolvedValue({ id: "ev_1", widget_id: "widget_1" } as any);
 
             const result = await service.create(request);
 
-            expect(mockUserRepo.get).toHaveBeenCalledWith(request.owner_id);
+            expect(mockUserService.get).toHaveBeenCalledWith(request.owner_id);
             expect(mockExportVideoRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 privacy_status: "UNLISTED",
                 tags: ["test"],
@@ -77,7 +76,7 @@ describe("ExportVideoService", () => {
         });
 
         it("should throw NotFoundError if user not found", async () => {
-            mockUserRepo.get.mockResolvedValue(null);
+            mockUserService.get.mockRejectedValue(new NotFoundError("User not found"));
             await expect(service.create(request)).rejects.toThrow(NotFoundError);
         });
     });
@@ -141,10 +140,12 @@ describe("ExportVideoService", () => {
         });
 
         it("should create history successfully", async () => {
+            const mockConfig = { id: "ev_1", widget: { id: "w_1" } };
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
             mockExportVideoRepo.createHistory.mockResolvedValue({ id: 1 } as any);
-            const request = { batch_id: "b1", video_id: "v1", status: "PENDING" };
+            const request = { batch_id: "b1", video_id: "v1", status: "PENDING" } as any;
 
-            await service.createHistory("user_1", "ev_1", request);
+            await service.createHistory("user_1", request);
 
             expect(mockExportVideoRepo.createHistory).toHaveBeenCalledWith({
                 ...request,
@@ -153,12 +154,16 @@ describe("ExportVideoService", () => {
         });
 
         it("should list history successfully", async () => {
-            mockExportVideoRepo.listHistoryByExportVideoId.mockResolvedValue([{ id: 1 }] as any);
+            const mockConfig = { id: "ev_1", widget: { id: "w_1" } };
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
+            mockExportVideoRepo.listHistoryByExportVideoId.mockResolvedValue([[{ id: 1 }], 1] as any);
 
-            const result = await service.listHistory("user_1", "ev_1");
+            const pagination = { page: 1, limit: 10 };
+            const result = await service.listHistory("user_1", pagination);
 
-            expect(result).toHaveLength(1);
-            expect(mockExportVideoRepo.listHistoryByExportVideoId).toHaveBeenCalledWith("ev_1");
+            expect(result.data).toHaveLength(1);
+            expect(result.pagination.total).toBe(1);
+            expect(mockExportVideoRepo.listHistoryByExportVideoId).toHaveBeenCalledWith("ev_1", pagination);
         });
 
         it("should get history successfully", async () => {

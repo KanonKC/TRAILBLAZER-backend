@@ -11,6 +11,7 @@ import { HelixVideo } from "@twurple/api";
 import { randomBytes } from "crypto";
 import WidgetService from "../widget.service";
 import { CreateExportVideo, CreateExportVideoHistory, UpdateExportVideo } from "./request";
+import { ListResponse, Pagination } from "@/services/response";
 
 export default class ExportVideoService {
     private readonly exportVideoRepository: ExportVideoRepository;
@@ -48,10 +49,9 @@ export default class ExportVideoService {
             const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-offline")
             await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
         }
-        
+
         const res = await this.exportVideoRepository.create({
             ...request,
-            overlay_key: randomBytes(16).toString("hex")
         });
 
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
@@ -98,9 +98,9 @@ export default class ExportVideoService {
     }
 
     // ExportVideoHistory methods
-    async createHistory(userId: string, exportVideoId: string, request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
+    async createHistory(userId: string, request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
         this.logger.setContext("service.exportVideo.createHistory");
-        const existing = await this.exportVideoRepository.get(exportVideoId);
+        const existing = await this.exportVideoRepository.getByOwnerId(userId);
         if (!existing) {
             throw new NotFoundError("Export video config not found");
         }
@@ -108,21 +108,29 @@ export default class ExportVideoService {
 
         const res = await this.exportVideoRepository.createHistory({
             ...request,
-            export_video_id: exportVideoId,
+            export_video_id: existing.id,
         });
-        this.logger.info({ message: "Export video history created successfully", data: { export_video_id: exportVideoId, userId } });
+        this.logger.info({ message: "Export video history created successfully", data: { export_video_id: existing.id, userId } });
         return res;
     }
 
-    async listHistory(userId: string, exportVideoId: string): Promise<ExportVideoHistoryResponse[]> {
+    async listHistory(userId: string, pagination: Pagination): Promise<ListResponse<ExportVideoHistoryResponse>> {
         this.logger.setContext("service.exportVideo.listHistory");
-        const existing = await this.exportVideoRepository.get(exportVideoId);
-        if (!existing) {
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
+        await this.widgetService.authorizeOwnership(userId, config.widget.id);
 
-        return this.exportVideoRepository.listHistoryByExportVideoId(exportVideoId);
+        const [data, total] = await this.exportVideoRepository.listHistoryByExportVideoId(config.id, pagination);
+
+        return {
+            data,
+            pagination: {
+                ...pagination,
+                total
+            }
+        };
     }
 
     async getHistory(userId: string, historyId: number): Promise<ExportVideoHistoryResponse | null> {
@@ -158,24 +166,24 @@ export default class ExportVideoService {
         this.logger.info({ message: "Export video history deleted successfully", data: { historyId, userId } });
     }
 
-    async exportTwitchVideoToYoutube(userId:string, video: HelixVideo): Promise<void> {
+    async exportTwitchVideoToYoutube(userId: string, video: HelixVideo): Promise<void> {
 
-        const exportVideoConfig = await this.getByUserId(userId)
+        const config = await this.getByUserId(userId)
 
-        if (!exportVideoConfig) {
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
 
-        if (!exportVideoConfig.widget.enabled) {
+        if (!config.widget.enabled) {
             return
         }
 
         const req: ExportVideoToYoutubeRequest[] = [{
             videoId: video.id,
             title: video.title,
-            description: exportVideoConfig.description || "",
-            tags: exportVideoConfig.tags,
-            privacyStatus: (exportVideoConfig.privacy_status as any) || "PRIVATE",
+            description: config.description || "",
+            tags: config.tags,
+            privacyStatus: (config.privacy_status as any) || "PRIVATE",
             doSplit: false
         }]
 
@@ -186,12 +194,20 @@ export default class ExportVideoService {
         }
 
         try {
-            await this.twitchGql.exportVideosToYoutube(req)
-            this.createHistory(userId, exportVideoConfig.id, reqLog)
+            const res = await this.twitchGql.exportVideosToYoutube(req)
+            const result = res[0]
+            if (result.errors) {
+                reqLog.status = "FAILED"
+                reqLog.message = JSON.stringify(result.errors)
+            }
+            if (result.data) {
+                reqLog.message = JSON.stringify(result.data)
+            }
+            this.createHistory(userId, reqLog)
         } catch (err) {
             reqLog.status = "FAILED"
             reqLog.message = String(err)
-            this.createHistory(userId, exportVideoConfig.id, reqLog)
+            this.createHistory(userId, reqLog)
         }
     }
 
