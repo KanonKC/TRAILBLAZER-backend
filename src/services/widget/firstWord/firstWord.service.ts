@@ -56,6 +56,12 @@ export default class FirstWordService {
             await twitchAppAPI.eventSub.subscribeToStreamOnlineEvents(user.twitch_id, tsp)
         }
 
+        const streamOfflineSubs = enabledSubs.filter(sub => sub.type === 'stream.offline')
+        if (streamOfflineSubs.length === 0) {
+            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-offline")
+            await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
+        }
+
         const res = await this.firstWordRepository.create({
             ...request,
             reply_message: "สวัสดี {{user_name}} ยินดีต้อนรับเข้าสู่สตรีม!",

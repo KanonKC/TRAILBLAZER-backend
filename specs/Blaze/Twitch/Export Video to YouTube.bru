@@ -1,0 +1,31 @@
+meta {
+  name: Export Video to YouTube
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BaseURL}}/api/v1/twitch/export-videos
+  body: json
+  auth: inherit
+}
+
+body:json {
+  [
+    {
+      "videoId": "1131285667",
+      "title": "Test Export from Blaze",
+      "description": "Test description",
+      "tags": ["test", "blaze"],
+      "privacyStatus": "PRIVATE",
+      "doSplit": false
+    }
+  ]
+  
+  // 1131285667
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,62 @@
+meta {
+  name: test
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://gql.twitch.tv/gql#origin=twilight
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: OAuth upyekv4llnb8824qp966t0ydz7m5jp
+  ~Accept-Encoding: gzip, deflate, br, zstd
+  ~User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0
+  ~Accept: */*
+  ~Accept-Language: en-US
+  ~Referer: https://dashboard.twitch.tv/
+  ~Client-Id: kimne78kx3ncx6brgo4mv6wki5h1ko
+  ~X-Device-Id: e3k04RG8YV8AtOFSav7sltI7ur3hlBLS
+  ~Client-Version: bb20717f-bafe-4854-92db-64e522efc13d
+  ~Client-Session-Id: 320b352e6f2f4574
+  ~Client-Integrity: v4.local.y4UABnplgEIO1ON-v15BmL4XdXIDzNxFmdxzVU2Pt-JS2WxdtgiqzmZQjwZ5Neaec06xinxppw6bfKyVgS6Zqqm5vnBs30G5KW5XxFg17tE5mHBVslTpVX8s7kO1oRdQBsDV_kHQfORc4BtUuIrGxsWgjR_AqtCM5iShSVXoTgy5Gf4X07i4V-9B-HFOfPta4iqBzRoiJr1TYZ8aBZeEErZDU0nAGtdwmu2UD953yAcL8d5R6FoLrbTS5y0Ok1m5vkFFbFVKIlr1Uhu1UG6Yezeo7Yz6JMzncvjt3oFAw4LrAFCAXNUYdhVWy2ddjVyi0ARq19SAVQ8n6fxhTgh6q_7Tj4FInr_4FeQ7Mg0ZZ0_QgTRlXitGf3zpXE8MDPoa32ldm5F-RJ3GeNZ06GftyWjVbq3toMUEm8btrwaN549E22gjJX_edOqRdxBDKfBah6IF4t8ZwMN5kiJQ
+  ~Content-Type: text/plain;charset=UTF-8
+  ~Origin: https://dashboard.twitch.tv
+  ~Connection: keep-alive
+  ~Sec-Fetch-Dest: empty
+  ~Sec-Fetch-Mode: cors
+  ~Sec-Fetch-Site: same-site
+  ~Priority: u=4
+  ~TE: trailers
+}
+
+body:json {
+  [
+    {
+      "operationName": "YoutubeExportModal_ExportVideoToYoutube",
+      "variables": {
+        "input": {
+          "videoID": "1160134893",
+          "title": "DDD",
+          "description": "asd",
+          "tags": null,
+          "privacyStatus": "UNLISTED",
+          "doSplit": false
+        }
+      },
+      "extensions": {
+        "persistedQuery": {
+          "version": 1,
+          "sha256Hash": "e9bd10425b3fdaa190dd0024db34dc9a348ec4d02434c0487acbe58eea79ac20"
+        }
+      }
+    }
+  ]
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

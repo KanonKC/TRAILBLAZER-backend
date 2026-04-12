@@ -11,19 +11,19 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  twitch_id      String         @unique
-  username       String
-  display_name   String
-  avatar_url     String?
-  tier           Int            @default(0)
-  tier_expire_at DateTime?
-  created_at     DateTime       @default(now())
-  updated_at     DateTime       @updatedAt
-  auth           Auth?
-  workflows      Workflow[]
-  triggers       Trigger[]
-  widgets        Widget[]
+  id              String          @id @default(cuid())
+  twitch_id       String          @unique
+  username        String
+  display_name    String
+  avatar_url      String?
+  tier            Int             @default(0)
+  tier_expire_at  DateTime?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+  auth            Auth?
+  workflows       Workflow[]
+  triggers        Trigger[]
+  widgets         Widget[]
   uploaded_files  UploadedFile[]
   linked_accounts LinkedAccount[]
 }
@@ -89,6 +89,7 @@ model Widget {
   widget_type      WidgetType?    @relation(fields: [widget_type_slug], references: [slug])
   randomDbdPerk    RandomDbdPerk?
   dropImage        DropImage?
+  exportVideo      ExportVideo?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -185,17 +186,17 @@ model RandomDbdPerkClass {
 }
 
 model LinkedAccount {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   user_id             String
-  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  platform            String   // "youtube" | "discord"
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  platform            String // "youtube" | "discord"
   platform_user_id    String
   platform_username   String
   platform_avatar_url String?
   refresh_token       String?
   token_expires_at    DateTime?
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
   @@unique([user_id, platform])
   @@unique([platform, platform_user_id])
@@ -215,4 +216,29 @@ model DropImage {
   widget                 Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at             DateTime @default(now())
   updated_at             DateTime @updatedAt
+}
+
+model ExportVideo {
+  id                   String               @id @default(uuid())
+  enabled              Boolean              @default(true)
+  privacy_status       String               @default("UNLISTED")
+  tags                 String[]             @default([])
+  description          String?              @default("")
+  widget_id            String               @unique
+  widget               Widget               @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+  exportVideoHistories ExportVideoHistory[]
+}
+
+model ExportVideoHistory {
+  id              Int         @id @default(autoincrement())
+  batch_id        String?
+  video_id        String
+  status          String
+  message         String?
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  export_video_id String
+  export_video    ExportVideo @relation(fields: [export_video_id], references: [id], onDelete: Cascade)
 }

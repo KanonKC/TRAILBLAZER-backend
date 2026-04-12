@@ -18,7 +18,11 @@ const config: Configurations = {
     },
     twitchGql: {
         clientId: process.env.TWITCH_GQL_CLIENT_ID || "",
-        sha256Hash: process.env.TWITCH_GQL_SHA256_HASH || ""
+        sha256Hash: process.env.TWITCH_GQL_SHA256_HASH || "",
+        exportVideo: {
+            sha256Hash: process.env.TWITCH_GQL_EXPORT_VIDEO_SHA256_HASH || "",
+            oAuth: process.env.TWITCH_GQL_EXPORT_VIDEO_OAUTH || ""
+        }
     },
     sightengine: {
         apiUser: process.env.SIGHTENGINE_API_USER || "",

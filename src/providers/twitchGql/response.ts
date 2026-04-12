@@ -28,3 +28,23 @@ export interface TwitchClipResponse {
         requestID: string;
     };
 }
+
+export interface ExportVideoToYoutubeResponse {
+    data?: {
+        exportVideoToYoutube: {
+            video: {
+                id: string;
+                __typename: string;
+            };
+            __typename: string;
+        };
+    };
+    errors?: {
+        message: string;
+    }[];
+    extensions: {
+        durationMilliseconds: number;
+        operationName: string;
+        requestID: string;
+    };
+}

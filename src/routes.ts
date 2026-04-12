@@ -4,11 +4,13 @@ import ClipShoutoutController from "./controllers/clipShoutout/clipShoutout.cont
 import FirstWordController from "./controllers/firstWord/firstWord.controller";
 import RandomDbdPerkController from "./controllers/randomDbdPerk/randomDbdPerk.controller";
 import UserController from "./controllers/user/user.controller";
+import ExportVideoController from "./controllers/exportVideo/exportVideo.controller";
 import AdminController from "./controllers/admin/admin.controller";
 import WidgetController from "./controllers/widget/widget.controller";
 import DropImageController from "./controllers/dropImage/dropImage.controller";
 import TwitchChannelChatMessageEvent from "./events/twitch/channelChatMessage/channelChatMessage.event";
 import UploadedFileController from "./controllers/uploadedFile/uploadedFile.controller";
+import ExportVideoRepository from "./repositories/exportVideo/exportVideo.repository";
 import TwitchChannelChatNotificationEvent from "./events/twitch/channelChatNotification/channelChatNotification.event";
 import FirstWordRepository from "./repositories/firstWord/firstWord.repository";
 import RandomDbdPerkRepository from "./repositories/randomDbdPerk/randomDbdPerk.repository";
@@ -22,6 +24,7 @@ import RandomDbdPerkService from "./services/widget/randomDbdPerk/randomDbdPerk.
 import UserService from "./services/user/user.service";
 import WidgetService from "./services/widget/widget.service";
 import DropImageService from "./services/widget/dropImage/dropImage.service";
+import ExportVideoService from "./services/widget/exportVideo/exportVideo.service";
 import { UploadedFileService } from "./services/uploadedFile/uploadedFile.service";
 
 import cookie from "@fastify/cookie";
@@ -33,8 +36,10 @@ import DropImageEventController from "./controllers/dropImage/dropImage.event.co
 import FirstWordEventController from "./controllers/firstWord/firstWord.event.controller";
 import SystemController from "./controllers/system/system.controller";
 import TwitchController from "./controllers/twitch/twitch.controller";
+import TwitchGqlController from "./controllers/twitch/twitch-gql.controller";
 import TwitchChannelRedemptionAddEvent from "./events/twitch/channelRedemptionAdd/channelRedemptionAdd.event";
 import TwitchStreamOnlineEvent from "./events/twitch/streamOnline/streamOnline.event";
+import TwitchStreamOfflineEvent from "./events/twitch/streamOffline/streamOffline.event";
 import TwitchGql from "./providers/twitchGql";
 import AuthRepository from "./repositories/auth/auth.repository";
 import ClipShoutoutRepository from "./repositories/clipShoutout/clipShoutout.repository";
@@ -67,6 +72,7 @@ const randomDbdPerkRepository = new RandomDbdPerkRepository();
 const widgetRepository = new WidgetRepository();
 const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
+const exportVideoRepository = new ExportVideoRepository();
 
 // Service Layer
 const systemService = new SystemService();
@@ -83,6 +89,7 @@ const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, u
 const uploadedFileService = new UploadedFileService(uploadedFileRepository);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
+const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
@@ -101,10 +108,13 @@ const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
 const linkedAccountController = new LinkedAccountController(linkedAccountService);
+const twitchGqlController = new TwitchGqlController(twitchGql);
+const exportVideoController = new ExportVideoController(exportVideoService);
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService)
 const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService);
+const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService);
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(clipShoutoutService);
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService);
 
@@ -171,6 +181,16 @@ server.put("/api/v1/drop-image", dropImageController.update.bind(dropImageContro
 server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bind(dropImageController));
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
 
+server.post("/api/v1/export-video", exportVideoController.create.bind(exportVideoController));
+server.get("/api/v1/export-video", exportVideoController.get.bind(exportVideoController));
+server.put("/api/v1/export-video", exportVideoController.update.bind(exportVideoController));
+server.delete("/api/v1/export-video", exportVideoController.delete.bind(exportVideoController));
+server.post("/api/v1/export-video/history", exportVideoController.createHistory.bind(exportVideoController));
+server.get("/api/v1/export-video/history", exportVideoController.listHistory.bind(exportVideoController));
+server.get("/api/v1/export-video/history/:historyId", exportVideoController.getHistory.bind(exportVideoController));
+server.delete("/api/v1/export-video/history/:historyId", exportVideoController.deleteHistory.bind(exportVideoController));
+server.post("/api/v1/export-video/test", exportVideoController.test.bind(exportVideoController));
+
 server.get("/api/v1/widgets", widgetController.list.bind(widgetController));
 server.get("/api/v1/widgets/first-enabled", widgetController.getFirstEnabled.bind(widgetController));
 server.get("/api/v1/widgets/validate-overlay/:key", widgetController.validateOverlayAccess.bind(widgetController));
@@ -186,6 +206,7 @@ server.delete("/api/v1/uploaded-files/:id", uploadedFileController.delete.bind(u
 
 server.get("/api/v1/twitch/channel-rewards", twitchController.listChannelRewards.bind(twitchController));
 server.get("/api/v1/twitch/user", twitchController.getUser.bind(twitchController));
+server.post("/api/v1/twitch/export-videos", twitchGqlController.exportVideoToYoutube.bind(twitchGqlController));
 
 server.get("/api/v1/linked-accounts", linkedAccountController.list.bind(linkedAccountController));
 server.post("/api/v1/linked-accounts/:platform/bind", linkedAccountController.bind.bind(linkedAccountController));
@@ -198,6 +219,7 @@ server.get("/api/v1/events/drop-image/:userId", dropImageEventController.sse.bin
 
 server.post("/webhook/v1/twitch/event-sub/channel-chat-message", twitchChannelChatMessageEvent.handle.bind(twitchChannelChatMessageEvent))
 server.post("/webhook/v1/twitch/event-sub/stream-online", twitchStreamOnlineEvent.handle.bind(twitchStreamOnlineEvent))
+server.post("/webhook/v1/twitch/event-sub/stream-offline", twitchStreamOfflineEvent.handle.bind(twitchStreamOfflineEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-chat-notification", twitchChannelChatNotificationEvent.handle.bind(twitchChannelChatNotificationEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-redemption-add", twitchChannelRedemptionAddEvent.handle.bind(twitchChannelRedemptionAddEvent))
 
