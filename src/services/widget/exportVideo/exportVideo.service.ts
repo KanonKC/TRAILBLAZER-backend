@@ -168,6 +168,7 @@ export default class ExportVideoService {
     }
 
     async exportTwitchVideoToYoutube(userId: string, video: HelixVideo): Promise<void> {
+        this.logger.setContext("service.exportVideo.exportTwitchVideoToYoutube");
 
         const config = await this.getByUserId(userId)
 
@@ -204,15 +205,16 @@ export default class ExportVideoService {
             if (result.data) {
                 reqLog.message = JSON.stringify(result.data)
             }
-            this.createHistory(userId, reqLog)
+            await this.createHistory(userId, reqLog)
         } catch (err) {
             reqLog.status = "FAILED"
             reqLog.message = String(err)
-            this.createHistory(userId, reqLog)
+            await this.createHistory(userId, reqLog)
         }
     }
 
     async onTwitchStreamOffline(e: TwitchStreamOfflineEventRequest): Promise<void> {
+        this.logger.setContext("service.exportVideo.onTwitchStreamOffline");
         const twitchId = e.broadcaster_user_id
         const user = await this.userService.getByTwitchId(twitchId)
         if (!user) {

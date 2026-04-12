@@ -136,14 +136,18 @@ export default class ExportVideoController {
         try {
             const body = createExportVideoHistorySchema.parse(req.body);
             const created = await this.service.createHistory(user.id, body);
+            this.logger.info({ message: "Successfully created export video history", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
             if (error instanceof z.ZodError) {
+                this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
+            this.logger.error({ message: "Failed to create export video history", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
@@ -161,11 +165,14 @@ export default class ExportVideoController {
             const limit = parseInt(query.limit || "10");
 
             const history = await this.service.listHistory(user.id, { page, limit });
+            this.logger.info({ message: "Successfully listed export video history", data: { userId: user.id, page, limit } });
             res.send(history);
         } catch (error) {
             if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
+            this.logger.error({ message: "Failed to list export video history", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
@@ -180,11 +187,14 @@ export default class ExportVideoController {
         const { historyId } = req.params as { historyId: string };
         try {
             const entry = await this.service.getHistory(user.id, parseInt(historyId));
+            this.logger.info({ message: "Successfully retrieved export video history", data: { userId: user.id, historyId } });
             res.send(entry);
         } catch (error) {
             if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id, historyId }, error });
                 return res.status(error.status).send(error.toJSON());
             }
+            this.logger.error({ message: "Failed to get export video history", data: { userId: user.id, historyId }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
@@ -199,11 +209,14 @@ export default class ExportVideoController {
         const { historyId } = req.params as { historyId: string };
         try {
             await this.service.deleteHistory(user.id, parseInt(historyId));
+            this.logger.info({ message: "Successfully deleted export video history", data: { userId: user.id, historyId } });
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id, historyId }, error });
                 return res.status(error.status).send(error.toJSON());
             }
+            this.logger.error({ message: "Failed to delete export video history", data: { userId: user.id, historyId }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
@@ -217,12 +230,14 @@ export default class ExportVideoController {
 
         try {
             await this.service.testExport(user.id);
+            this.logger.info({ message: "Successfully triggered manual test export", data: { userId: user.id } });
             res.status(200).send({ message: "Success" });
         } catch (error) {
-            console.log("Failed", error)
             if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
+            this.logger.error({ message: "Failed to test export video", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: error instanceof Error ? error.message : "Internal Server Error" });
         }
     }
