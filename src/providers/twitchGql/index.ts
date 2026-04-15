@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import Configurations from "@/config/index";
-import { TwitchClipResponse } from "./response";
+import { ExportVideoToYoutubeResponse, TwitchClipResponse } from "./response";
+import { ExportVideoToYoutubeRequest } from "./request";
 
 export default class TwitchGql {
     private readonly endpoint: string = "https://gql.twitch.tv/gql";
@@ -51,5 +52,34 @@ export default class TwitchGql {
         } else {
             throw new Error("No suitable video quality found.");
         }
+    }
+
+    async exportVideosToYoutube(req: ExportVideoToYoutubeRequest[]): Promise<ExportVideoToYoutubeResponse[]> {
+        const body = req.map(r => ({
+            "operationName": "YoutubeExportModal_ExportVideoToYoutube",
+            "variables": {
+                "input": {
+                    "videoID": r.videoId,
+                    "title": r.title,
+                    "description": r.description || "",
+                    "tags": r.tags || [],
+                    "privacyStatus": r.privacyStatus || "PRIVATE",
+                    "doSplit": r.doSplit || false
+                }
+            },
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": this.cfg.twitchGql.exportVideo.sha256Hash
+                }
+            }
+        }))
+        const response = await this.api.post("/", body, {
+            headers: {
+                "Authorization": `OAuth ${this.cfg.twitchGql.exportVideo.oAuth}`
+            }
+        });
+
+        return response.data;
     }
 }

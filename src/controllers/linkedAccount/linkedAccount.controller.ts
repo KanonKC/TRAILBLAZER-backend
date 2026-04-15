@@ -48,7 +48,7 @@ export default class LinkedAccountController {
             const linkedAccount = await this.linkedAccountService.bindAccount(user.id, platform, code, code_verifier);
             this.logger.info({ message: "Account bound", data: { userId: user.id, platform } });
             res.send(linkedAccount);
-        } catch (err) {
+        } catch (err) { 
             if (err instanceof TError) {
                 this.logger.error({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());

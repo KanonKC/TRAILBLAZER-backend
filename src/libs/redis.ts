@@ -9,6 +9,8 @@ import { createClient, SetOptions } from "redis";
 
 export const TTL = {
     TEN_SECONDS: { expiration: { type: "EX", value: 10 } },
+    ONE_MINUTE: { expiration: { type: "EX", value: 60 } },
+    FIVE_MINUTES: { expiration: { type: "EX", value: 60 * 5 } },
     TWO_HOURS: { expiration: { type: "EX", value: 60 * 60 * 2 } },
     ONE_HOUR: { expiration: { type: "EX", value: 60 * 60 } },
     ONE_WEEK: { expiration: { type: "EX", value: 60 * 60 * 24 * 7 } },

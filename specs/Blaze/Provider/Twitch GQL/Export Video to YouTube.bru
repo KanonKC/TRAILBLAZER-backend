@@ -1,0 +1,44 @@
+meta {
+  name: Export Video to YouTube
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{TwitchGQLBaseURL}}#origin=twilight
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: OAuth upyekv4llnb8824qp966t0ydz7m5jp
+}
+
+body:json {
+  [
+    {
+      "operationName": "YoutubeExportModal_ExportVideoToYoutube",
+      "variables": {
+        "input": {
+          "videoID": "1160134893",
+          "title": "From Bruno",
+          "description": "asd",
+          "tags": null,
+          "privacyStatus": "UNLISTED",
+          "doSplit": false
+        }
+      },
+      "extensions": {
+        "persistedQuery": {
+          "version": 1,
+          "sha256Hash": "e9bd10425b3fdaa190dd0024db34dc9a348ec4d02434c0487acbe58eea79ac20"
+        }
+      }
+    }
+  ]
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

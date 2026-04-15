@@ -14,6 +14,10 @@ export default interface Configurations {
     twitchGql: {
         clientId: string;
         sha256Hash: string;
+        exportVideo: {
+            sha256Hash: string;
+            oAuth: string;
+        }
     }
     sightengine: {
         apiUser: string;
