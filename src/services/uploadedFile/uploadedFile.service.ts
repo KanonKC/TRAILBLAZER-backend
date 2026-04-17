@@ -11,6 +11,7 @@ import { ListResponse, Pagination } from "../response"
 import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
 import Configurations from "@/config/index"
+import path from "path"
 
 export class UploadedFileService {
     private ufr: UploadedFileRepository
@@ -52,8 +53,33 @@ export class UploadedFileService {
         const random = randomBytes(16).toString("hex")
         const key = `users/${userId}/${random}`
         await s3.uploadFile(file.buffer, key, file.mimetype)
+
+        let filename = file.filename;
+        const ext = path.extname(file.filename);
+        const base = path.basename(file.filename, ext);
+        
+        const existingFiles = await this.ufr.listByPattern(userId, base, ext);
+        const fileNames = existingFiles.map(f => f.name);
+
+        if (fileNames.includes(filename)) {
+            const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`^${escapedBase} \\((\\d+)\\)${escapedExt}$`);
+            
+            let maxCounter = 0;
+            fileNames.forEach(name => {
+                const match = name.match(pattern);
+                if (match) {
+                    const count = parseInt(match[1], 10);
+                    maxCounter = Math.max(maxCounter, count);
+                }
+            });
+            
+            filename = `${base} (${maxCounter + 1})${ext}`;
+        }
+
         await this.ufr.create({
-            name: file.filename,
+            name: filename,
             type: file.mimetype,
             owner_id: userId,
             key: key,

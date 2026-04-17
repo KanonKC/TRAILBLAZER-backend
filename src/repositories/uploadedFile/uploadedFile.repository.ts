@@ -21,6 +21,30 @@ export class UploadedFileRepository {
         })
     }
 
+    async getByName(ownerId: string, name: string) {
+        return prisma.uploadedFile.findFirst({
+            where: {
+                owner_id: ownerId,
+                name: name
+            }
+        })
+    }
+
+    async listByPattern(ownerId: string, base: string, ext: string) {
+        return prisma.uploadedFile.findMany({
+            where: {
+                owner_id: ownerId,
+                name: {
+                    startsWith: base,
+                    endsWith: ext
+                }
+            },
+            select: {
+                name: true
+            }
+        })
+    }
+
     async list(request: ListUploadedFileRequest, pagination: Pagination): Promise<[UploadedFile[], number]> {
         const where: any = {
             owner_id: request.ownerId
