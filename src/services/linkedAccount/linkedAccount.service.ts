@@ -126,19 +126,57 @@ export default class LinkedAccountService {
             throw new NotFoundError(`No linked account found for ${platform}`);
         }
 
-        const { accessToken, expiresAt } = await this.refreshAccessToken(platform as Platform, account.refresh_token);
+        const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(platform as Platform, account.refresh_token);
 
         await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
-        // Update token expiry in DB if changed
-        if (expiresAt) {
+        // Update tokens in DB if changed
+        if (expiresAt || refreshToken) {
             this.logger.info({ message: "Refreshed access token", data: { userId, platform } });
             await this.linkedAccountRepository.update(account.id, {
-                token_expires_at: expiresAt
+                token_expires_at: expiresAt,
+                refresh_token: refreshToken || account.refresh_token
             });
         }
 
         return accessToken;
+    }
+
+    async refreshExpiringTokens() {
+        this.logger.setContext("service.linkedAccount.refreshExpiringTokens");
+        this.logger.info({ message: "Starting bulk refresh of expiring tokens" });
+
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const accounts = await this.linkedAccountRepository.listExpiring(tomorrow);
+
+        this.logger.info({ message: `Found ${accounts.length} accounts with expiring tokens` });
+
+        for (const account of accounts) {
+            try {
+                this.logger.info({ message: "Refreshing token for account", data: { id: account.id, platform: account.platform } });
+                
+                const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(account.platform as Platform, account.refresh_token!);
+                
+                await this.linkedAccountRepository.update(account.id, {
+                    token_expires_at: expiresAt,
+                    refresh_token: refreshToken || account.refresh_token
+                });
+
+                // Update Redis cache
+                const redisKey = `linked_account:access_token:${account.platform}:${account.user_id}`;
+                await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
+
+                this.logger.info({ message: "Successfully refreshed token", data: { accountId: account.id, platform: account.platform }});
+            } catch (error) {
+                this.logger.error({ 
+                    message: "Failed to refresh token", 
+                    data: { accountId: account.id, platform: account.platform }, 
+                    error: error as Error 
+                });
+            }
+        }
+
+        this.logger.info({ message: "Bulk refresh completed" });
     }
 
     private validatePlatform(platform: string): void {
@@ -185,7 +223,7 @@ export default class LinkedAccountService {
         }
     }
 
-    private async refreshAccessToken(platform: Platform, refreshToken: string): Promise<{ accessToken: string; expiresAt: Date | null }> {
+    private async refreshAccessToken(platform: Platform, refreshToken: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
         this.logger.setContext("service.linkedAccount.refreshAccessToken");
 
         try {
@@ -193,6 +231,7 @@ export default class LinkedAccountService {
                 const tokens = await this.googleOAuth.refreshAccessToken(refreshToken);
                 return {
                     accessToken: tokens.accessToken(),
+                    refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
                     expiresAt: tokens.accessTokenExpiresAt(),
                 };
             }
@@ -201,6 +240,7 @@ export default class LinkedAccountService {
                 const tokens = await this.discordOAuth.refreshAccessToken(refreshToken);
                 return {
                     accessToken: tokens.accessToken(),
+                    refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
                     expiresAt: tokens.accessTokenExpiresAt(),
                 };
             }

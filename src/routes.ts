@@ -119,7 +119,7 @@ const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEven
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService);
 
 // Cron
-const tbCron = new TbCron(userService)
+const tbCron = new TbCron(userService, linkedAccountService)
 
 
 const server = fastify();

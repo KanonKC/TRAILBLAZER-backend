@@ -45,4 +45,17 @@ export default class LinkedAccountRepository {
             data
         });
     }
+
+    async listExpiring(before: Date): Promise<LinkedAccount[]> {
+        return prisma.linkedAccount.findMany({
+            where: {
+                token_expires_at: {
+                    lt: before
+                },
+                refresh_token: {
+                    not: null
+                }
+            }
+        });
+    }
 }
