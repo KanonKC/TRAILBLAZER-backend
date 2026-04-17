@@ -307,4 +307,13 @@ export default class UserService {
             throw error;
         }
     }
+
+    async getMaxStorageMB(userId: string) {
+        const user = await this.get(userId)
+        let maxStorageMb = user.max_storage_mb
+        if (user.tier >= UserTier.PRO_TIER) {
+            maxStorageMb += 45
+        }
+        return maxStorageMb
+    }
 }

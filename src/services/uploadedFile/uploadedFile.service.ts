@@ -4,7 +4,7 @@ import { prisma } from "@/libs/prisma"
 import s3 from "@/libs/awsS3"
 import { randomBytes } from "crypto"
 import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors"
-import { UploadedFileResponse } from "./response"
+import { TotalFileSizeResponse, UploadedFileResponse } from "./response"
 import { UploadedFile } from "generated/prisma/client"
 import redis, { TTL } from "@/libs/redis"
 import { ListResponse, Pagination } from "../response"
@@ -12,19 +12,24 @@ import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
 import Configurations from "@/config/index"
 import path from "path"
+import UserService from "../user/user.service"
+import { UserTier } from "../user/constant"
 
 export class UploadedFileService {
     private ufr: UploadedFileRepository
     private logger: TLogger;
     public config: Configurations;
+    private userService: UserService;
 
     constructor(
         config: Configurations,
-        uploadedFileRepository: UploadedFileRepository
+        uploadedFileRepository: UploadedFileRepository,
+        userService: UserService
     ) {
         this.config = config
         this.ufr = uploadedFileRepository
         this.logger = new TLogger(Layer.SERVICE)
+        this.userService = userService
     }
 
     async extend(uf: UploadedFile): Promise<UploadedFileResponse> {
@@ -40,14 +45,15 @@ export class UploadedFileService {
     async create(userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
         this.logger.setContext("service.uploadedFile.create");
         this.logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
-        
+
         const currentTotalSize = await this.getTotalFileSize(userId);
         const fileSizeKb = Math.round(file.buffer.length / 1024);
-        const limitKb = this.config.maxStorageMB * 1024;
-        
-        if (currentTotalSize + fileSizeKb > limitKb) {
+        const maxStorageMb = await this.userService.getMaxStorageMB(userId)
+        const limitKb = maxStorageMb * 1024;
+
+        if (currentTotalSize.total_size_kb + fileSizeKb > limitKb) {
             this.logger.warn({ message: "Storage limit reached", data: { userId, currentTotalSize, fileSizeKb, limitKb } });
-            throw new BadRequestError(`Storage limit reached (${this.config.maxStorageMB} MB). Please delete some files and try again.`);
+            throw new BadRequestError(`Storage limit reached (${maxStorageMb} MB). Please delete some files and try again.`);
         }
 
         const random = randomBytes(16).toString("hex")
@@ -57,7 +63,7 @@ export class UploadedFileService {
         let filename = file.filename;
         const ext = path.extname(file.filename);
         const base = path.basename(file.filename, ext);
-        
+
         const existingFiles = await this.ufr.listByPattern(userId, base, ext);
         const fileNames = existingFiles.map(f => f.name);
 
@@ -65,7 +71,7 @@ export class UploadedFileService {
             const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const pattern = new RegExp(`^${escapedBase} \\((\\d+)\\)${escapedExt}$`);
-            
+
             let maxCounter = 0;
             fileNames.forEach(name => {
                 const match = name.match(pattern);
@@ -74,7 +80,7 @@ export class UploadedFileService {
                     maxCounter = Math.max(maxCounter, count);
                 }
             });
-            
+
             filename = `${base} (${maxCounter + 1})${ext}`;
         }
 
@@ -173,14 +179,19 @@ export class UploadedFileService {
         return res
     }
 
-    async getTotalFileSize(ownerId: string): Promise<number> {
+    async getTotalFileSize(ownerId: string): Promise<TotalFileSizeResponse> {
         const cacheKey = `uploadedFile:totalSize:${ownerId}`
         const cachedData = await redis.get(cacheKey)
         if (cachedData) {
             return JSON.parse(cachedData)
         }
-        const data = await this.ufr.getTotalFileSize(ownerId)
-        redis.set(cacheKey, JSON.stringify(data), TTL.ONE_HOUR)
-        return data
+        const totalFileSize = await this.ufr.getTotalFileSize(ownerId)
+        const maxFileSize = await this.userService.getMaxStorageMB(ownerId)
+        const res = {
+            total_size_kb: totalFileSize,
+            max_storage_kb: maxFileSize * 1024
+        }
+        redis.set(cacheKey, JSON.stringify(res), TTL.ONE_HOUR)
+        return res
     }
 }

@@ -170,12 +170,9 @@ export default class UploadedFileController {
         }
 
         try {
-            const totalSize = await this.service.getTotalFileSize(user.id);
-            this.logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize } });
-            res.send({ 
-                total_size_kb: totalSize,
-                max_storage_kb: this.service.config.maxStorageMB * 1024 
-            });
+            const result = await this.service.getTotalFileSize(user.id);
+            this.logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize: result.total_size_kb } });
+            res.send(result);
         } catch (error) {
             this.logger.error({ message: "Failed to get total uploaded file size", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });

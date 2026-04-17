@@ -40,8 +40,7 @@ const config: Configurations = {
         clientId: process.env.DISCORD_CLIENT_ID || "",
         clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
         redirectUrl: process.env.DISCORD_REDIRECT_URL || ""
-    },
-    maxStorageMB: Number(process.env.MAX_STORAGE_MB) || 0
+    }
 }
 
 export default config;

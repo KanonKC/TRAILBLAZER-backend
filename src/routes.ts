@@ -86,7 +86,7 @@ const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutReposito
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
-const uploadedFileService = new UploadedFileService(config, uploadedFileRepository);
+const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
 const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
