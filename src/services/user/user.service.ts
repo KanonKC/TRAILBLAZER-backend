@@ -190,7 +190,7 @@ export default class UserService {
             if (tier === 0) {
                 await this.update(user.id, { tier_expire_at: null })
             }
-            else if (user.tier_expire_at && user.tier_expire_at < tierExpireDate) {
+            else if (!user.tier_expire_at || user.tier_expire_at < tierExpireDate) {
                 await this.update(user.id, { tier_expire_at: tierExpireDate })
             }
         }
