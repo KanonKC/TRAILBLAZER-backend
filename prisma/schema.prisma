@@ -69,7 +69,7 @@ model UploadedFile {
   owner                     User                   @relation(fields: [owner_id], references: [id])
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
-  // firstWords FirstWord[]
+  size_kb                   Int                    @default(0)
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
 }

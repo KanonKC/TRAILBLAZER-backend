@@ -5,6 +5,7 @@ export interface CreateUploadedFileRequest {
     name: string;
     type: string;
     owner_id: string;
+    size_kb: number;
 }
 
 export interface UpdateUploadedFileRequest {

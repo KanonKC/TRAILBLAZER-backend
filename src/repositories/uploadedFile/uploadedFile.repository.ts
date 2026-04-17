@@ -54,6 +54,19 @@ export class UploadedFileRepository {
         return [data, count]
     }
 
+    async getTotalFileSize(ownerId: string): Promise<number> {
+        const res = await prisma.uploadedFile.aggregate({
+            where: {
+                owner_id: ownerId
+            },
+            _sum: {
+                size_kb: true
+            }
+        })
+
+        return res._sum.size_kb || 0
+    }
+
     async update(id: string, request: UpdateUploadedFileRequest) {
         return prisma.uploadedFile.update({
             where: {

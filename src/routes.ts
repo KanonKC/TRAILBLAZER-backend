@@ -86,7 +86,7 @@ const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutReposito
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
-const uploadedFileService = new UploadedFileService(uploadedFileRepository);
+const uploadedFileService = new UploadedFileService(config, uploadedFileRepository);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
 const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
@@ -198,6 +198,7 @@ server.put("/api/v1/widgets/:id", widgetController.update.bind(widgetController)
 server.patch("/api/v1/widgets/:id/enable", widgetController.updateEnable.bind(widgetController));
 server.delete("/api/v1/widgets/:id", widgetController.delete.bind(widgetController));
 
+server.get("/api/v1/uploaded-files/total-size", uploadedFileController.getTotalFileSize.bind(uploadedFileController));
 server.post("/api/v1/uploaded-files", uploadedFileController.create.bind(uploadedFileController));
 server.get("/api/v1/uploaded-files", uploadedFileController.list.bind(uploadedFileController));
 server.get("/api/v1/uploaded-files/:id", uploadedFileController.get.bind(uploadedFileController));

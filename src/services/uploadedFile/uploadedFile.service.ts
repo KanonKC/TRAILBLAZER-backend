@@ -3,20 +3,25 @@ import { CreateUploadedFileRequest, UpdateUploadedFileRequest, UploadedFileFilte
 import { prisma } from "@/libs/prisma"
 import s3 from "@/libs/awsS3"
 import { randomBytes } from "crypto"
-import { NotFoundError, ForbiddenError } from "@/errors"
+import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors"
 import { UploadedFileResponse } from "./response"
 import { UploadedFile } from "generated/prisma/client"
 import redis, { TTL } from "@/libs/redis"
 import { ListResponse, Pagination } from "../response"
 import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
+import Configurations from "@/config/index"
 
 export class UploadedFileService {
     private ufr: UploadedFileRepository
     private logger: TLogger;
+    public config: Configurations;
+
     constructor(
+        config: Configurations,
         uploadedFileRepository: UploadedFileRepository
     ) {
+        this.config = config
         this.ufr = uploadedFileRepository
         this.logger = new TLogger(Layer.SERVICE)
     }
@@ -24,7 +29,7 @@ export class UploadedFileService {
     async extend(uf: UploadedFile): Promise<UploadedFileResponse> {
         this.logger.setContext("service.uploadedFile.extend");
         this.logger.info({ message: "Extending uploaded file with signed URL", data: { id: uf.id } });
-        const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 });
+        const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 })
         return {
             ...uf,
             url
@@ -34,6 +39,16 @@ export class UploadedFileService {
     async create(userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
         this.logger.setContext("service.uploadedFile.create");
         this.logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
+        
+        const currentTotalSize = await this.getTotalFileSize(userId);
+        const fileSizeKb = Math.round(file.buffer.length / 1024);
+        const limitKb = this.config.maxStorageMB * 1024;
+        
+        if (currentTotalSize + fileSizeKb > limitKb) {
+            this.logger.warn({ message: "Storage limit reached", data: { userId, currentTotalSize, fileSizeKb, limitKb } });
+            throw new BadRequestError(`Storage limit reached (${this.config.maxStorageMB} MB). Please delete some files and try again.`);
+        }
+
         const random = randomBytes(16).toString("hex")
         const key = `users/${userId}/${random}`
         await s3.uploadFile(file.buffer, key, file.mimetype)
@@ -41,8 +56,10 @@ export class UploadedFileService {
             name: file.filename,
             type: file.mimetype,
             owner_id: userId,
-            key: key
+            key: key,
+            size_kb: fileSizeKb
         })
+        await redis.del(`uploadedFile:totalSize:${userId}`)
     }
 
     async get(id: string, userId: string): Promise<UploadedFileResponse> {
@@ -125,6 +142,19 @@ export class UploadedFileService {
             this.logger.warn({ message: "User not allowed to delete this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to delete this file")
         }
-        return this.ufr.delete(id)
+        const res = await this.ufr.delete(id)
+        await redis.del(`uploadedFile:totalSize:${userId}`)
+        return res
+    }
+
+    async getTotalFileSize(ownerId: string): Promise<number> {
+        const cacheKey = `uploadedFile:totalSize:${ownerId}`
+        const cachedData = await redis.get(cacheKey)
+        if (cachedData) {
+            return JSON.parse(cachedData)
+        }
+        const data = await this.ufr.getTotalFileSize(ownerId)
+        redis.set(cacheKey, JSON.stringify(data), TTL.ONE_HOUR)
+        return data
     }
 }

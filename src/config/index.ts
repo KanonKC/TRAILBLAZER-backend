@@ -36,4 +36,5 @@ export default interface Configurations {
         clientSecret: string;
         redirectUrl: string;
     }
+    maxStorageMB: number;
 }
