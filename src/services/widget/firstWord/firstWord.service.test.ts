@@ -34,6 +34,7 @@ jest.mock("@/libs/twurple", () => ({
             getSubscriptionsForUser: jest.fn(),
             subscribeToChannelChatMessageEvents: jest.fn(),
             subscribeToStreamOnlineEvents: jest.fn(),
+            subscribeToStreamOfflineEvents: jest.fn(),
         },
         chat: {
             sendChatMessageAsApp: jest.fn(),
@@ -45,7 +46,7 @@ jest.mock("@/libs/twurple", () => ({
     createESTransport: jest.fn(),
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomBytes: jest.fn().mockReturnValue({
         toString: jest.fn().mockReturnValue("mocked_hex"),
     }),
@@ -108,7 +109,7 @@ describe("FirstWordService", () => {
 
             expect(mockUserRepo.get).toHaveBeenCalledWith(request.owner_id);
             expect(twitchAppAPI.eventSub.getSubscriptionsForUser).toHaveBeenCalledWith(mockUser.twitch_id);
-            expect(createESTransport).toHaveBeenCalledTimes(2);
+            expect(createESTransport).toHaveBeenCalledTimes(3);
             expect(mockFirstWordRepo.create).toHaveBeenCalled();
             expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith("widget_1", "user_1");
             expect(result).toBeDefined();
@@ -120,7 +121,8 @@ describe("FirstWordService", () => {
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ 
                 data: [
                     { type: 'channel.chat.message', status: 'enabled' },
-                    { type: 'stream.online', status: 'enabled' }
+                    { type: 'stream.online', status: 'enabled' },
+                    { type: 'stream.offline', status: 'enabled' }
                 ] 
             });
             mockFirstWordRepo.create.mockResolvedValue({ id: "fw_1", widget_id: "widget_1" } as any);

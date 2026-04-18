@@ -18,6 +18,8 @@ model User {
   avatar_url      String?
   tier            Int             @default(0)
   tier_expire_at  DateTime?
+  max_storage_mb  Int             @default(5)
+  is_showcase     Boolean         @default(false)
   created_at      DateTime        @default(now())
   updated_at      DateTime        @updatedAt
   auth            Auth?
@@ -69,7 +71,7 @@ model UploadedFile {
   owner                     User                   @relation(fields: [owner_id], references: [id])
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
-  // firstWords FirstWord[]
+  size_kb                   Int                    @default(0)
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
 }

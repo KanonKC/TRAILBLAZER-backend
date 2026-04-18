@@ -160,5 +160,22 @@ export default class UploadedFileController {
         }
     }
 
+    async getTotalFileSize(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.uploadedFile.getTotalFileSize");
+        this.logger.info({ message: "Getting total uploaded file size" });
+        const user = getUserFromRequest(req);
+        if (!user) {
+            this.logger.warn({ message: "Unauthorized access attempt" });
+            return res.status(401).send({ message: "Unauthorized" });
+        }
 
+        try {
+            const result = await this.service.getTotalFileSize(user.id);
+            this.logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize: result.total_size_kb } });
+            res.send(result);
+        } catch (error) {
+            this.logger.error({ message: "Failed to get total uploaded file size", error: error as Error });
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
 }

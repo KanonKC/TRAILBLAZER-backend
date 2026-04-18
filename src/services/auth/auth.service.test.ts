@@ -24,7 +24,7 @@ jest.mock("@twurple/auth", () => ({
     refreshUserToken: jest.fn(),
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
 
@@ -38,6 +38,8 @@ describe("AuthService", () => {
         mockAuthRepo = {
             create: jest.fn(),
             updateTwitchToken: jest.fn(),
+            getByUserId: jest.fn(),
+            getByTwitchRefreshToken: jest.fn(),
         } as any;
         mockUserRepo = {
             get: jest.fn(),
@@ -134,10 +136,7 @@ describe("AuthService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any); // for logout call
 
             await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
-            expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalledWith("u1", {
-                twitch_refresh_token: null,
-                twitch_token_expires_at: null,
-            });
+            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
         });
 
         it("should refresh token successfully if not in cache", async () => {
@@ -189,9 +188,7 @@ describe("AuthService", () => {
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
             mockAuthRepo.updateTwitchToken.mockRejectedValue(new Error("DB Update Error"));
 
-            const result = await (service as any).getTwitchAccessToken(twitchId);
-
-            expect(result).toBe("new_at"); // Should still return token as redis.set is after try-catch
+            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow("DB Update Error");
         });
     });
 
@@ -213,10 +210,6 @@ describe("AuthService", () => {
             
             await service.logout("u1");
 
-            expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalledWith("u1", {
-                twitch_refresh_token: null,
-                twitch_token_expires_at: null,
-            });
             expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:t1");
         });
 

@@ -86,7 +86,7 @@ const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutReposito
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
-const uploadedFileService = new UploadedFileService(uploadedFileRepository);
+const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
 const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
@@ -119,7 +119,7 @@ const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEven
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService);
 
 // Cron
-const tbCron = new TbCron(userService)
+const tbCron = new TbCron(userService, linkedAccountService)
 
 
 const server = fastify();
@@ -146,6 +146,7 @@ server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndW
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))
 server.get("/api/v1/user/tier", userController.getTier.bind(userController))
+server.get("/api/v1/users/showcase", userController.listShowcase.bind(userController))
 server.post("/api/v1/logout", authController.logout.bind(authController))
 server.post("/api/v1/refresh-token", userController.refresh.bind(userController))
 
@@ -198,6 +199,7 @@ server.put("/api/v1/widgets/:id", widgetController.update.bind(widgetController)
 server.patch("/api/v1/widgets/:id/enable", widgetController.updateEnable.bind(widgetController));
 server.delete("/api/v1/widgets/:id", widgetController.delete.bind(widgetController));
 
+server.get("/api/v1/uploaded-files/total-size", uploadedFileController.getTotalFileSize.bind(uploadedFileController));
 server.post("/api/v1/uploaded-files", uploadedFileController.create.bind(uploadedFileController));
 server.get("/api/v1/uploaded-files", uploadedFileController.list.bind(uploadedFileController));
 server.get("/api/v1/uploaded-files/:id", uploadedFileController.get.bind(uploadedFileController));

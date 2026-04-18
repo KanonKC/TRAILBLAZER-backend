@@ -16,6 +16,7 @@ import { UserTier } from "./constant";
 import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
+import { ListUserShowcaseResponse } from "./response";
 
 export default class UserService {
     private readonly cfg: Configurations
@@ -156,6 +157,9 @@ export default class UserService {
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
+            if (request.is_showcase !== null) {
+                await redis.del(`user:showcase`)
+            }
             return user
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
@@ -190,7 +194,7 @@ export default class UserService {
             if (tier === 0) {
                 await this.update(user.id, { tier_expire_at: null })
             }
-            else if (user.tier_expire_at && user.tier_expire_at < tierExpireDate) {
+            else if (!user.tier_expire_at || user.tier_expire_at < tierExpireDate) {
                 await this.update(user.id, { tier_expire_at: tierExpireDate })
             }
         }
@@ -306,5 +310,26 @@ export default class UserService {
             this.logger.error({ message: "Failed during bulk adjustment", error: error as Error });
             throw error;
         }
+    }
+
+    async getMaxStorageMB(userId: string) {
+        const user = await this.get(userId)
+        let maxStorageMb = user.max_storage_mb
+        if (user.tier >= UserTier.PRO_TIER) {
+            maxStorageMb += 45
+        }
+        return maxStorageMb
+    }
+
+    async listShowcase(): Promise<ListUserShowcaseResponse> {
+        this.logger.setContext("service.user.listShowcase");
+        const cacheKey = `user:showcase`
+        const cachedShowcase = await redis.get(cacheKey)
+        if (cachedShowcase) {
+            return JSON.parse(cachedShowcase)
+        }
+        const showcase = await this.userRepository.listShowcase()
+        await redis.set(cacheKey, JSON.stringify(showcase), TTL.ONE_DAY)
+        return { data: showcase as ListUserShowcaseResponse['data'] }
     }
 }

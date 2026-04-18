@@ -3,28 +3,39 @@ import { CreateUploadedFileRequest, UpdateUploadedFileRequest, UploadedFileFilte
 import { prisma } from "@/libs/prisma"
 import s3 from "@/libs/awsS3"
 import { randomBytes } from "crypto"
-import { NotFoundError, ForbiddenError } from "@/errors"
-import { UploadedFileResponse } from "./response"
+import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors"
+import { TotalFileSizeResponse, UploadedFileResponse } from "./response"
 import { UploadedFile } from "generated/prisma/client"
 import redis, { TTL } from "@/libs/redis"
 import { ListResponse, Pagination } from "../response"
 import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
+import Configurations from "@/config/index"
+import path from "path"
+import UserService from "../user/user.service"
+import { UserTier } from "../user/constant"
 
 export class UploadedFileService {
     private ufr: UploadedFileRepository
     private logger: TLogger;
+    public config: Configurations;
+    private userService: UserService;
+
     constructor(
-        uploadedFileRepository: UploadedFileRepository
+        config: Configurations,
+        uploadedFileRepository: UploadedFileRepository,
+        userService: UserService
     ) {
+        this.config = config
         this.ufr = uploadedFileRepository
         this.logger = new TLogger(Layer.SERVICE)
+        this.userService = userService
     }
 
     async extend(uf: UploadedFile): Promise<UploadedFileResponse> {
         this.logger.setContext("service.uploadedFile.extend");
         this.logger.info({ message: "Extending uploaded file with signed URL", data: { id: uf.id } });
-        const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 });
+        const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 })
         return {
             ...uf,
             url
@@ -34,15 +45,53 @@ export class UploadedFileService {
     async create(userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
         this.logger.setContext("service.uploadedFile.create");
         this.logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
+
+        const currentTotalSize = await this.getTotalFileSize(userId);
+        const fileSizeKb = Math.round(file.buffer.length / 1024);
+        const maxStorageMb = await this.userService.getMaxStorageMB(userId)
+        const limitKb = maxStorageMb * 1024;
+
+        if (currentTotalSize.total_size_kb + fileSizeKb > limitKb) {
+            this.logger.warn({ message: "Storage limit reached", data: { userId, currentTotalSize, fileSizeKb, limitKb } });
+            throw new BadRequestError(`Storage limit reached (${maxStorageMb} MB). Please delete some files and try again.`);
+        }
+
         const random = randomBytes(16).toString("hex")
         const key = `users/${userId}/${random}`
         await s3.uploadFile(file.buffer, key, file.mimetype)
+
+        let filename = file.filename;
+        const ext = path.extname(file.filename);
+        const base = path.basename(file.filename, ext);
+
+        const existingFiles = await this.ufr.listByPattern(userId, base, ext);
+        const fileNames = existingFiles.map(f => f.name);
+
+        if (fileNames.includes(filename)) {
+            const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`^${escapedBase} \\((\\d+)\\)${escapedExt}$`);
+
+            let maxCounter = 0;
+            fileNames.forEach(name => {
+                const match = name.match(pattern);
+                if (match) {
+                    const count = parseInt(match[1], 10);
+                    maxCounter = Math.max(maxCounter, count);
+                }
+            });
+
+            filename = `${base} (${maxCounter + 1})${ext}`;
+        }
+
         await this.ufr.create({
-            name: file.filename,
+            name: filename,
             type: file.mimetype,
             owner_id: userId,
-            key: key
+            key: key,
+            size_kb: fileSizeKb
         })
+        await redis.del(`uploadedFile:totalSize:${userId}`)
     }
 
     async get(id: string, userId: string): Promise<UploadedFileResponse> {
@@ -125,6 +174,24 @@ export class UploadedFileService {
             this.logger.warn({ message: "User not allowed to delete this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to delete this file")
         }
-        return this.ufr.delete(id)
+        const res = await this.ufr.delete(id)
+        await redis.del(`uploadedFile:totalSize:${userId}`)
+        return res
+    }
+
+    async getTotalFileSize(ownerId: string): Promise<TotalFileSizeResponse> {
+        const cacheKey = `uploadedFile:totalSize:${ownerId}`
+        const cachedData = await redis.get(cacheKey)
+        if (cachedData) {
+            return JSON.parse(cachedData)
+        }
+        const totalFileSize = await this.ufr.getTotalFileSize(ownerId)
+        const maxFileSize = await this.userService.getMaxStorageMB(ownerId)
+        const res = {
+            total_size_kb: totalFileSize,
+            max_storage_kb: maxFileSize * 1024
+        }
+        redis.set(cacheKey, JSON.stringify(res), TTL.ONE_HOUR)
+        return res
     }
 }

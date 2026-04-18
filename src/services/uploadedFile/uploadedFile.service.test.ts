@@ -1,9 +1,11 @@
 import { UploadedFileService } from "./uploadedFile.service";
 import { UploadedFileRepository } from "@/repositories/uploadedFile/uploadedFile.repository";
+import UserService from "../user/user.service";
 import s3 from "@/libs/awsS3";
 import redis, { TTL } from "@/libs/redis";
 import { randomBytes } from "crypto";
 import { NotFoundError, ForbiddenError } from "@/errors";
+import Configurations from "@/config/index";
 
 jest.mock("@/libs/awsS3", () => ({
     getSignedURL: jest.fn(),
@@ -13,12 +15,13 @@ jest.mock("@/libs/awsS3", () => ({
 jest.mock("@/libs/redis", () => ({
     get: jest.fn(),
     set: jest.fn(),
+    del: jest.fn(),
     TTL: {
         ONE_HOUR: 3600,
     },
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomBytes: jest.fn().mockReturnValue(Buffer.from("random_bytes")),
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
@@ -26,6 +29,8 @@ jest.mock("crypto", () => ({
 describe("UploadedFileService", () => {
     let service: UploadedFileService;
     let mockUploadedFileRepo: jest.Mocked<UploadedFileRepository>;
+    let mockUserService: jest.Mocked<UserService>;
+    let mockConfig: jest.Mocked<Configurations>;
 
     beforeEach(() => {
         mockUploadedFileRepo = {
@@ -34,9 +39,19 @@ describe("UploadedFileService", () => {
             list: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            getByName: jest.fn(),
+            listByPattern: jest.fn(),
+            getTotalFileSize: jest.fn(),
+        } as any;
+        mockUserService = {
+            getMaxStorageMB: jest.fn(),
         } as any;
 
-        service = new UploadedFileService(mockUploadedFileRepo);
+        mockConfig = {
+            maxStorageMB: 100,
+        } as any;
+
+        service = new UploadedFileService(mockConfig, mockUploadedFileRepo, mockUserService);
         jest.clearAllMocks();
     });
 
@@ -61,6 +76,10 @@ describe("UploadedFileService", () => {
                 mimetype: "image/png",
             };
 
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUploadedFileRepo.listByPattern.mockResolvedValue([]);
+
             await service.create(userId, file);
 
             expect(s3.uploadFile).toHaveBeenCalledWith(file.buffer, expect.stringContaining(`users/${userId}/`), file.mimetype);
@@ -69,6 +88,68 @@ describe("UploadedFileService", () => {
                 type: file.mimetype,
                 owner_id: userId,
             }));
+        });
+
+        it("should rename file if filename already exists", async () => {
+            const userId = "user1";
+            const file = {
+                buffer: Buffer.from("file-content"),
+                filename: "apple.mp3",
+                mimetype: "audio/mpeg",
+            };
+
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUploadedFileRepo.listByPattern.mockResolvedValue([{ name: "apple.mp3" }] as any);
+
+            await service.create(userId, file);
+
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+                name: "apple (1).mp3",
+            }));
+        });
+
+        it("should increment rename suffix until finding available name", async () => {
+            const userId = "user1";
+            const file = {
+                buffer: Buffer.from("file-content"),
+                filename: "apple.mp3",
+                mimetype: "audio/mpeg",
+            };
+
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            // apple.mp3 and apple (1).mp3 exist
+            mockUploadedFileRepo.listByPattern.mockResolvedValue([
+                { name: "apple.mp3" },
+                { name: "apple (1).mp3" }
+            ] as any);
+
+            await service.create(userId, file);
+
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+                name: "apple (2).mp3",
+            }));
+        });
+
+        it("should not rename if different extension exists", async () => {
+            const userId = "user1";
+            const file = {
+                buffer: Buffer.from("file-content"),
+                filename: "apple.ogg",
+                mimetype: "audio/ogg",
+            };
+
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUploadedFileRepo.listByPattern.mockResolvedValue([]);
+
+            await service.create(userId, file);
+
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+                name: "apple.ogg",
+            }));
+            expect(mockUploadedFileRepo.listByPattern).toHaveBeenCalledWith(userId, "apple", ".ogg");
         });
     });
 
@@ -195,6 +276,21 @@ describe("UploadedFileService", () => {
         it("should throw ForbiddenError if not owner", async () => {
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: "other" } as any);
             await expect(service.delete(id, userId)).rejects.toThrow(ForbiddenError);
+        });
+    });
+    describe("getTotalFileSize", () => {
+        const ownerId = "user1";
+
+        it("should return total file size and max storage", async () => {
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(500);
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            (redis.get as jest.Mock).mockResolvedValue(null);
+
+            const result = await service.getTotalFileSize(ownerId);
+
+            expect(result.total_size_kb).toBe(500);
+            expect(result.max_storage_kb).toBe(100 * 1024);
+            expect(redis.set).toHaveBeenCalled();
         });
     });
 });

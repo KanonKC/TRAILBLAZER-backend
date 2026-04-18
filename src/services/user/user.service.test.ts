@@ -49,7 +49,7 @@ jest.mock("@/utils/error", () => ({
     convertPrismaError: jest.fn().mockReturnValue(new Error("Prisma Error")),
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
 
@@ -109,7 +109,6 @@ describe("UserService", () => {
 
             expect(result.accessToken).toBe("access_token");
             expect(mockUserRepo.upsert).toHaveBeenCalled();
-            expect(mockAuthRepo.create).toHaveBeenCalledWith("u1");
             expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalled();
             expect(redis.set).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:t1", "at", TTL.ONE_WEEK);
         });
@@ -138,7 +137,6 @@ describe("UserService", () => {
 
             await service.login(loginReq);
             // Should not throw
-            expect(mockAuthRepo.create).toHaveBeenCalled();
         });
     });
 

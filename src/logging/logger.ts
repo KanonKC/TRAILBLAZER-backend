@@ -31,7 +31,12 @@ export default class TLogger {
 
     public setContext(context: string): TLogger {
         this.context = context
-        this.transactionId = randomUUID()
+        try {
+            this.transactionId = randomUUID()
+        } catch (e) {
+            // Fallback for environments/mocks where randomUUID is missing
+            this.transactionId = Date.now().toString()
+        }
         return this
     }
 

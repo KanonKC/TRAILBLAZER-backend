@@ -76,4 +76,17 @@ export default class UserRepository {
             take: pagination.limit
         })
     }
+
+    async listShowcase(): Promise<Partial<User>[]> {
+        return prisma.user.findMany({
+            where: {
+                is_showcase: true
+            },
+            select: {
+                display_name: true,
+                username: true,
+                avatar_url: true
+            }
+        })
+    }
 }
