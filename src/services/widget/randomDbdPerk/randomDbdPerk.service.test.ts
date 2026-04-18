@@ -29,7 +29,7 @@ jest.mock("@/libs/twurple", () => ({
     createESTransport: jest.fn(),
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
 

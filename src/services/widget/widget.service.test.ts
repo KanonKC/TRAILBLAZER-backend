@@ -16,7 +16,7 @@ jest.mock("@/libs/redis", () => ({
     },
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
 

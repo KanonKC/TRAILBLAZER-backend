@@ -39,7 +39,7 @@ jest.mock("@/libs/twurple", () => ({
     createESTransport: jest.fn(),
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomBytes: jest.fn().mockReturnValue({
         toString: jest.fn().mockReturnValue("mocked_hex"),
     }),

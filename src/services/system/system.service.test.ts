@@ -24,7 +24,7 @@ jest.mock("../../libs/twurple", () => ({
     },
 }));
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
 

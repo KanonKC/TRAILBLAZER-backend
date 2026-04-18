@@ -5,11 +5,24 @@ import WidgetService from "../widget.service";
 import { NotFoundError } from "@/errors";
 import TwitchGql from "@/providers/twitchGql";
 
-jest.mock("crypto", () => ({
+jest.mock("node:crypto", () => ({
     randomBytes: jest.fn().mockReturnValue({
         toString: jest.fn().mockReturnValue("mocked_hex"),
     }),
+    randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
 }));
+
+jest.mock("@/libs/twurple", () => ({
+    twitchAppAPI: {
+        eventSub: {
+            getSubscriptionsForUser: jest.fn(),
+            subscribeToStreamOfflineEvents: jest.fn(),
+        },
+    },
+    createESTransport: jest.fn(),
+}));
+
+import { twitchAppAPI } from "@/libs/twurple";
 
 describe("ExportVideoService", () => {
     let service: ExportVideoService;
@@ -60,7 +73,8 @@ describe("ExportVideoService", () => {
         };
 
         it("should create export video successfully", async () => {
-            mockUserService.get.mockResolvedValue({ id: "user_1" } as any);
+            mockUserService.get.mockResolvedValue({ id: "user_1", twitch_id: "twitch_1" } as any);
+            (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
             mockExportVideoRepo.create.mockResolvedValue({ id: "ev_1", widget_id: "widget_1" } as any);
 
             const result = await service.create(request);
