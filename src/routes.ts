@@ -146,6 +146,7 @@ server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndW
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))
 server.get("/api/v1/user/tier", userController.getTier.bind(userController))
+server.get("/api/v1/users/showcase", userController.listShowcase.bind(userController))
 server.post("/api/v1/logout", authController.logout.bind(authController))
 server.post("/api/v1/refresh-token", userController.refresh.bind(userController))
 

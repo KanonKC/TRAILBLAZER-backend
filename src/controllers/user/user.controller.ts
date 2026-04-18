@@ -157,4 +157,20 @@ export default class UserController {
             res.status(401).send({ message: "Invalid refresh token" });
         }
     }
+
+    async listShowcase(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.user.listShowcase");
+        this.logger.info({ message: "Listing user showcase" });
+        try {
+            const showcase = await this.userService.listShowcase();
+            this.logger.info({ message: "Successfully retrieved user showcase" });
+            res.send(showcase);
+        } catch (err) {
+            this.logger.error({ message: "Failed to list user showcase", error: err as string | Error });
+            if (err instanceof TError) {
+                return res.status(err.status).send(err.toJSON());
+            }
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
 }

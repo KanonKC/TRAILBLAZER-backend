@@ -1,0 +1,22 @@
+meta {
+  name: List User Showcase
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{BaseURL}}/api/v1/users/showcase
+  body: none
+  auth: inherit
+}
+
+body:json {
+  {
+    "tier": 1
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

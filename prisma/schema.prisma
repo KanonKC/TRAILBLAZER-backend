@@ -19,6 +19,7 @@ model User {
   tier            Int             @default(0)
   tier_expire_at  DateTime?
   max_storage_mb  Int             @default(5)
+  is_showcase     Boolean         @default(false)
   created_at      DateTime        @default(now())
   updated_at      DateTime        @updatedAt
   auth            Auth?
