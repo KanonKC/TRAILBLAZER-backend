@@ -3,7 +3,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from "@/errors";
 import redis, { TTL } from "@/libs/redis";
 import TLogger, { Layer } from "@/logging/logger";
 import LinkedAccountRepository from "@/repositories/linkedAccount/linkedAccount.repository";
-import { Google, Discord, OAuth2RequestError, ArcticFetchError } from "arctic";
+import { Google, Discord, Spotify, OAuth2RequestError, ArcticFetchError } from "arctic";
 import axios from "axios";
 import { Platform, SUPPORTED_PLATFORMS } from "./constant";
 
@@ -18,18 +18,21 @@ export default class LinkedAccountService {
     private readonly linkedAccountRepository: LinkedAccountRepository;
     private readonly googleOAuth: Google;
     private readonly discordOAuth: Discord;
+    private readonly spotifyOAuth: Spotify;
     private readonly logger: TLogger;
 
     constructor(
         cfg: Configurations,
         linkedAccountRepository: LinkedAccountRepository,
         googleOAuth: Google,
-        discordOAuth: Discord
+        discordOAuth: Discord,
+        spotifyOAuth: Spotify
     ) {
         this.cfg = cfg;
         this.linkedAccountRepository = linkedAccountRepository;
         this.googleOAuth = googleOAuth;
         this.discordOAuth = discordOAuth;
+        this.spotifyOAuth = spotifyOAuth;
         this.logger = new TLogger(Layer.SERVICE);
     }
 
@@ -207,6 +210,15 @@ export default class LinkedAccountService {
                 };
             }
 
+            if (platform === "spotify") {
+                const tokens = await this.spotifyOAuth.validateAuthorizationCode(code, null);
+                return {
+                    accessToken: tokens.accessToken(),
+                    refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
+                    expiresAt: tokens.accessTokenExpiresAt(),
+                };
+            }
+
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof OAuth2RequestError) {
@@ -245,6 +257,15 @@ export default class LinkedAccountService {
                 };
             }
 
+            if (platform === "spotify") {
+                const tokens = await this.spotifyOAuth.refreshAccessToken(refreshToken);
+                return {
+                    accessToken: tokens.accessToken(),
+                    refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
+                    expiresAt: tokens.accessTokenExpiresAt(),
+                };
+            }
+
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof BadRequestError) throw error;
@@ -262,6 +283,10 @@ export default class LinkedAccountService {
 
         if (platform === "discord") {
             return await this.fetchDiscordProfile(accessToken);
+        }
+
+        if (platform === "spotify") {
+            return await this.fetchSpotifyProfile(accessToken);
         }
 
         throw new BadRequestError(`Unsupported platform: ${platform}`);
@@ -317,6 +342,30 @@ export default class LinkedAccountService {
                 error: error as Error 
             });
             throw new BadRequestError("Failed to fetch user profile from Discord");
+        }
+    }
+
+    private async fetchSpotifyProfile(accessToken: string): Promise<PlatformUserProfile> {
+        try {
+            const response = await axios.get("https://api.spotify.com/v1/me", {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+            const user = response.data;
+            const avatarUrl = user.images?.[0]?.url || null;
+
+            return {
+                platform_user_id: user.id,
+                platform_username: user.display_name || user.id,
+                platform_avatar_url: avatarUrl,
+            };
+        } catch (error: any) {
+            this.logger.error({ 
+                message: "Failed to fetch Spotify profile", 
+                data: error.response?.data, 
+                error: error as Error 
+            });
+            throw new BadRequestError("Failed to fetch user profile from Spotify");
         }
     }
 }

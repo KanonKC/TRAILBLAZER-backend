@@ -36,4 +36,9 @@ export default interface Configurations {
         clientSecret: string;
         redirectUrl: string;
     }
+    spotify: {
+        clientId: string;
+        clientSecret: string;
+        redirectUrl: string;
+    }
 }
