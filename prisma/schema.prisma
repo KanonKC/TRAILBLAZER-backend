@@ -82,21 +82,22 @@ model UploadedFile {
 }
 
 model Widget {
-  id               String         @id @default(uuid())
-  twitch_id        String
-  enabled          Boolean        @default(true)
-  overlay_key      String?        @unique
-  owner_id         String
-  owner            User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  first_word       FirstWord?
-  clip_shoutout    ClipShoutout?
-  created_at       DateTime       @default(now())
-  updated_at       DateTime       @updatedAt
-  widget_type_slug String?
-  widget_type      WidgetType?    @relation(fields: [widget_type_slug], references: [slug])
-  randomDbdPerk    RandomDbdPerk?
-  dropImage        DropImage?
-  exportVideo      ExportVideo?
+  id                 String              @id @default(uuid())
+  twitch_id          String
+  enabled            Boolean             @default(true)
+  overlay_key        String?             @unique
+  owner_id           String
+  owner              User                @relation(fields: [owner_id], references: [id])
+  first_word         FirstWord?
+  clip_shoutout      ClipShoutout?
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+  widget_type_slug   String?
+  widget_type        WidgetType?         @relation(fields: [widget_type_slug], references: [slug])
+  randomDbdPerk      RandomDbdPerk?
+  dropImage          DropImage?
+  exportVideo        ExportVideo?
+  spotifySongRequest SpotifySongRequest?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -280,4 +281,16 @@ model ReferralCode {
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   code       String   @unique
   created_at DateTime @default(now())
+}
+
+model SpotifySongRequest {
+  id               String   @id @default(uuid())
+  twitch_reward_id String?  @unique
+  twitch_bot_id    String?
+  invalid_message  String?
+  success_message  String?
+  widget_id        String   @unique
+  widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 }
