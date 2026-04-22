@@ -2,11 +2,13 @@ import axios, { AxiosInstance } from "axios";
 import Configurations from "@/config/index";
 import { ExportVideoToYoutubeResponse, TwitchClipResponse } from "./response";
 import { ExportVideoToYoutubeRequest } from "./request";
+import AuthService from "@/services/auth/auth.service";
 
 export default class TwitchGql {
     private readonly endpoint: string = "https://gql.twitch.tv/gql";
     private readonly api: AxiosInstance;
     private readonly cfg: Configurations;
+
     constructor(cfg: Configurations) {
         this.cfg = cfg;
         this.api = axios.create({
@@ -54,7 +56,7 @@ export default class TwitchGql {
         }
     }
 
-    async exportVideosToYoutube(req: ExportVideoToYoutubeRequest[]): Promise<ExportVideoToYoutubeResponse[]> {
+    async exportVideosToYoutube(req: ExportVideoToYoutubeRequest[], token: string): Promise<ExportVideoToYoutubeResponse[]> {
         const body = req.map(r => ({
             "operationName": "YoutubeExportModal_ExportVideoToYoutube",
             "variables": {
@@ -74,9 +76,10 @@ export default class TwitchGql {
                 }
             }
         }))
+        console.log("BODY", body, token)
         const response = await this.api.post("/", body, {
             headers: {
-                "Authorization": `OAuth ${this.cfg.twitchGql.exportVideo.oAuth}`
+                "Authorization": `OAuth ${token}`
             }
         });
 

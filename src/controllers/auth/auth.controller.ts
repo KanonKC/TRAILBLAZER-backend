@@ -33,4 +33,29 @@ export default class AuthController {
             return res.status(500).send({ message: "Logout failed" });
         }
     }
+
+    async syncTwitchGqlToken(req: FastifyRequest<{ Body: { token: string } }>, res: FastifyReply) {
+        this.logger.setContext("controller.auth.syncTwitchGqlToken");
+        const user = getUserFromRequest(req);
+        if (!user) {
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        const { token } = req.body;
+        if (!token) {
+            return res.status(400).send({ message: "Token is required" });
+        }
+
+        try {
+            await this.authService.updateTwitchGqlToken(user.id, token);
+            this.logger.info({ message: "Twitch GQL token synced", data: { userId: user.id } });
+            res.status(204).send();
+        } catch (err) {
+            if (err instanceof TError) {
+                return res.status(err.status).send(err.toJSON());
+            }
+            this.logger.error({ message: "Token sync failed", error: err as string | Error });
+            return res.status(500).send({ message: "Internal server error" });
+        }
+    }
 }

@@ -26,13 +26,13 @@ export default class ExportVideoController {
 
         try {
             const config = await this.service.getByUserId(user.id);
-            if (!config) {
-                this.logger.info({ message: "Export video not enabled", data: { userId: user.id } });
-                return res.status(404).send({ message: "Export video not enabled" });
-            }
             this.logger.info({ message: "Successfully retrieved export video", data: { userId: user.id } });
             res.send(config);
         } catch (error) {
+            if (error instanceof NotFoundError) {
+                this.logger.info({ message: "Export video not enabled", data: { userId: user.id } });
+                return res.status(404).send({ message: "Export video not enabled" });
+            }
             if (error instanceof TError) {
                 this.logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
@@ -53,9 +53,9 @@ export default class ExportVideoController {
 
         try {
             const body = createExportVideoSchema.parse(req.body);
-            const created = await this.service.create(body);
+            await this.service.create(user.id, body);
             this.logger.info({ message: "Successfully created export video", data: { userId: user.id } });
-            res.status(201).send(created);
+            res.status(201).send({ message: "Success" });
         } catch (error) {
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
@@ -81,14 +81,9 @@ export default class ExportVideoController {
 
         try {
             const body = updateExportVideoSchema.parse(req.body);
-            const config = await this.service.getByUserId(user.id);
-            if (!config) {
-                throw new NotFoundError("Export video not enabled");
-            }
-
-            const updated = await this.service.update(config.id, user.id, body);
+            await this.service.update(user.id, body);
             this.logger.info({ message: "Successfully updated export video", data: { userId: user.id } });
-            res.send(updated);
+            res.status(200).send({ message: "Success" });
         } catch (error) {
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: error.message });
@@ -135,9 +130,9 @@ export default class ExportVideoController {
 
         try {
             const body = createExportVideoHistorySchema.parse(req.body);
-            const created = await this.service.createHistory(user.id, body);
+            await this.service.createHistory(user.id, body);
             this.logger.info({ message: "Successfully created export video history", data: { userId: user.id } });
-            res.status(201).send(created);
+            res.status(201).send({ message: "Success" });
         } catch (error) {
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
