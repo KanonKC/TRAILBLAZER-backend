@@ -76,7 +76,6 @@ export default class TwitchGql {
                 }
             }
         }))
-        console.log("BODY", body, token)
         const response = await this.api.post("/", body, {
             headers: {
                 "Authorization": `OAuth ${token}`

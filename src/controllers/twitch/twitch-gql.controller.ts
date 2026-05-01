@@ -20,7 +20,6 @@ export default class TwitchGqlController {
             // const result = await this.twitchGql.exportVideosToYoutube(req.body);
             return res.status(204).send();
         } catch (error) {
-            console.log("Error", error)
             if (error instanceof TError) {
                 this.logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());

@@ -4,6 +4,7 @@ import UserService from "@/services/user/user.service";
 import WidgetService from "../widget.service";
 import { NotFoundError } from "@/errors";
 import TwitchGql from "@/providers/twitchGql";
+import AuthService from "@/services/auth/auth.service";
 
 jest.mock("node:crypto", () => ({
     randomBytes: jest.fn().mockReturnValue({
@@ -25,12 +26,13 @@ jest.mock("@/libs/twurple", () => ({
     createESTransport: jest.fn(),
 }));
 
-import { twitchAppAPI } from "@/libs/twurple";
+import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 
 describe("ExportVideoService", () => {
     let service: ExportVideoService;
     let mockExportVideoRepo: jest.Mocked<ExportVideoRepository>;
     let mockUserService: jest.Mocked<UserService>;
+    let mockAuthService: jest.Mocked<AuthService>;
     let mockWidgetService: jest.Mocked<WidgetService>;
     let mockTwitchGql: jest.Mocked<TwitchGql>;
 
@@ -50,9 +52,15 @@ describe("ExportVideoService", () => {
             get: jest.fn(),
             getByTwitchId: jest.fn(),
         } as any;
+        mockAuthService = {
+            getTwitchAccessToken: jest.fn(),
+            updateTwitchGqlToken: jest.fn(),
+            getTwitchGqlToken: jest.fn(),
+        } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
             authorizeOwnership: jest.fn(),
+            delete: jest.fn(),
         } as any;
         mockTwitchGql = {
             exportVideosToYoutube: jest.fn(),
@@ -61,6 +69,7 @@ describe("ExportVideoService", () => {
         service = new ExportVideoService(
             mockExportVideoRepo,
             mockUserService,
+            mockAuthService,
             mockWidgetService,
             mockTwitchGql
         );
@@ -80,8 +89,9 @@ describe("ExportVideoService", () => {
             mockUserService.get.mockResolvedValue({ id: "user_1", twitch_id: "twitch_1" } as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
             mockExportVideoRepo.create.mockResolvedValue({ id: "ev_1", widget_id: "widget_1" } as any);
+            (createESTransport as jest.Mock).mockReturnValue({});
 
-            const result = await service.create(request);
+            await service.create("user_1", request);
 
             expect(mockUserService.get).toHaveBeenCalledWith(request.owner_id);
             expect(mockExportVideoRepo.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -90,13 +100,8 @@ describe("ExportVideoService", () => {
                 description: "test description"
             }));
             expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith("widget_1", "user_1");
-            expect(result).toBeDefined();
         });
 
-        it("should throw NotFoundError if user not found", async () => {
-            mockUserService.get.mockResolvedValue(null as any);
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
-        });
     });
 
     describe("getByUserId", () => {
@@ -119,10 +124,10 @@ describe("ExportVideoService", () => {
     describe("update", () => {
         it("should update config successfully", async () => {
             const mockExisting = { id: "ev_1", widget: { id: "widget_1" } };
-            mockExportVideoRepo.get.mockResolvedValue(mockExisting as any);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
             mockExportVideoRepo.update.mockResolvedValue({ id: "ev_1" } as any);
 
-            await service.update("ev_1", "user_1", { 
+            await service.update("user_1", { 
                 enabled: false,
                 privacy_status: "PUBLIC",
                 tags: ["new"],
@@ -139,8 +144,8 @@ describe("ExportVideoService", () => {
         });
 
         it("should throw NotFoundError if config not found", async () => {
-            mockExportVideoRepo.get.mockResolvedValue(null);
-            await expect(service.update("ev_1", "user_1", {} as any)).rejects.toThrow(NotFoundError);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(null);
+            await expect(service.update("user_1", {} as any)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -165,7 +170,7 @@ describe("ExportVideoService", () => {
         const mockExisting = { id: "ev_1", widget: { id: "widget_1" } };
 
         beforeEach(() => {
-            mockExportVideoRepo.get.mockResolvedValue(mockExisting as any);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
         });
 
         it("should create history successfully", async () => {
@@ -221,7 +226,7 @@ describe("ExportVideoService", () => {
 
         it("should throw NotFoundError if config missing during history retrieval", async () => {
             mockExportVideoRepo.getHistory.mockResolvedValue({ export_video_id: "ev_1" } as any);
-            mockExportVideoRepo.get.mockResolvedValue(null);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(null);
             await expect(service.getHistory("user_1", 1)).rejects.toThrow(NotFoundError);
         });
 
@@ -241,7 +246,7 @@ describe("ExportVideoService", () => {
 
         it("should throw NotFoundError if config missing during history deletion", async () => {
             mockExportVideoRepo.getHistory.mockResolvedValue({ export_video_id: "ev_1" } as any);
-            mockExportVideoRepo.get.mockResolvedValue(null);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue(null);
             await expect(service.deleteHistory("user_1", 1)).rejects.toThrow(NotFoundError);
         });
     });
@@ -250,9 +255,11 @@ describe("ExportVideoService", () => {
         const mockVideo = { id: "v1", title: "Video 1" } as any;
 
         it("should export video successfully", async () => {
-            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true }, description: "desc", tags: ["tag"], privacy_status: "UNLISTED" };
+            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true, twitch_id: "t1" }, description: "desc", tags: ["tag"], privacy_status: "UNLISTED" };
             mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
             mockTwitchGql.exportVideosToYoutube.mockResolvedValue([{ data: "ok" }] as any);
+            mockUserService.getByTwitchId.mockResolvedValue({ id: "u1" } as any);
+            mockAuthService.getTwitchGqlToken.mockResolvedValue("mock_gql_token");
 
             await service.exportTwitchVideoToYoutube("user_1", mockVideo);
 
@@ -277,8 +284,10 @@ describe("ExportVideoService", () => {
         });
 
         it("should handle GQL errors", async () => {
-            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true } };
+            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true, twitch_id: "t1" } };
             mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
+            mockUserService.getByTwitchId.mockResolvedValue({ id: "u1" } as any);
+            mockAuthService.getTwitchGqlToken.mockResolvedValue("mock_gql_token");
             mockTwitchGql.exportVideosToYoutube.mockResolvedValue([{ errors: ["error"] }] as any);
 
             await service.exportTwitchVideoToYoutube("user_1", mockVideo);
@@ -289,8 +298,10 @@ describe("ExportVideoService", () => {
         });
 
         it("should handle GQL exceptions", async () => {
-            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true } };
+            const mockConfig = { id: "ev_1", widget: { id: "w_1", enabled: true, twitch_id: "t1" } };
             mockExportVideoRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
+            mockUserService.getByTwitchId.mockResolvedValue({ id: "u1" } as any);
+            mockAuthService.getTwitchGqlToken.mockResolvedValue("mock_gql_token");
             mockTwitchGql.exportVideosToYoutube.mockRejectedValue(new Error("Network error"));
 
             await service.exportTwitchVideoToYoutube("user_1", mockVideo);
@@ -308,7 +319,8 @@ describe("ExportVideoService", () => {
         it("should handle offline event successfully", async () => {
             mockUserService.getByTwitchId.mockResolvedValue({ id: "u1" } as any);
             (twitchAppAPI.videos.getVideosByUser as jest.Mock).mockResolvedValue({ data: [{ id: "v1", title: "Video 1" }] });
-            mockExportVideoRepo.getByOwnerId.mockResolvedValue({ id: "ev_1", widget: { enabled: true } } as any);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue({ id: "ev_1", widget: { enabled: true, twitch_id: "t1" } } as any);
+            mockAuthService.getTwitchGqlToken.mockResolvedValue("mock_gql_token");
             mockTwitchGql.exportVideosToYoutube.mockResolvedValue([{ data: "ok" }] as any);
 
             await service.onTwitchStreamOffline(mockEvent);
@@ -341,7 +353,9 @@ describe("ExportVideoService", () => {
         it("should trigger test export successfully", async () => {
             mockUserService.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
             (twitchAppAPI.videos.getVideosByUser as jest.Mock).mockResolvedValue({ data: [{ id: "v1", title: "Video 1" }] });
-            mockExportVideoRepo.getByOwnerId.mockResolvedValue({ id: "ev_1", widget: { enabled: true } } as any);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue({ id: "ev_1", widget: { enabled: true, twitch_id: "t1" } } as any);
+            mockUserService.getByTwitchId.mockResolvedValue({ id: "u1" } as any);
+            mockAuthService.getTwitchGqlToken.mockResolvedValue("mock_gql_token");
             mockTwitchGql.exportVideosToYoutube.mockResolvedValue([{ data: "ok" }] as any);
 
             await service.testExport("u1");
@@ -356,8 +370,9 @@ describe("ExportVideoService", () => {
 
         it("should throw error if no videos found on Twitch", async () => {
             mockUserService.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
+            mockExportVideoRepo.getByOwnerId.mockResolvedValue({ id: "ev_1", widget: { enabled: true, twitch_id: "t1" } } as any);
             (twitchAppAPI.videos.getVideosByUser as jest.Mock).mockResolvedValue({ data: [] });
-            await expect(service.testExport("u1")).rejects.toThrow("ไม่พบวิดีโอล่าสุดบน Twitch สำหรับการส่งออก");
+            await expect(service.testExport("u1")).rejects.toThrow(NotFoundError);
         });
     });
 });

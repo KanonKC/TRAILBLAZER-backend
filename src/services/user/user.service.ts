@@ -157,7 +157,7 @@ export default class UserService {
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
-            if (request.is_showcase !== null) {
+            if (request.is_showcase !== undefined && request.is_showcase !== null) {
                 await redis.del(`user:showcase`)
             }
             return user
