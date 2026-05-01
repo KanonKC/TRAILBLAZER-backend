@@ -78,9 +78,11 @@ export default class UserController {
             return res.status(401).send({ message: "Unauthorized" });
         }
         try {
-            const decoded = verifyToken(token);
+            // TODO: Define interface for decoded token to avoid using any
+            const decoded = verifyToken(token) as any;
             const currentTier = await this.userService.getTier(decoded.id);
             decoded.tier = currentTier;
+            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(decoded.id);
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
             res.send(decoded);
         } catch (err) {

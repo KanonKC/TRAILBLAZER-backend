@@ -8,14 +8,15 @@ import ExportVideoRepository from "@/repositories/exportVideo/exportVideo.reposi
 import { ExportVideoHistoryResponse, ExportVideoWithWidget } from "@/repositories/exportVideo/response";
 import UserService from "@/services/user/user.service";
 import { HelixVideo } from "@twurple/api";
-import { randomBytes } from "crypto";
 import WidgetService from "../widget.service";
-import { CreateExportVideo, CreateExportVideoHistory, UpdateExportVideo } from "./request";
 import { ListResponse, Pagination } from "@/services/response";
+import AuthService from "@/services/auth/auth.service";
+import { CreateExportVideo, CreateExportVideoHistory, UpdateExportVideo } from "@/repositories/exportVideo/request";
 
 export default class ExportVideoService {
     private readonly exportVideoRepository: ExportVideoRepository;
     private readonly userService: UserService;
+    private readonly authService: AuthService;
     private readonly widgetService: WidgetService;
     private readonly logger: TLogger;
     private readonly twitchGql: TwitchGql;
@@ -23,23 +24,21 @@ export default class ExportVideoService {
     constructor(
         exportVideoRepository: ExportVideoRepository,
         userService: UserService,
+        authService: AuthService,
         widgetService: WidgetService,
         twitchGql: TwitchGql
     ) {
         this.exportVideoRepository = exportVideoRepository;
         this.userService = userService;
+        this.authService = authService;
         this.widgetService = widgetService;
         this.logger = new TLogger(Layer.SERVICE);
         this.twitchGql = twitchGql;
     }
 
-    async create(request: CreateExportVideo): Promise<ExportVideoWithWidget> {
+    async create(userId: string, request: Omit<CreateExportVideo, "owner_id" | "twitch_id">): Promise<ExportVideoWithWidget> {
         this.logger.setContext("service.exportVideo.create");
-        const user = await this.userService.get(request.owner_id);
-        if (!user) {
-            this.logger.warn({ message: "User not found", data: { owner_id: request.owner_id } });
-            throw new NotFoundError("User not found");
-        }
+        const user = await this.userService.get(userId);
 
         const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
         const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
@@ -50,69 +49,55 @@ export default class ExportVideoService {
             await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
         }
 
-        const res = await this.exportVideoRepository.create({
+        const config = await this.exportVideoRepository.create({
             ...request,
-            privacy_status: "UNLISTED"
-        });
-
-        await this.widgetService.setInitialEnabled(res.widget_id, user.id);
-        this.logger.info({ message: "Export video widget created successfully", data: { id: res.id, owner_id: user.id } });
-        return res;
+            owner_id: userId,
+            twitch_id: user.twitch_id
+        } as CreateExportVideo);
+        await this.widgetService.setInitialEnabled(config.widget_id, userId);
+        return config;
     }
 
-    async getByUserId(userId: string): Promise<ExportVideoWithWidget | null> {
-        this.logger.setContext("service.exportVideo.getByUserId");
-        const res = await this.exportVideoRepository.getByOwnerId(userId);
-        if (!res) {
-            this.logger.warn({ message: "Export video config not found", data: { userId } });
-            throw new NotFoundError("Export video config not found");
-        }
-        await this.widgetService.authorizeOwnership(userId, res.widget.id);
-        return res;
-    }
-
-    async update(id: string, userId: string, data: UpdateExportVideo): Promise<ExportVideoWithWidget> {
+    async update(userId: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
         this.logger.setContext("service.exportVideo.update");
-        const existing = await this.exportVideoRepository.get(id);
-        if (!existing) {
-            this.logger.warn({ message: "Export video config not found", data: { id } });
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
+        await this.widgetService.authorizeOwnership(userId, config.widget.id);
+        return await this.exportVideoRepository.update(config.id, request);
+    }
 
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
-
-        const res = await this.exportVideoRepository.update(id, data);
-        this.logger.info({ message: "Export video widget updated successfully", data: { id, userId } });
-        return res;
+    async getByUserId(userId: string): Promise<ExportVideoWithWidget> {
+        this.logger.setContext("service.exportVideo.getByUserId");
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
+            throw new NotFoundError("Export video config not found");
+        }
+        await this.widgetService.authorizeOwnership(userId, config.widget.id);
+        return config;
     }
 
     async delete(userId: string): Promise<void> {
         this.logger.setContext("service.exportVideo.delete");
-        const existing = await this.exportVideoRepository.getByOwnerId(userId);
-        if (!existing) {
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             return;
         }
-
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
-        await this.exportVideoRepository.delete(existing.id);
-        this.logger.info({ message: "Export video widget deleted successfully", data: { userId } });
+        await this.widgetService.delete(config.widget_id, userId);
+        await this.exportVideoRepository.delete(config.id);
     }
 
-    // ExportVideoHistory methods
-    async createHistory(userId: string, request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
+    async createHistory(userId: string, request: Omit<CreateExportVideoHistory, "export_video_id">): Promise<void> {
         this.logger.setContext("service.exportVideo.createHistory");
-        const existing = await this.exportVideoRepository.getByOwnerId(userId);
-        if (!existing) {
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
-
-        const res = await this.exportVideoRepository.createHistory({
+        await this.exportVideoRepository.createHistory({
             ...request,
-            export_video_id: existing.id,
-        });
-        this.logger.info({ message: "Export video history created successfully", data: { export_video_id: existing.id, userId } });
-        return res;
+            export_video_id: config.id
+        } as CreateExportVideoHistory);
     }
 
     async listHistory(userId: string, pagination: Pagination): Promise<ListResponse<ExportVideoHistoryResponse>> {
@@ -121,10 +106,7 @@ export default class ExportVideoService {
         if (!config) {
             throw new NotFoundError("Export video config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, config.widget.id);
-
         const [data, total] = await this.exportVideoRepository.listHistoryByExportVideoId(config.id, pagination);
-
         return {
             data,
             pagination: {
@@ -134,44 +116,37 @@ export default class ExportVideoService {
         };
     }
 
-    async getHistory(userId: string, historyId: number): Promise<ExportVideoHistoryResponse | null> {
+    async getHistory(userId: string, historyId: number): Promise<ExportVideoHistoryResponse> {
         this.logger.setContext("service.exportVideo.getHistory");
-        const history = await this.exportVideoRepository.getHistory(historyId);
-        if (!history) {
-            throw new NotFoundError("Export video history not found");
-        }
-
-        const exportVideo = await this.exportVideoRepository.get(history.export_video_id);
-        if (!exportVideo) {
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, exportVideo.widget.id);
-
+        const history = await this.exportVideoRepository.getHistory(historyId);
+        if (!history || history.export_video_id !== config.id) {
+            throw new NotFoundError("History not found");
+        }
+        await this.widgetService.authorizeOwnership(userId, config.widget.id);
         return history;
     }
 
     async deleteHistory(userId: string, historyId: number): Promise<void> {
         this.logger.setContext("service.exportVideo.deleteHistory");
-        const history = await this.exportVideoRepository.getHistory(historyId);
-        if (!history) {
-            return;
-        }
-
-        const exportVideo = await this.exportVideoRepository.get(history.export_video_id);
-        if (!exportVideo) {
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
             throw new NotFoundError("Export video config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, exportVideo.widget.id);
-
+        const history = await this.exportVideoRepository.getHistory(historyId);
+        if (!history || history.export_video_id !== config.id) {
+            return;
+        }
+        await this.widgetService.authorizeOwnership(userId, config.widget.id);
         await this.exportVideoRepository.deleteHistory(historyId);
-        this.logger.info({ message: "Export video history deleted successfully", data: { historyId, userId } });
     }
 
     async exportTwitchVideoToYoutube(userId: string, video: HelixVideo): Promise<void> {
         this.logger.setContext("service.exportVideo.exportTwitchVideoToYoutube");
-
-        const config = await this.getByUserId(userId)
-
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
         if (!config) {
             throw new NotFoundError("Export video config not found");
         }
@@ -189,21 +164,30 @@ export default class ExportVideoService {
             doSplit: false
         }]
 
-        let reqLog: CreateExportVideoHistory = {
+        let reqLog: Omit<CreateExportVideoHistory, "export_video_id"> = {
             batch_id: null,
             video_id: video.id,
             status: "SUCCESS",
         }
 
         try {
-            const res = await this.twitchGql.exportVideosToYoutube(req)
-            const result = res[0]
-            if (result.errors) {
-                reqLog.status = "FAILED"
-                reqLog.message = JSON.stringify(result.errors)
-            }
-            if (result.data) {
-                reqLog.message = JSON.stringify(result.data)
+            const user = await this.userService.getByTwitchId(config.widget.twitch_id);
+            const gqlToken = await this.authService.getTwitchGqlToken(user.id);
+            
+            if (!gqlToken) {
+                this.logger.warn({ message: "No Twitch GQL token found, sync via extension required", data: { userId: user.id } });
+                reqLog.status = "FAILED";
+                reqLog.message = "Missing Twitch session token. Please sync using the Blaze extension.";
+            } else {
+                const res = await this.twitchGql.exportVideosToYoutube(req, gqlToken)
+                const result = res[0]
+                if (result.errors) {
+                    reqLog.status = "FAILED"
+                    reqLog.message = JSON.stringify(result.errors)
+                }
+                if (result.data) {
+                    reqLog.message = JSON.stringify(result.data)
+                }
             }
             await this.createHistory(userId, reqLog)
         } catch (err) {
@@ -237,24 +221,17 @@ export default class ExportVideoService {
 
     async testExport(userId: string): Promise<void> {
         this.logger.setContext("service.exportVideo.testExport");
-        const user = await this.userService.get(userId);
-        if (!user) {
-            this.logger.warn({ message: "User not found", data: { userId } });
-            throw new NotFoundError("User not found");
+        const config = await this.exportVideoRepository.getByOwnerId(userId);
+        if (!config) {
+            throw new NotFoundError("Export video config not found");
         }
-
-        const videos = await twitchAppAPI.videos.getVideosByUser(user.twitch_id, {
-            limit: 1,
-            orderBy: "time"
-        });
-
-        if (videos.data.length === 0) {
-            this.logger.warn({ message: "No videos found for export", data: { userId, twitchId: user.twitch_id } });
-            throw new Error("ไม่พบวิดีโอล่าสุดบน Twitch สำหรับการส่งออก");
+        const video = await twitchAppAPI.videos.getVideosByUser(config.widget.twitch_id, {
+            orderBy: "time",
+            limit: 1
+        })
+        if (video.data.length === 0) {
+            throw new NotFoundError("No videos found to test export");
         }
-
-        const latestVideo = videos.data[0];
-        this.logger.info({ message: "Manually triggering test export", data: { userId, videoId: latestVideo.id } });
-        await this.exportTwitchVideoToYoutube(userId, latestVideo);
+        await this.exportTwitchVideoToYoutube(userId, video.data[0])
     }
 }

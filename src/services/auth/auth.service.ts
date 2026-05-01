@@ -22,7 +22,7 @@ export default class AuthService {
         this.userRepository = userRepository;
     }
 
-    private async getTwitchAccessToken(twitchId: string): Promise<string> {
+    async getTwitchAccessToken(twitchId: string): Promise<string> {
         logger.setContext("service.auth.getTwitchAccessToken");
         logger.info({ message: "getTwitchAccessToken", data: { twitchId } });
         const cacheKey = `auth:twitch_access_token:twitch_id:${twitchId}`;
@@ -97,5 +97,18 @@ export default class AuthService {
         }
         const cacheKey = `auth:twitch_access_token:twitch_id:${user.twitch_id}`;
         await redis.del(cacheKey);
+    }
+
+    async updateTwitchGqlToken(userId: string, token: string): Promise<void> {
+        logger.setContext("service.auth.updateTwitchGqlToken");
+        await this.authRepository.updateTwitchToken(userId, {
+            twitch_gql_token: token
+        });
+    }
+
+    async getTwitchGqlToken(userId: string): Promise<string | null> {
+        logger.setContext("service.auth.getTwitchGqlToken");
+        const auth = await this.authRepository.getByUserId(userId);
+        return auth?.twitch_gql_token || null;
     }
 }

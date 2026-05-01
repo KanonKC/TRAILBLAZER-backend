@@ -157,7 +157,7 @@ export default class UserService {
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
-            if (request.is_showcase !== null) {
+            if (request.is_showcase !== undefined && request.is_showcase !== null) {
                 await redis.del(`user:showcase`)
             }
             return user
@@ -217,6 +217,12 @@ export default class UserService {
             }
             throw err
         }
+    }
+
+    async hasTwitchGqlToken(userId: string): Promise<boolean> {
+        this.logger.setContext("service.user.hasTwitchGqlToken");
+        const auth = await this.authRepository.getByUserId(userId);
+        return !!auth?.twitch_gql_token;
     }
 
     createAccessToken(user: User): string {

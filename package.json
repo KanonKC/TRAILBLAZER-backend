@@ -10,7 +10,7 @@
     "script": "ts-node --require tsconfig-paths/register src/script.ts",
     "build": "tsc && tsc-alias",
     "start": "node -r dotenv/config -r newrelic build/src/index.js",
-    "generate:twitch-login": "python3 scripts/generate_twitch_login.py --env dev",
+    "generate:twitch-login": "python scripts/generate_twitch_login.py --env dev",
     "generate:twitch-login:prod": "python3 scripts/generate_twitch_login.py --env prod"
   },
   "author": "",

@@ -51,7 +51,7 @@ import AuthController from "./controllers/auth/auth.controller";
 import LinkedAccountController from "./controllers/linkedAccount/linkedAccount.controller";
 import LinkedAccountRepository from "./repositories/linkedAccount/linkedAccount.repository";
 import LinkedAccountService from "./services/linkedAccount/linkedAccount.service";
-import { Google, Discord } from "arctic";
+import { Google, Discord, Spotify } from "arctic";
 import TbCron from "./cron";
 
 // Providers
@@ -59,6 +59,7 @@ const twitchGql = new TwitchGql(config);
 const sightengine = new Sightengine(config);
 const googleOAuth = new Google(config.youtube.clientId, config.youtube.clientSecret, config.youtube.redirectUrl);
 const discordOAuth = new Discord(config.discord.clientId, config.discord.clientSecret, config.discord.redirectUrl);
+const spotifyOAuth = new Spotify(config.spotify.clientId, config.spotify.clientSecret, config.spotify.redirectUrl);
 
 // Repository Layer
 const userRepository = new UserRepository();
@@ -88,8 +89,8 @@ const dropImageService = new DropImageService(dropImageRepository, userRepositor
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
 const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
-const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth);
-const exportVideoService = new ExportVideoService(exportVideoRepository, userService, widgetService, twitchGql);
+const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth, spotifyOAuth);
+const exportVideoService = new ExportVideoService(exportVideoRepository, userService, authService, widgetService, twitchGql);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
@@ -148,6 +149,7 @@ server.get("/api/v1/user/me", userController.me.bind(userController))
 server.get("/api/v1/user/tier", userController.getTier.bind(userController))
 server.get("/api/v1/users/showcase", userController.listShowcase.bind(userController))
 server.post("/api/v1/logout", authController.logout.bind(authController))
+server.post("/api/v1/auth/twitch-gql-token", authController.syncTwitchGqlToken.bind(authController))
 server.post("/api/v1/refresh-token", userController.refresh.bind(userController))
 
 server.post("/api/v1/first-word", firstWordController.create.bind(firstWordController));

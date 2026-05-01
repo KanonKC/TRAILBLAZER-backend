@@ -1,2 +1,2 @@
-export const SUPPORTED_PLATFORMS = ["youtube", "discord"] as const;
+export const SUPPORTED_PLATFORMS = ["youtube", "discord", "spotify"] as const;
 export type Platform = (typeof SUPPORTED_PLATFORMS)[number];
