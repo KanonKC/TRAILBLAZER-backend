@@ -75,15 +75,15 @@ export default class UserController {
         this.logger.setContext("controller.user.me");
         this.logger.info({ message: "Getting current user info" });
         const token = req.cookies.accessToken;
-        console.log("Me", req.cookies);
         if (!token) {
             this.logger.warn({ message: "No access token provided" });
             return res.status(401).send({ message: "Unauthorized" });
         }
         try {
-            const decoded = verifyToken(token);
+            const decoded = verifyToken(token) as any;
             const currentTier = await this.userService.getTier(decoded.id);
             decoded.tier = currentTier;
+            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(decoded.id);
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
             console.log("Me 2", decoded);
             res.send(decoded);
