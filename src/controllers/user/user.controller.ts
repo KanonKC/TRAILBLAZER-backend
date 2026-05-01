@@ -53,11 +53,9 @@ export default class UserController {
                 maxAge: 60 * 60 * 24 * 30 // 30 days
             });
 
-            console.log("Login success", user, this.cfg.frontendOrigin);
             res.redirect(this.cfg.frontendOrigin);
             this.logger.info({ message: "Login successful", data: user });
         } catch (err) {
-            console.log(err);
             if (err instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", data: req.query, error: err.message });
                 return res.status(400).send({ message: "Validation Error", errors: err.issues });
@@ -80,15 +78,14 @@ export default class UserController {
             return res.status(401).send({ message: "Unauthorized" });
         }
         try {
+            // TODO: Define interface for decoded token to avoid using any
             const decoded = verifyToken(token) as any;
             const currentTier = await this.userService.getTier(decoded.id);
             decoded.tier = currentTier;
             decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(decoded.id);
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
-            console.log("Me 2", decoded);
             res.send(decoded);
         } catch (err) {
-            console.log('me failed', err);
             this.logger.warn({ message: "Invalid token", error: err as string | Error });
             return res.status(401).send({ message: "Invalid token" });
         }
