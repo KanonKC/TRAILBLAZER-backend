@@ -36,7 +36,7 @@ export default class ExportVideoService {
         this.twitchGql = twitchGql;
     }
 
-    async create(userId: string, request: Omit<CreateExportVideo, "owner_id" | "twitch_id">): Promise<void> {
+    async create(userId: string, request: Omit<CreateExportVideo, "owner_id" | "twitch_id">): Promise<ExportVideoWithWidget> {
         this.logger.setContext("service.exportVideo.create");
         const user = await this.userService.get(userId);
 
@@ -55,16 +55,17 @@ export default class ExportVideoService {
             twitch_id: user.twitch_id
         } as CreateExportVideo);
         await this.widgetService.setInitialEnabled(config.widget_id, userId);
+        return config;
     }
 
-    async update(userId: string, request: UpdateExportVideo): Promise<void> {
+    async update(userId: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
         this.logger.setContext("service.exportVideo.update");
         const config = await this.exportVideoRepository.getByOwnerId(userId);
         if (!config) {
             throw new NotFoundError("Export video config not found");
         }
         await this.widgetService.authorizeOwnership(userId, config.widget.id);
-        await this.exportVideoRepository.update(config.id, request);
+        return await this.exportVideoRepository.update(config.id, request);
     }
 
     async getByUserId(userId: string): Promise<ExportVideoWithWidget> {

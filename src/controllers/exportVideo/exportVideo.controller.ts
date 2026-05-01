@@ -53,9 +53,9 @@ export default class ExportVideoController {
 
         try {
             const body = createExportVideoSchema.parse(req.body);
-            await this.service.create(user.id, body);
+            const config = await this.service.create(user.id, body);
             this.logger.info({ message: "Successfully created export video", data: { userId: user.id } });
-            res.status(201).send({ message: "Success" });
+            res.status(201).send(config);
         } catch (error) {
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
@@ -81,9 +81,9 @@ export default class ExportVideoController {
 
         try {
             const body = updateExportVideoSchema.parse(req.body);
-            await this.service.update(user.id, body);
+            const updated = await this.service.update(user.id, body);
             this.logger.info({ message: "Successfully updated export video", data: { userId: user.id } });
-            res.status(200).send({ message: "Success" });
+            res.status(200).send(updated);
         } catch (error) {
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: error.message });
