@@ -219,6 +219,12 @@ export default class UserService {
         }
     }
 
+    async hasTwitchGqlToken(userId: string): Promise<boolean> {
+        this.logger.setContext("service.user.hasTwitchGqlToken");
+        const auth = await this.authRepository.getByUserId(userId);
+        return !!auth?.twitch_gql_token;
+    }
+
     createAccessToken(user: User): string {
         this.logger.setContext("service.user.createAccessToken");
         const accessToken = signAccessToken({
