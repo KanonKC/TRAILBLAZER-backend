@@ -177,7 +177,7 @@ export default class ExportVideoService {
             if (!gqlToken) {
                 this.logger.warn({ message: "No Twitch GQL token found, sync via extension required", data: { userId: user.id } });
                 reqLog.status = "FAILED";
-                reqLog.message = "Missing Twitch session token. Please sync using the Blaze extension.";
+                reqLog.message = "Missing Twitch OAuth token. Please sync using the TRAILBLAZER extension.";
             } else {
                 const res = await this.twitchGql.exportVideosToYoutube(req, gqlToken)
                 const result = res[0]
