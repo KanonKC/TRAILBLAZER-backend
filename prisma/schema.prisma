@@ -103,6 +103,7 @@ model WidgetType {
   id          Int      @id @default(autoincrement())
   slug        String   @unique
   displayName String
+  cost        Int      @default(1)
   widgets     Widget[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
