@@ -97,9 +97,7 @@ export default class WidgetController {
         }
     }
 
-    async updateEnable(req: FastifyRequest<{
-        Querystring: { force_update?: string }
-    }>, res: FastifyReply) {
+    async updateEnable(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.widget.updateEnable");
         this.logger.info({ message: "Updating widget enable status" });
         const user = getUserFromRequest(req);
@@ -110,11 +108,8 @@ export default class WidgetController {
 
         try {
             const { id } = req.params as { id: string };
-            const forceUpdate = req.query.force_update === 'true'
             const request = updateWidgetEnableSchema.parse(req.body);
-            const updated = await this.widgetService.updateEnable(id, user.id, request.enabled, {
-                forceUpdate
-            });
+            const updated = await this.widgetService.updateEnable(id, user.id, request.enabled);
             this.logger.info({ message: "Successfully updated widget enable status", data: { userId: user.id, widgetId: id, enabled: request.enabled } });
             res.send(updated);
         } catch (error) {
@@ -176,6 +171,28 @@ export default class WidgetController {
                 return res.status(error.status).send(error.toJSON());
             }
             this.logger.error({ message: "Failed to delete widget", data: { userId: user.id }, error: error as Error });
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
+    async getQuota(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.widget.getQuota");
+        this.logger.info({ message: "Getting widget quota" });
+        const user = getUserFromRequest(req);
+        if (!user) {
+            this.logger.warn({ message: "Unauthorized access attempt" });
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        try {
+            const quota = await this.widgetService.getQuota(user.id);
+            this.logger.info({ message: "Successfully fetched quota", data: { userId: user.id, quota } });
+            res.send(quota);
+        } catch (error) {
+            if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                return res.status(error.status).send(error.toJSON());
+            }
+            this.logger.error({ message: "Failed to fetch quota", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

@@ -76,6 +76,18 @@ export default class WidgetRepository {
         });
     }
 
+    async getEnabledQuotaUsed(ownerId: string, excludeIds?: string[]): Promise<number> {
+        const enabledWidgets = await prisma.widget.findMany({
+            where: {
+                owner_id: ownerId,
+                enabled: true,
+                ...(excludeIds && excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+            },
+            include: { widget_type: true },
+        });
+        return enabledWidgets.reduce((sum, w) => sum + (w.widget_type?.cost ?? 1), 0);
+    }
+
     async getFirstEnabled(ownerId: string): Promise<ExtendedWidget | null> {
         return prisma.widget.findFirst({
             where: {
