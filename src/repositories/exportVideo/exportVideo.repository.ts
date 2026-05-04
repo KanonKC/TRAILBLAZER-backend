@@ -25,7 +25,11 @@ export default class ExportVideoRepository {
                 }
             },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -42,7 +46,11 @@ export default class ExportVideoRepository {
             where: { id },
             data: updateData,
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -57,7 +65,11 @@ export default class ExportVideoRepository {
         return prisma.exportVideo.findUnique({
             where: { id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -66,7 +78,11 @@ export default class ExportVideoRepository {
         return prisma.exportVideo.findUnique({
             where: { widget_id: widgetId },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -83,7 +99,11 @@ export default class ExportVideoRepository {
         return prisma.exportVideo.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -100,7 +120,11 @@ export default class ExportVideoRepository {
         return prisma.exportVideo.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
