@@ -5,5 +5,5 @@ export enum UserTier {
 
 export const PLAN_QUOTA: Record<number, number> = {
     [UserTier.FREE_TIER]: 1,
-    [UserTier.PRO_TIER]: 2,
+    [UserTier.PRO_TIER]: 10,
 };
