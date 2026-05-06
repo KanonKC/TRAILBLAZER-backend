@@ -1,17 +1,17 @@
 import crypto from "crypto";
 import TLogger, { Layer } from "@/logging/logger";
 import ReferralRepository from "@/repositories/referral/referral.repository";
-import UserRepository from "@/repositories/user/user.repository";
+import UserService from "../user/user.service";
 
 export default class ReferralService {
     private readonly referralRepository: ReferralRepository;
-    private readonly userRepository: UserRepository;
     private readonly logger: TLogger;
+    private readonly userService: UserService;
 
-    constructor(referralRepository: ReferralRepository, userRepository: UserRepository) {
+    constructor(referralRepository: ReferralRepository, userService: UserService) {
         this.referralRepository = referralRepository;
-        this.userRepository = userRepository;
         this.logger = new TLogger(Layer.SERVICE);
+        this.userService = userService;
     }
 
     /**
@@ -66,7 +66,7 @@ export default class ReferralService {
             }
 
             // 3. Apply Referee Reward (+1 widget quota)
-            await this.userRepository.update(refereeId, {
+            await this.userService.update(refereeId, {
                 extra_widget_quota: {
                     increment: 1
                 } as any // Prisma increment
@@ -75,7 +75,7 @@ export default class ReferralService {
 
             // 4. Apply Inviter Rewards (Milestones: 1, 2, 3)
             const referralCount = await this.referralRepository.countReferralsByReferrerId(referrerId);
-            
+
             let inviterUpdate: any = {};
             if (referralCount === 1) {
                 inviterUpdate = { extra_widget_quota: { increment: 1 } };
@@ -86,10 +86,10 @@ export default class ReferralService {
             }
 
             if (Object.keys(inviterUpdate).length > 0) {
-                await this.userRepository.update(referrerId, inviterUpdate);
-                this.logger.info({ 
-                    message: "Applied inviter milestone reward", 
-                    data: { referrerId, referralCount, reward: inviterUpdate } 
+                await this.userService.update(referrerId, inviterUpdate);
+                this.logger.info({
+                    message: "Applied inviter milestone reward",
+                    data: { referrerId, referralCount, reward: inviterUpdate }
                 });
             }
 
@@ -101,7 +101,7 @@ export default class ReferralService {
     async getReferralStatus(userId: string) {
         const count = await this.referralRepository.countReferralsByReferrerId(userId);
         const referralCode = await this.referralRepository.getReferralCodeByUserId(userId);
-        
+
         return {
             count,
             code: referralCode?.code || null,

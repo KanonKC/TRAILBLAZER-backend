@@ -37,7 +37,7 @@ model User {
 model Auth {
   id                      String    @id @default(cuid())
   user_id                 String    @unique
-  user                    User      @relation(fields: [user_id], references: [id])
+  user                    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   twitch_refresh_token    String?   @unique
   twitch_token_expires_at DateTime?
   twitch_gql_token        String?
@@ -50,7 +50,7 @@ model Workflow {
   name       String
   data       Json
   owner_id   String
-  owner      User      @relation(fields: [owner_id], references: [id])
+  owner      User      @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   triggers   Trigger[]
@@ -61,7 +61,7 @@ model Trigger {
   type       String
   platform   String
   user_id    String
-  user       User       @relation(fields: [user_id], references: [id])
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   workflows  Workflow[]
   created_at DateTime   @default(now())
   updated_at DateTime   @updatedAt
@@ -73,7 +73,7 @@ model UploadedFile {
   name                      String
   type                      String
   owner_id                  String
-  owner                     User                   @relation(fields: [owner_id], references: [id])
+  owner                     User                   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   size_kb                   Int                    @default(0)
@@ -87,7 +87,7 @@ model Widget {
   enabled          Boolean        @default(true)
   overlay_key      String?        @unique
   owner_id         String
-  owner            User           @relation(fields: [owner_id], references: [id])
+  owner            User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   first_word       FirstWord?
   clip_shoutout    ClipShoutout?
   created_at       DateTime       @default(now())
@@ -254,7 +254,7 @@ model ExportVideoHistory {
 model Referral {
   id          String   @id @default(cuid())
   referrer_id String
-  referrer    User     @relation("Referrer", fields: [referrer_id], references: [id])
+  referrer    User     @relation("Referrer", fields: [referrer_id], references: [id], onDelete: Cascade)
   referee_id  String   @unique
   referee     User     @relation("Referee", fields: [referee_id], references: [id])
   created_at  DateTime @default(now())
@@ -263,7 +263,7 @@ model Referral {
 model ReferralCode {
   id         String   @id @default(cuid())
   user_id    String   @unique
-  user       User     @relation(fields: [user_id], references: [id])
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   code       String   @unique
   created_at DateTime @default(now())
 }

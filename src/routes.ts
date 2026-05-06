@@ -82,7 +82,7 @@ const referralRepository = new ReferralRepository();
 const systemService = new SystemService();
 const authService = new AuthService(config, authRepository, userRepository);
 const userService = new UserService(config, userRepository, authRepository, authService);
-const referralService = new ReferralService(referralRepository, userRepository);
+const referralService = new ReferralService(referralRepository, userService);
 userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);
 userService.setWidgetService(widgetService);
