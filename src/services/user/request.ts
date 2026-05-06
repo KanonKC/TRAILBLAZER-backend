@@ -2,6 +2,7 @@ export interface LoginRequest {
     code: string;
     state: string;
     scope: string[];
+    ref?: string;
 }
 
 export interface GetTierOptions {

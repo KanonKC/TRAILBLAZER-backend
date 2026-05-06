@@ -11,24 +11,27 @@ datasource db {
 }
 
 model User {
-  id                  String          @id @default(cuid())
-  twitch_id           String          @unique
-  username            String
-  display_name        String
-  avatar_url          String?
-  tier                Int             @default(0)
-  tier_expire_at      DateTime?
-  max_storage_mb      Int             @default(5)
-  extra_widget_quota  Int             @default(0)
-  is_showcase         Boolean         @default(false)
-  created_at          DateTime        @default(now())
-  updated_at          DateTime        @updatedAt
-  auth                Auth?
-  workflows           Workflow[]
-  triggers            Trigger[]
-  widgets             Widget[]
-  uploaded_files      UploadedFile[]
-  linked_accounts     LinkedAccount[]
+  id                 String          @id @default(cuid())
+  twitch_id          String          @unique
+  username           String
+  display_name       String
+  avatar_url         String?
+  tier               Int             @default(0)
+  tier_expire_at     DateTime?
+  max_storage_mb     Int             @default(5)
+  extra_widget_quota Int             @default(0)
+  is_showcase        Boolean         @default(false)
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+  auth               Auth?
+  workflows          Workflow[]
+  triggers           Trigger[]
+  widgets            Widget[]
+  uploaded_files     UploadedFile[]
+  linked_accounts    LinkedAccount[]
+  referrals          Referral[]      @relation("Referrer")
+  referred_by        Referral?       @relation("Referee")
+  referral_code      ReferralCode?
 }
 
 model Auth {
@@ -246,4 +249,21 @@ model ExportVideoHistory {
   updated_at      DateTime    @updatedAt
   export_video_id String
   export_video    ExportVideo @relation(fields: [export_video_id], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrer_id String
+  referrer    User     @relation("Referrer", fields: [referrer_id], references: [id])
+  referee_id  String   @unique
+  referee     User     @relation("Referee", fields: [referee_id], references: [id])
+  created_at  DateTime @default(now())
+}
+
+model ReferralCode {
+  id         String   @id @default(cuid())
+  user_id    String   @unique
+  user       User     @relation(fields: [user_id], references: [id])
+  code       String   @unique
+  created_at DateTime @default(now())
 }

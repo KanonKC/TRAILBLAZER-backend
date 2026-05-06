@@ -12,6 +12,7 @@ import { generateRefreshToken, signAccessToken } from "@/libs/jwt";
 import { ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
+import ReferralService from "../referral/referral.service";
 import { UserTier } from "./constant";
 import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
@@ -25,6 +26,7 @@ export default class UserService {
     private readonly logger: TLogger
     private readonly authService: AuthService
     private widgetService?: WidgetService;
+    private referralService?: ReferralService;
 
     constructor(cfg: Configurations, userRepository: UserRepository, authRepository: AuthRepository, authService: AuthService) {
         this.cfg = cfg
@@ -36,6 +38,10 @@ export default class UserService {
 
     public setWidgetService(widgetService: WidgetService) {
         this.widgetService = widgetService;
+    }
+
+    public setReferralService(referralService: ReferralService) {
+        this.referralService = referralService;
     }
 
     async login(request: LoginRequest): Promise<{ accessToken: string, refreshToken: string, user: User }> {
@@ -66,8 +72,21 @@ export default class UserService {
             avatar_url: twitchUser.profilePictureUrl
         }
         this.logger.debug({ message: "Creating user request", data: cr });
+        
+        const existingUser = await this.userRepository.getByTwitchId(twitchUser.id);
+        const isNewUser = !existingUser;
+        
         const user = await this.userRepository.upsert(cr)
-        this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username } });
+        this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
+
+        if (isNewUser && request.ref && this.referralService) {
+            await this.referralService.handleReferralRegistration(request.ref, user.id);
+            // Refresh user object to get updated quotas from referral
+            const updatedUser = await this.userRepository.get(user.id);
+            if (updatedUser) {
+                Object.assign(user, updatedUser);
+            }
+        }
         await this.authRepository.updateTwitchToken(user.id, {
             twitch_refresh_token: token.refreshToken,
             twitch_token_expires_at: token.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
