@@ -25,7 +25,11 @@ export default class ClipShoutoutRepository {
                 }
             },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -35,7 +39,11 @@ export default class ClipShoutoutRepository {
             where: { id },
             data: request,
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -50,7 +58,11 @@ export default class ClipShoutoutRepository {
         return prisma.clipShoutout.findUnique({
             where: { id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -67,7 +79,11 @@ export default class ClipShoutoutRepository {
         return prisma.clipShoutout.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -84,7 +100,11 @@ export default class ClipShoutoutRepository {
         return prisma.clipShoutout.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }

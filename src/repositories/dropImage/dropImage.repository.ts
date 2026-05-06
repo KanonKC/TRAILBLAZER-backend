@@ -28,7 +28,11 @@ export default class DropImageRepository {
                 }
             },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -49,7 +53,11 @@ export default class DropImageRepository {
             where: { id },
             data: updateData,
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -64,7 +72,11 @@ export default class DropImageRepository {
         return prisma.dropImage.findUnique({
             where: { id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -81,7 +93,11 @@ export default class DropImageRepository {
         return prisma.dropImage.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -98,7 +114,11 @@ export default class DropImageRepository {
         return prisma.dropImage.findUnique({
             where: { widget_id: widget.id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }
@@ -107,7 +127,11 @@ export default class DropImageRepository {
         return prisma.dropImage.findFirst({
             where: { twitch_reward_id: twitchRewardId },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
             }
         });
     }

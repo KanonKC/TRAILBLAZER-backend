@@ -196,6 +196,7 @@ server.post("/api/v1/export-video/test", exportVideoController.test.bind(exportV
 
 server.get("/api/v1/widgets", widgetController.list.bind(widgetController));
 server.get("/api/v1/widgets/first-enabled", widgetController.getFirstEnabled.bind(widgetController));
+server.get("/api/v1/widgets/quota", widgetController.getQuota.bind(widgetController));
 server.get("/api/v1/widgets/validate-overlay/:key", widgetController.validateOverlayAccess.bind(widgetController));
 server.put("/api/v1/widgets/:id", widgetController.update.bind(widgetController));
 server.patch("/api/v1/widgets/:id/enable", widgetController.updateEnable.bind(widgetController));

@@ -8,9 +8,9 @@ import UserService from "../user/user.service";
 import { ListResponse, Pagination } from "../response";
 import { ExtendedWidget } from "@/repositories/widget/response";
 import UserRepository from "@/repositories/user/user.repository";
-import { UserTier } from "../user/constant";
+import { UserTier, PLAN_QUOTA } from "../user/constant";
 import { WidgetQuotaLimitError } from "./error";
-import { UpdateEnableOptions } from "./request";
+
 
 export default class WidgetService {
     private readonly widgetRepository: WidgetRepository;
@@ -37,44 +37,30 @@ export default class WidgetService {
         }
     }
 
-    async authorizeTierUsage(userId: string, widgetId?: string, isEnabling?: boolean) {
+    async authorizeTierUsage(userId: string, widgetId: string, isEnabling?: boolean) {
         try {
-            this.logger.setContext("WidgetService.authorizeTierUsage");
+            this.logger.setContext("service.widget.authorizeTierUsage");
 
             if (isEnabling === false) return; // Disabling is always allowed
 
             const tier = await this.userService.getTier(userId);
-            const limit = tier >= UserTier.PRO_TIER ? 9999 : 1;
+            const quota = PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
 
-            let otherActiveWidgetsCount = 0;
+            const currentWidget = await this.get(widgetId);
+            const currentWidgetCost = currentWidget.widget_type?.cost ?? 1;
 
-            if (widgetId) {
-                // Modifying existing widget
-                const currentWidget = await this.get(widgetId);
-                if (!currentWidget) {
-                    throw new NotFoundError(`Widget not found`);
-                }
+            const willBeEnabled = isEnabling ?? currentWidget.enabled;
+            if (!willBeEnabled) return; // Disabling — skip quota check
 
-                const otherWidgetsFilter: ListWidgetFilters = { enabled: true, excludeIds: [widgetId] };
-                const [_, count] = await this.widgetRepository.listByOwnerId(userId, { page: 1, limit: 1 }, otherWidgetsFilter);
-                otherActiveWidgetsCount = count;
+            const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [widgetId]);
+            const resultingQuota = usedQuota + currentWidgetCost;
 
-                const willBeEnabled = isEnabling ?? currentWidget.enabled;
-                const resultingActiveWidgets = otherActiveWidgetsCount + (willBeEnabled ? 1 : 0);
-
-                if (resultingActiveWidgets > limit) {
-                    this.logger.warn({ message: `You need to upgrade your tier to use more widgets`, data: { userId, widgetId } });
-                    throw new ForbiddenError(`You need to upgrade your tier to use more widgets`);
-                }
-            } else {
-                // Creating new widget (defaults to enabled)
-                const [_, count] = await this.widgetRepository.listByOwnerId(userId, { page: 1, limit: 1 }, { enabled: true });
-                const resultingActiveWidgets = count + 1;
-
-                if (resultingActiveWidgets > limit) {
-                    this.logger.warn({ message: `You need to upgrade your tier to use more widgets`, data: { userId } });
-                    throw new ForbiddenError(`You need to upgrade your tier to use more widgets`);
-                }
+            if (resultingQuota > quota) {
+                this.logger.warn({
+                    message: `Quota exceeded`,
+                    data: { userId, widgetId, usedQuota, currentWidgetCost, quota }
+                });
+                throw new WidgetQuotaLimitError();
             }
         } catch (error) {
             this.logger.error({ message: `Error authorizing tier usage`, error: error as Error });
@@ -95,33 +81,24 @@ export default class WidgetService {
         return res
     }
 
-    async updateEnable(id: string, userId: string, value: boolean, options: UpdateEnableOptions) {
+    async updateEnable(id: string, userId: string, value: boolean) {
         this.logger.setContext("service.widget.updateEnable");
-        this.logger.info({ message: "Updating widget enabled status", data: { id, userId, value, options } });
+        this.logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
-        if (options.forceUpdate && value === true) {
-            await this.disableAll(userId)
-        } else {
-            try {
-                await this.authorizeTierUsage(userId, id, value);
-            } catch (error) {
-                this.logger.error({ message: "Error authorizing tier usage", error: error as Error });
-                if (error instanceof ForbiddenError) {
-                    throw new WidgetQuotaLimitError();
-                }
-                throw error;
-            }
-
-        }
+        await this.authorizeTierUsage(userId, id, value);
         return this.update(id, userId, { enabled: value });
     }
 
     async setInitialEnabled(id: string, userId: string) {
         this.logger.setContext("service.widget.setInitialEnabled");
-        const activeCount = await this.getTotalByOwnerId(userId, { enabled: true, excludeIds: [id] })
-        const user = await this.userService.get(userId)
-        let isEnabled = !(user.tier === UserTier.FREE_TIER && activeCount >= 1)
-        await this.update(id, userId, { enabled: isEnabled })
+        const widget = await this.get(id);
+        const cost = widget.widget_type?.cost ?? 1;
+        const tier = await this.userService.getTier(userId);
+        const quota = PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id]);
+        const isEnabled = usedQuota + cost <= quota;
+        this.logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled } });
+        await this.update(id, userId, { enabled: isEnabled });
     }
 
     async delete(id: string, userId: string) {
@@ -216,5 +193,15 @@ export default class WidgetService {
             throw new NotFoundError("Widget not found")
         }
         return first
+    }
+
+    async getQuota(userId: string): Promise<{ total_quota: number; used_quota: number; remaining_quota: number }> {
+        this.logger.setContext("service.widget.getQuota");
+        this.logger.info({ message: "Fetching quota info", data: { userId } });
+        const tier = await this.userService.getTier(userId);
+        const total_quota =  PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const used_quota = await this.widgetRepository.getEnabledQuotaUsed(userId);
+        const remaining_quota = Math.max(0, total_quota - used_quota);
+        return { total_quota, used_quota, remaining_quota };
     }
 }
