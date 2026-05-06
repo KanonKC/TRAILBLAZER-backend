@@ -80,7 +80,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         const refreshToken = generateRefreshToken();
 
@@ -125,7 +126,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         const newRefreshToken = generateRefreshToken();
 
@@ -233,7 +235,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         return accessToken;
     }
@@ -247,18 +250,21 @@ export default class UserService {
         try {
             const user = await this.get(userId)
             const tier = await this.getTierFromTwitch(user.twitch_id)
-            const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
-            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
-            if (activeWidgets > 1 && tier < 1) {
-                this.logger.info({ message: "Disabling all widgets", data: { userId } });
-                await this.widgetService.disableAll(userId)
-                await redis.del(`user:tier:${userId}`)
-            }
+            
+            // Update tier first so getQuota uses the new tier
             const tierExpireDate = generateTierExpireDate()
             await this.update(userId, {
                 tier: tier,
                 tier_expire_at: tier === 0 ? null : tierExpireDate
             })
+
+            const quotaInfo = await this.widgetService.getQuota(userId)
+            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
+            
+            if (quotaInfo.used_quota > quotaInfo.total_quota) {
+                this.logger.info({ message: "Quota exceeded after tier adjustment, disabling all widgets", data: { userId, quotaInfo } });
+                await this.widgetService.disableAll(userId)
+            }
         } catch (err) {
             if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
                 this.logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });

@@ -43,8 +43,9 @@ export default class WidgetService {
 
             if (isEnabling === false) return; // Disabling is always allowed
 
-            const tier = await this.userService.getTier(userId);
-            const quota = PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+            const user = await this.userService.get(userId);
+            const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+            const quota = baseQuota + user.extra_widget_quota;
 
             const currentWidget = await this.get(widgetId);
             const currentWidgetCost = currentWidget.widget_type?.cost ?? 1;
@@ -58,7 +59,7 @@ export default class WidgetService {
             if (resultingQuota > quota) {
                 this.logger.warn({
                     message: `Quota exceeded`,
-                    data: { userId, widgetId, usedQuota, currentWidgetCost, quota }
+                    data: { userId, widgetId, usedQuota, currentWidgetCost, quota, extraQuota: user.extra_widget_quota }
                 });
                 throw new WidgetQuotaLimitError();
             }
@@ -93,11 +94,12 @@ export default class WidgetService {
         this.logger.setContext("service.widget.setInitialEnabled");
         const widget = await this.get(id);
         const cost = widget.widget_type?.cost ?? 1;
-        const tier = await this.userService.getTier(userId);
-        const quota = PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const user = await this.userService.get(userId);
+        const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const quota = baseQuota + user.extra_widget_quota;
         const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id]);
         const isEnabled = usedQuota + cost <= quota;
-        this.logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled } });
+        this.logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
         await this.update(id, userId, { enabled: isEnabled });
     }
 
@@ -198,8 +200,9 @@ export default class WidgetService {
     async getQuota(userId: string): Promise<{ total_quota: number; used_quota: number; remaining_quota: number }> {
         this.logger.setContext("service.widget.getQuota");
         this.logger.info({ message: "Fetching quota info", data: { userId } });
-        const tier = await this.userService.getTier(userId);
-        const total_quota =  PLAN_QUOTA[tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const user = await this.userService.get(userId);
+        const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
+        const total_quota = baseQuota + user.extra_widget_quota;
         const used_quota = await this.widgetRepository.getEnabledQuotaUsed(userId);
         const remaining_quota = Math.max(0, total_quota - used_quota);
         return { total_quota, used_quota, remaining_quota };

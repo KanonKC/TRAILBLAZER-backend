@@ -80,9 +80,10 @@ export default class UserController {
         try {
             // TODO: Define interface for decoded token to avoid using any
             const decoded = verifyToken(token) as any;
-            const currentTier = await this.userService.getTier(decoded.id);
-            decoded.tier = currentTier;
-            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(decoded.id);
+            const user = await this.userService.get(decoded.id);
+            decoded.tier = await this.userService.getTier(user.id);
+            decoded.extraWidgetQuota = user.extra_widget_quota;
+            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
             res.send(decoded);
         } catch (err) {
