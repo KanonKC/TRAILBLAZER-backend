@@ -42,8 +42,9 @@ export default class UserRepository {
         });
     }
 
-    async update(id: string, request: Partial<User>): Promise<User> {
-        return prisma.user.update({
+    async update(id: string, request: Partial<User>, tx?: any): Promise<User> {
+        const client = tx || prisma;
+        return client.user.update({
             where: { id },
             data: request
         })

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import TLogger, { Layer } from "@/logging/logger";
 import ReferralRepository from "@/repositories/referral/referral.repository";
 import UserService from "../user/user.service";
+import { prisma } from "@/libs/prisma";
 
 export default class ReferralService {
     private readonly referralRepository: ReferralRepository;
@@ -42,63 +43,70 @@ export default class ReferralService {
         this.logger.info({ message: "Processing referral registration", data: { code, refereeId } });
 
         try {
-            // 1. Resolve code to referrer
-            const referralCode = await this.referralRepository.getReferralCodeByCode(code);
-            if (!referralCode) {
-                this.logger.warn({ message: "Invalid referral code", data: { code } });
-                return;
-            }
+            await prisma.$transaction(async (tx) => {
+                // 1. Resolve code to referrer
+                const referralCode = await this.referralRepository.getReferralCodeByCode(code);
+                if (!referralCode) {
+                    this.logger.warn({ message: "Invalid referral code", data: { code } });
+                    return;
+                }
 
-            const referrerId = referralCode.user_id;
+                const referrerId = referralCode.user_id;
 
-            // Prevent self-referral (though unlikely with Twitch OAuth, good to have)
-            if (referrerId === refereeId) {
-                this.logger.warn({ message: "User tried to refer themselves", data: { referrerId, refereeId } });
-                return;
-            }
+                // Prevent self-referral (though unlikely with Twitch OAuth, good to have)
+                if (referrerId === refereeId) {
+                    this.logger.warn({ message: "User tried to refer themselves", data: { referrerId, refereeId } });
+                    return;
+                }
 
-            // 2. Create referral record (will fail if referee already referred due to @unique)
-            try {
-                await this.referralRepository.createReferral(referrerId, refereeId);
-            } catch (error) {
-                this.logger.warn({ message: "Referee already referred or error creating record", error: error as Error });
-                return;
-            }
+                // 2. Create referral record (will fail if referee already referred due to @unique)
+                try {
+                    await this.referralRepository.createReferral(referrerId, refereeId, tx);
+                } catch (error) {
+                    this.logger.warn({ message: "Referee already referred or error creating record", error: error as Error });
+                    return;
+                }
 
-            // 3. Apply Referee Reward (+1 widget quota)
-            await this.userService.update(refereeId, {
-                extra_widget_quota: {
-                    increment: 1
-                } as any // Prisma increment
+                // 3. Apply Referee Reward (+1 widget quota)
+                // TODO: If createReferral succeeds but the
+                // subsequent userService.update for rewards fails,
+                // the user will have a referral record but no reward
+                await this.userService.update(refereeId, {
+                    extra_widget_quota: {
+                        increment: 1
+                    } as any // Prisma increment
+                }, tx);
+                this.logger.info({ message: "Applied referee reward", data: { refereeId } });
+
+                // 4. Apply Inviter Rewards (Milestones: 1, 2, 3)
+                // TODO: If a reward fails to apply for count 1, it won't be 
+                // re-evaluated when count becomes 2.
+                const referralCount = await this.referralRepository.countReferralsByReferrerId(referrerId, tx);
+
+                let inviterUpdate: any = {};
+                if (referralCount === 1) {
+                    inviterUpdate = { extra_widget_quota: { increment: 1 } };
+                } else if (referralCount === 2) {
+                    inviterUpdate = { max_storage_mb: { increment: 15 } };
+                } else if (referralCount === 3) {
+                    inviterUpdate = { extra_widget_quota: { increment: 1 } };
+                }
+
+                if (Object.keys(inviterUpdate).length > 0) {
+                    await this.userService.update(referrerId, inviterUpdate, tx);
+                    this.logger.info({
+                        message: "Applied inviter milestone reward",
+                        data: { referrerId, referralCount, reward: inviterUpdate }
+                    });
+                }
             });
-            this.logger.info({ message: "Applied referee reward", data: { refereeId } });
-
-            // 4. Apply Inviter Rewards (Milestones: 1, 2, 3)
-            const referralCount = await this.referralRepository.countReferralsByReferrerId(referrerId);
-
-            let inviterUpdate: any = {};
-            if (referralCount === 1) {
-                inviterUpdate = { extra_widget_quota: { increment: 1 } };
-            } else if (referralCount === 2) {
-                inviterUpdate = { max_storage_mb: { increment: 15 } };
-            } else if (referralCount === 3) {
-                inviterUpdate = { extra_widget_quota: { increment: 1 } };
-            }
-
-            if (Object.keys(inviterUpdate).length > 0) {
-                await this.userService.update(referrerId, inviterUpdate);
-                this.logger.info({
-                    message: "Applied inviter milestone reward",
-                    data: { referrerId, referralCount, reward: inviterUpdate }
-                });
-            }
-
         } catch (error) {
             this.logger.error({ message: "Failed to process referral registration", error: error as Error });
         }
     }
 
     async getReferralStatus(userId: string) {
+        this.logger.setContext("service.referral.getReferralStatus");
         const count = await this.referralRepository.countReferralsByReferrerId(userId);
         const referralCode = await this.referralRepository.getReferralCodeByUserId(userId);
 

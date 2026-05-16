@@ -30,6 +30,7 @@ export default class WidgetService {
     }
 
     async authorizeOwnership(userId: string, widgetId: string) {
+        this.logger.setContext("service.widget.authorizeOwnership");
         const widget = await this.get(widgetId);
         if (widget.owner_id !== userId) {
             this.logger.warn({ message: "You are not the owner of this widget", data: { userId, widgetId: widget.id } });
@@ -168,6 +169,7 @@ export default class WidgetService {
     }
 
     async getTotalByOwnerId(ownerId: string, filters?: ListWidgetFilters): Promise<number> {
+        this.logger.setContext("service.widget.getTotalByOwnerId");
         const total = await this.list(ownerId, { page: 1, limit: 1 }, filters);
 
         const res = total.pagination.total || 0;
@@ -181,15 +183,18 @@ export default class WidgetService {
     }
 
     async refreshOverlayKey(widgetId: string): Promise<void> {
+        this.logger.setContext("service.widget.refreshOverlayKey");
         const newKey = crypto.randomUUID();
         await this.widgetRepository.updateOverlayKey(widgetId, newKey);
     }
 
     async updateOverlayKey(widgetId: string, overlayKey: string): Promise<void> {
+        this.logger.setContext("service.widget.updateOverlayKey");
         await this.widgetRepository.updateOverlayKey(widgetId, overlayKey);
     }
 
     async getFirstEnabled(ownerId: string) {
+        this.logger.setContext("service.widget.getFirstEnabled");
         const first = await this.widgetRepository.getFirstEnabled(ownerId)
         if (!first) {
             throw new NotFoundError("Widget not found")

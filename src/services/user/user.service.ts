@@ -171,10 +171,10 @@ export default class UserService {
         return user;
     }
 
-    async update(id: string, request: Partial<User>) {
+    async update(id: string, request: Partial<User>, tx?: any) {
         this.logger.setContext("service.user.update");
         try {
-            const user = await this.userRepository.update(id, request)
+            const user = await this.userRepository.update(id, request, tx)
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
