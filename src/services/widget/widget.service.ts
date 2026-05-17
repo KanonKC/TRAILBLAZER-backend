@@ -38,7 +38,7 @@ export default class WidgetService {
         }
     }
 
-    async authorizeTierUsage(userId: string, widgetId: string, isEnabling?: boolean) {
+    async authorizeTierUsage(userId: string, widgetId?: string, isEnabling?: boolean) {
         try {
             this.logger.setContext("service.widget.authorizeTierUsage");
 
@@ -48,13 +48,18 @@ export default class WidgetService {
             const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
             const quota = baseQuota + user.extra_widget_quota;
 
-            const currentWidget = await this.get(widgetId);
-            const currentWidgetCost = currentWidget.widget_type?.cost ?? 1;
+            let currentWidgetCost = 1;
+            let willBeEnabled = isEnabling ?? true;
 
-            const willBeEnabled = isEnabling ?? currentWidget.enabled;
+            if (widgetId) {
+                const currentWidget = await this.get(widgetId);
+                currentWidgetCost = currentWidget.widget_type?.cost ?? 1;
+                willBeEnabled = isEnabling ?? currentWidget.enabled;
+            }
+
             if (!willBeEnabled) return; // Disabling — skip quota check
 
-            const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [widgetId]);
+            const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, widgetId ? [widgetId] : []);
             const resultingQuota = usedQuota + currentWidgetCost;
 
             if (resultingQuota > quota) {

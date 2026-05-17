@@ -36,6 +36,7 @@ describe("WidgetService", () => {
             disableAll: jest.fn(),
             updateOverlayKey: jest.fn(),
             getFirstEnabled: jest.fn(),
+            getEnabledQuotaUsed: jest.fn(),
         } as any;
         mockUserService = {
             getTier: jest.fn(),
@@ -69,38 +70,38 @@ describe("WidgetService", () => {
         });
 
         it("should allow enabling for Pro tier without limit", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.PRO_TIER);
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 5] as any);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.PRO_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(5);
             await expect(service.authorizeTierUsage("u_1", undefined, true)).resolves.not.toThrow();
         });
 
         it("should allow enabling for Free tier if limit not reached", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.FREE_TIER);
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 0] as any);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(0);
             await expect(service.authorizeTierUsage("u_1", undefined, true)).resolves.not.toThrow();
         });
 
-        it("should throw ForbiddenError for Free tier if limit reached (new widget)", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.FREE_TIER);
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 1] as any);
-            await expect(service.authorizeTierUsage("u_1", undefined, true)).rejects.toThrow(ForbiddenError);
+        it("should throw WidgetQuotaLimitError for Free tier if limit reached (new widget)", async () => {
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1);
+            await expect(service.authorizeTierUsage("u_1", undefined, true)).rejects.toThrow(WidgetQuotaLimitError);
         });
 
-        it("should throw ForbiddenError for Free tier if limit reached (existing widget)", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.FREE_TIER);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false } as any);
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 1] as any); // 1 other active
-            await expect(service.authorizeTierUsage("u_1", "w_1", true)).rejects.toThrow(ForbiddenError);
+        it("should throw WidgetQuotaLimitError for Free tier if limit reached (existing widget)", async () => {
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false, widget_type: { cost: 1 } } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1); // 1 other active
+            await expect(service.authorizeTierUsage("u_1", "w_1", true)).rejects.toThrow(WidgetQuotaLimitError);
         });
 
         it("should throw NotFoundError if widget missing during tier check", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.FREE_TIER);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
             mockWidgetRepo.get.mockResolvedValue(null);
             await expect(service.authorizeTierUsage("u_1", "w_1", true)).rejects.toThrow(NotFoundError);
         });
 
         it("should handle error during tier authorization", async () => {
-            mockUserService.getTier.mockRejectedValue(new Error("API Error"));
+            mockUserService.get.mockRejectedValue(new Error("API Error"));
             await expect(service.authorizeTierUsage("u_1")).rejects.toThrow("API Error");
         });
     });
@@ -123,31 +124,36 @@ describe("WidgetService", () => {
     });
 
     describe("updateEnable", () => {
-        it("should disable all if forceUpdate is true", async () => {
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
-            await service.updateEnable("w_1", "u_1", true, { forceUpdate: true });
-            expect(mockWidgetRepo.disableAll).toHaveBeenCalledWith("u_1");
+        it("should update enable status successfully", async () => {
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false, owner_id: "u_1", widget_type: { cost: 1 } } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(0);
+            mockWidgetRepo.update.mockResolvedValue({ id: "w_1" } as any);
+
+            await service.updateEnable("w_1", "u_1", true);
+
+            expect(mockWidgetRepo.update).toHaveBeenCalledWith("w_1", { enabled: true });
         });
 
-        it("should throw WidgetQuotaLimitError if authorizeTierUsage throws ForbiddenError", async () => {
-            mockUserService.getTier.mockResolvedValue(UserTier.FREE_TIER);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false } as any);
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 1] as any);
+        it("should throw WidgetQuotaLimitError if authorizeTierUsage throws WidgetQuotaLimitError", async () => {
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false, owner_id: "u_1", widget_type: { cost: 1 } } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1);
 
-            await expect(service.updateEnable("w_1", "u_1", true, {})).rejects.toThrow(WidgetQuotaLimitError);
+            await expect(service.updateEnable("w_1", "u_1", true)).rejects.toThrow(WidgetQuotaLimitError);
         });
 
         it("should rethrow other errors from authorizeTierUsage", async () => {
-            mockUserService.getTier.mockRejectedValue(new Error("Generic error"));
-            await expect(service.updateEnable("w_1", "u_1", true, {})).rejects.toThrow("Generic error");
+            mockUserService.get.mockRejectedValue(new Error("Generic error"));
+            await expect(service.updateEnable("w_1", "u_1", true)).rejects.toThrow("Generic error");
         });
     });
 
     describe("setInitialEnabled", () => {
         it("should enable if free tier and no active widgets", async () => {
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 0] as any);
-            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(0);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1 } } as any);
 
             await service.setInitialEnabled("w_1", "u_1");
 
@@ -155,9 +161,9 @@ describe("WidgetService", () => {
         });
 
         it("should disable if free tier and already 1 active widget", async () => {
-            mockWidgetRepo.listByOwnerId.mockResolvedValue([[], 1] as any);
-            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
+            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1 } } as any);
 
             await service.setInitialEnabled("w_1", "u_1");
 
