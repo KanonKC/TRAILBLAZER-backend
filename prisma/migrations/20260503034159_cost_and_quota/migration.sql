@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "WidgetType" ADD COLUMN     "cost" INTEGER NOT NULL DEFAULT 1;

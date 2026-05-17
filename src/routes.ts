@@ -18,6 +18,7 @@ import UserRepository from "./repositories/user/user.repository";
 import WidgetRepository from "./repositories/widget/widget.repository";
 import DropImageRepository from "./repositories/dropImage/dropImage.repository";
 import { UploadedFileRepository } from "./repositories/uploadedFile/uploadedFile.repository";
+import ReferralRepository from "./repositories/referral/referral.repository";
 import ClipShoutoutService from "./services/widget/clipShoutout/clipShoutout.service";
 import FirstWordService from "./services/widget/firstWord/firstWord.service";
 import RandomDbdPerkService from "./services/widget/randomDbdPerk/randomDbdPerk.service";
@@ -26,6 +27,7 @@ import WidgetService from "./services/widget/widget.service";
 import DropImageService from "./services/widget/dropImage/dropImage.service";
 import ExportVideoService from "./services/widget/exportVideo/exportVideo.service";
 import { UploadedFileService } from "./services/uploadedFile/uploadedFile.service";
+import ReferralService from "./services/referral/referral.service";
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -74,11 +76,14 @@ const widgetRepository = new WidgetRepository();
 const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
+const referralRepository = new ReferralRepository();
 
 // Service Layer
 const systemService = new SystemService();
 const authService = new AuthService(config, authRepository, userRepository);
 const userService = new UserService(config, userRepository, authRepository, authService);
+const referralService = new ReferralService(referralRepository, userService);
+userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);
 userService.setWidgetService(widgetService);
 const firstWordService = new FirstWordService(config, firstWordRepository, userRepository, widgetService);
@@ -95,7 +100,7 @@ const exportVideoService = new ExportVideoService(exportVideoRepository, userSer
 // Controller Layer
 const systemController = new SystemController(systemService);
 const authController = new AuthController(authService);
-const userController = new UserController(config, userService);
+const userController = new UserController(config, userService, referralService);
 const adminController = new AdminController(userService);
 const firstWordEventController = new FirstWordEventController(firstWordService);
 const firstWordController = new FirstWordController(firstWordService, firstWordEventController);
@@ -147,6 +152,7 @@ server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndW
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))
 server.get("/api/v1/user/tier", userController.getTier.bind(userController))
+server.get("/api/v1/user/referral-status", userController.getReferralStatus.bind(userController))
 server.get("/api/v1/users/showcase", userController.listShowcase.bind(userController))
 server.post("/api/v1/logout", authController.logout.bind(authController))
 server.post("/api/v1/auth/twitch-gql-token", authController.syncTwitchGqlToken.bind(authController))
@@ -196,6 +202,7 @@ server.post("/api/v1/export-video/test", exportVideoController.test.bind(exportV
 
 server.get("/api/v1/widgets", widgetController.list.bind(widgetController));
 server.get("/api/v1/widgets/first-enabled", widgetController.getFirstEnabled.bind(widgetController));
+server.get("/api/v1/widgets/quota", widgetController.getQuota.bind(widgetController));
 server.get("/api/v1/widgets/validate-overlay/:key", widgetController.validateOverlayAccess.bind(widgetController));
 server.put("/api/v1/widgets/:id", widgetController.update.bind(widgetController));
 server.patch("/api/v1/widgets/:id/enable", widgetController.updateEnable.bind(widgetController));

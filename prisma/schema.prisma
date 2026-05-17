@@ -11,29 +11,33 @@ datasource db {
 }
 
 model User {
-  id              String          @id @default(cuid())
-  twitch_id       String          @unique
-  username        String
-  display_name    String
-  avatar_url      String?
-  tier            Int             @default(0)
-  tier_expire_at  DateTime?
-  max_storage_mb  Int             @default(5)
-  is_showcase     Boolean         @default(false)
-  created_at      DateTime        @default(now())
-  updated_at      DateTime        @updatedAt
-  auth            Auth?
-  workflows       Workflow[]
-  triggers        Trigger[]
-  widgets         Widget[]
-  uploaded_files  UploadedFile[]
-  linked_accounts LinkedAccount[]
+  id                 String          @id @default(cuid())
+  twitch_id          String          @unique
+  username           String
+  display_name       String
+  avatar_url         String?
+  tier               Int             @default(0)
+  tier_expire_at     DateTime?
+  max_storage_mb     Int             @default(5)
+  extra_widget_quota Int             @default(0)
+  is_showcase        Boolean         @default(false)
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+  auth               Auth?
+  workflows          Workflow[]
+  triggers           Trigger[]
+  widgets            Widget[]
+  uploaded_files     UploadedFile[]
+  linked_accounts    LinkedAccount[]
+  referrals          Referral[]      @relation("Referrer")
+  referred_by        Referral?       @relation("Referee")
+  referral_code      ReferralCode?
 }
 
 model Auth {
   id                      String    @id @default(cuid())
   user_id                 String    @unique
-  user                    User      @relation(fields: [user_id], references: [id])
+  user                    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   twitch_refresh_token    String?   @unique
   twitch_token_expires_at DateTime?
   twitch_gql_token        String?
@@ -46,7 +50,7 @@ model Workflow {
   name       String
   data       Json
   owner_id   String
-  owner      User      @relation(fields: [owner_id], references: [id])
+  owner      User      @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   triggers   Trigger[]
@@ -57,7 +61,7 @@ model Trigger {
   type       String
   platform   String
   user_id    String
-  user       User       @relation(fields: [user_id], references: [id])
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   workflows  Workflow[]
   created_at DateTime   @default(now())
   updated_at DateTime   @updatedAt
@@ -69,7 +73,7 @@ model UploadedFile {
   name                      String
   type                      String
   owner_id                  String
-  owner                     User                   @relation(fields: [owner_id], references: [id])
+  owner                     User                   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   size_kb                   Int                    @default(0)
@@ -83,7 +87,7 @@ model Widget {
   enabled          Boolean        @default(true)
   overlay_key      String?        @unique
   owner_id         String
-  owner            User           @relation(fields: [owner_id], references: [id])
+  owner            User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   first_word       FirstWord?
   clip_shoutout    ClipShoutout?
   created_at       DateTime       @default(now())
@@ -103,6 +107,7 @@ model WidgetType {
   id          Int      @id @default(autoincrement())
   slug        String   @unique
   displayName String
+  cost        Int      @default(1)
   widgets     Widget[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -244,4 +249,21 @@ model ExportVideoHistory {
   updated_at      DateTime    @updatedAt
   export_video_id String
   export_video    ExportVideo @relation(fields: [export_video_id], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrer_id String
+  referrer    User     @relation("Referrer", fields: [referrer_id], references: [id], onDelete: Cascade)
+  referee_id  String   @unique
+  referee     User     @relation("Referee", fields: [referee_id], references: [id])
+  created_at  DateTime @default(now())
+}
+
+model ReferralCode {
+  id         String   @id @default(cuid())
+  user_id    String   @unique
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  code       String   @unique
+  created_at DateTime @default(now())
 }

@@ -83,7 +83,8 @@ async function refresh(refreshToken: string) {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         const newRefreshToken = generateRefreshToken();
 

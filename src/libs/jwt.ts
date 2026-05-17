@@ -9,6 +9,7 @@ export interface AccessToken {
     displayName: string;
     avatarUrl: string | null;
     tier: number;
+    extraWidgetQuota: number;
 }
 
 const ACCESS_TOKEN_EXPIRY = "15m";

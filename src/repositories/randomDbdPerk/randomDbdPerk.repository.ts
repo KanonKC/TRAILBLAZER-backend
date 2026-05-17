@@ -30,7 +30,11 @@ export default class RandomDbdPerkRepository {
                 }
             },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
                 classes: {
                     orderBy: {
                         type: "desc"
@@ -61,7 +65,11 @@ export default class RandomDbdPerkRepository {
                 } : undefined
             },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
                 classes: {
                     orderBy: {
                         type: "desc"
@@ -81,7 +89,11 @@ export default class RandomDbdPerkRepository {
         return prisma.randomDbdPerk.findUnique({
             where: { id },
             include: {
-                widget: true,
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
                 classes: {
                     orderBy: {
                         type: "desc"
@@ -107,7 +119,11 @@ export default class RandomDbdPerkRepository {
             return prisma.randomDbdPerk.findUnique({
                 where: { widget_id: widget.id },
                 include: {
-                    widget: true,
+                    widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
                     classes: {
                         orderBy: {
                             type: "desc"
@@ -136,7 +152,11 @@ export default class RandomDbdPerkRepository {
             return prisma.randomDbdPerk.findUnique({
                 where: { widget_id: widget.id },
                 include: {
-                    widget: true,
+                    widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
                     classes: {
                         orderBy: {
                             type: "desc"

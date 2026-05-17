@@ -12,6 +12,7 @@ import { generateRefreshToken, signAccessToken } from "@/libs/jwt";
 import { ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
+import ReferralService from "../referral/referral.service";
 import { UserTier } from "./constant";
 import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
@@ -25,6 +26,7 @@ export default class UserService {
     private readonly logger: TLogger
     private readonly authService: AuthService
     private widgetService?: WidgetService;
+    private referralService?: ReferralService;
 
     constructor(cfg: Configurations, userRepository: UserRepository, authRepository: AuthRepository, authService: AuthService) {
         this.cfg = cfg
@@ -36,6 +38,10 @@ export default class UserService {
 
     public setWidgetService(widgetService: WidgetService) {
         this.widgetService = widgetService;
+    }
+
+    public setReferralService(referralService: ReferralService) {
+        this.referralService = referralService;
     }
 
     async login(request: LoginRequest): Promise<{ accessToken: string, refreshToken: string, user: User }> {
@@ -66,8 +72,21 @@ export default class UserService {
             avatar_url: twitchUser.profilePictureUrl
         }
         this.logger.debug({ message: "Creating user request", data: cr });
+        
+        const existingUser = await this.userRepository.getByTwitchId(twitchUser.id);
+        const isNewUser = !existingUser;
+        
         const user = await this.userRepository.upsert(cr)
-        this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username } });
+        this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
+
+        if (isNewUser && request.ref && this.referralService) {
+            await this.referralService.handleReferralRegistration(request.ref, user.id);
+            // Refresh user object to get updated quotas from referral
+            const updatedUser = await this.userRepository.get(user.id);
+            if (updatedUser) {
+                Object.assign(user, updatedUser);
+            }
+        }
         await this.authRepository.updateTwitchToken(user.id, {
             twitch_refresh_token: token.refreshToken,
             twitch_token_expires_at: token.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
@@ -80,7 +99,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         const refreshToken = generateRefreshToken();
 
@@ -125,7 +145,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         const newRefreshToken = generateRefreshToken();
 
@@ -150,10 +171,10 @@ export default class UserService {
         return user;
     }
 
-    async update(id: string, request: Partial<User>) {
+    async update(id: string, request: Partial<User>, tx?: any) {
         this.logger.setContext("service.user.update");
         try {
-            const user = await this.userRepository.update(id, request)
+            const user = await this.userRepository.update(id, request, tx)
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
@@ -233,7 +254,8 @@ export default class UserService {
             displayName: user.display_name,
             avatarUrl: user.avatar_url,
             twitchId: user.twitch_id,
-            tier: user.tier
+            tier: user.tier,
+            extraWidgetQuota: user.extra_widget_quota
         });
         return accessToken;
     }
@@ -247,18 +269,21 @@ export default class UserService {
         try {
             const user = await this.get(userId)
             const tier = await this.getTierFromTwitch(user.twitch_id)
-            const activeWidgets = await this.widgetService.getTotalByOwnerId(userId, { enabled: true })
-            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, activeWidgets } });
-            if (activeWidgets > 1 && tier < 1) {
-                this.logger.info({ message: "Disabling all widgets", data: { userId } });
-                await this.widgetService.disableAll(userId)
-                await redis.del(`user:tier:${userId}`)
-            }
+            
+            // Update tier first so getQuota uses the new tier
             const tierExpireDate = generateTierExpireDate()
             await this.update(userId, {
                 tier: tier,
                 tier_expire_at: tier === 0 ? null : tierExpireDate
             })
+
+            const quotaInfo = await this.widgetService.getQuota(userId)
+            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
+            
+            if (quotaInfo.used_quota > quotaInfo.total_quota) {
+                this.logger.info({ message: "Quota exceeded after tier adjustment, disabling all widgets", data: { userId, quotaInfo } });
+                await this.widgetService.disableAll(userId)
+            }
         } catch (err) {
             if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
                 this.logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });

@@ -1,4 +1,5 @@
 import UserService from "@/services/user/user.service";
+import ReferralService from "@/services/referral/referral.service";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { getUserFromRequest } from "../middleware";
 import { GetTierQuery, LoginQuery } from "./request";
@@ -14,11 +15,13 @@ export default class UserController {
 
     private readonly cfg: Configurations;
     private readonly userService: UserService;
+    private readonly referralService: ReferralService;
     private readonly logger: TLogger;
 
-    constructor(cfg: Configurations, userService: UserService) {
+    constructor(cfg: Configurations, userService: UserService, referralService: ReferralService) {
         this.cfg = cfg;
         this.userService = userService;
+        this.referralService = referralService;
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
@@ -27,10 +30,19 @@ export default class UserController {
         this.logger.info({ message: "Login attempt initiated" });
         try {
             const query = loginSchema.parse(req.query);
+            
+            // Extract ref from state if present (format: nonce:ref)
+            let ref: string | undefined = undefined;
+            if (query.state && query.state.includes(":")) {
+                const parts = query.state.split(":");
+                ref = parts[1];
+            }
+
             const request = {
                 code: query.code,
                 state: query.state,
-                scope: query.scope.split(" ")
+                scope: query.scope.split(" "),
+                ref: ref
             };
 
             const { accessToken, refreshToken, user } = await this.userService.login(request);
@@ -80,9 +92,10 @@ export default class UserController {
         try {
             // TODO: Define interface for decoded token to avoid using any
             const decoded = verifyToken(token) as any;
-            const currentTier = await this.userService.getTier(decoded.id);
-            decoded.tier = currentTier;
-            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(decoded.id);
+            const user = await this.userService.get(decoded.id);
+            decoded.tier = await this.userService.getTier(user.id);
+            decoded.extraWidgetQuota = user.extra_widget_quota;
+            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
             this.logger.info({ message: "Successfully retrieved user info", data: decoded });
             res.send(decoded);
         } catch (err) {
@@ -172,6 +185,24 @@ export default class UserController {
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
+
+    async getReferralStatus(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.user.getReferralStatus");
+        const token = req.cookies.accessToken;
+        if (!token) return res.status(401).send({ message: "Unauthorized" });
+
+        try {
+            const decoded = verifyToken(token);
+            const user = await this.userService.get(decoded.id);
+            const code = await this.referralService.getOrCreateCode(user.id, user.twitch_id);
+            const status = await this.referralService.getReferralStatus(user.id);
+            
+            res.send({ ...status, code });
+        } catch (err) {
+            this.logger.error({ message: "Failed to get referral status", error: err as string | Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

@@ -22,12 +22,29 @@ export default class FirstWordRepository {
                     }
                 }
             },
-            include: { widget: true, audio: true }
+            include: { 
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                }, 
+                audio: true 
+            }
         });
     }
 
     async get(id: string) {
-        return prisma.firstWord.findUnique({ where: { id }, include: { widget: true, audio: true } });
+        return prisma.firstWord.findUnique({ 
+            where: { id }, 
+            include: { 
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                }, 
+                audio: true 
+            } 
+        });
     }
 
     async getByOwnerId(ownerId: string): Promise<FirstWordWidget | null> {
@@ -39,7 +56,17 @@ export default class FirstWordRepository {
                 }
             }
         });
-        return prisma.firstWord.findUnique({ where: { widget_id: widget.id }, include: { widget: true, audio: true } });
+        return prisma.firstWord.findUnique({ 
+            where: { widget_id: widget.id }, 
+            include: { 
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                }, 
+                audio: true 
+            } 
+        });
     }
 
     async getByTwitchId(twitchId: string): Promise<FirstWordWidget | null> {
@@ -51,14 +78,31 @@ export default class FirstWordRepository {
                 }
             }
         });
-        return prisma.firstWord.findUnique({ where: { widget_id: widget.id }, include: { widget: true, audio: true } });
+        return prisma.firstWord.findUnique({ 
+            where: { widget_id: widget.id }, 
+            include: { 
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                }, 
+                audio: true 
+            } 
+        });
     }
 
     async update(id: string, request: UpdateFirstWord): Promise<FirstWordWidget> {
         return prisma.firstWord.update({
             where: { id },
             data: request,
-            include: { widget: true, audio: true }
+            include: { 
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                }, 
+                audio: true 
+            }
         });
     }
 
