@@ -79,6 +79,7 @@ describe("UserService", () => {
         mockWidgetService = {
             getTotalByOwnerId: jest.fn(),
             disableAll: jest.fn(),
+            getQuota: jest.fn().mockResolvedValue({ total_quota: 1, used_quota: 0, remaining_quota: 1 }),
         } as any;
         mockCfg = {
             twitch: {
@@ -246,7 +247,7 @@ describe("UserService", () => {
 
             const result = await service.getTier("u1", { forceTwitch: true });
             expect(result).toBe(2);
-            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", expect.objectContaining({ tier: 2 }));
+            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", expect.objectContaining({ tier: 2 }), undefined);
         });
 
         it("should reset tier to 0 if no twitch subscription", async () => {
@@ -258,7 +259,7 @@ describe("UserService", () => {
 
             const result = await service.getTier("u1");
             expect(result).toBe(0);
-            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier_expire_at: null });
+            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier: 0, tier_expire_at: null }, undefined);
         });
     });
 
@@ -272,7 +273,7 @@ describe("UserService", () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
             const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue(null) } };
             mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
-            mockWidgetService.getTotalByOwnerId.mockResolvedValue(2);
+            mockWidgetService.getQuota.mockResolvedValue({ total_quota: 1, used_quota: 2, remaining_quota: 0 });
             mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
 
             await service.adjustTierAndWidgets("u1");

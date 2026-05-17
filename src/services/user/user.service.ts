@@ -209,14 +209,20 @@ export default class UserService {
         } else {
             tier = await this.getTierFromTwitch(user.twitch_id)
             const tierExpireDate = generateTierExpireDate()
-            await this.update(user.id, {
-                tier: tier,
-            })
             if (tier === 0) {
-                await this.update(user.id, { tier_expire_at: null })
-            }
-            else if (!user.tier_expire_at || user.tier_expire_at < tierExpireDate) {
-                await this.update(user.id, { tier_expire_at: tierExpireDate })
+                await this.update(user.id, {
+                    tier: tier,
+                    tier_expire_at: null,
+                })
+            } else if (!user.tier_expire_at || user.tier_expire_at < tierExpireDate) {
+                await this.update(user.id, {
+                    tier: tier,
+                    tier_expire_at: tierExpireDate,
+                })
+            } else {
+                await this.update(user.id, {
+                    tier: tier,
+                })
             }
         }
 
