@@ -1,6 +1,6 @@
 import Configurations from "@/config/index";
 import redis, { TTL } from "@/libs/redis";
-import { twitchAppAPI } from "@/libs/twurple";
+import { createTwitchUserAPI, twitchAppAPI } from "@/libs/twurple";
 import AuthRepository from "@/repositories/auth/auth.repository";
 import { CreateUserRequest } from "@/repositories/user/request";
 import UserRepository from "@/repositories/user/user.repository";
@@ -368,5 +368,12 @@ export default class UserService {
         const showcase = await this.userRepository.listShowcase()
         await redis.set(cacheKey, JSON.stringify(showcase), TTL.ONE_DAY)
         return { data: showcase as ListUserShowcaseResponse['data'] }
+    }
+
+    async listTwitchEventSubs(userId: string) {
+        const user = await this.get(userId)
+        const twitchUserApi = await this.authService.createTwitchUserAPI(userId)
+        const events = await twitchUserApi.eventSub.getSubscriptionsForUser(user.twitch_id)
+        return events.data
     }
 }
