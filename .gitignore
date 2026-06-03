@@ -12,3 +12,5 @@ dev.db
 login.txt
 
 coverage
+
+.claude/

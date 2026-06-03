@@ -266,8 +266,8 @@ export default class FirstWordService {
             return
         }
 
-        // Add chatter to database if not test user to prevent duplicate greetings
         if (e.chatter_user_id !== "0") {
+            // Add chatter to database if not test user to prevent duplicate greetings
             this.logger.info({ message: "Adding chatter to database", data: { chatter: e.chatter_user_id } });
             try {
                 await this.firstWordRepository.addChatter({
@@ -282,6 +282,15 @@ export default class FirstWordService {
                 this.logger.error({ message: "Failed to add chatter to database", error: error as Error });
                 return
             }
+
+            // Increase chatter greet count
+            this.logger.info({ message: "Increasing chatter greet count", data: { chatter: e.chatter_user_id } });
+            try {
+                await this.firstWordRepository.createOrIncrementGreetCount(firstWord.id, e.chatter_user_id, e.broadcaster_user_id)
+            } catch (error) {
+                this.logger.error({ message: "Failed to increase chatter greet count", error: error as Error });
+                return
+            }
         }
 
         this.logger.info({ message: "Found custom reply", data: { firstWord, chatterId: e.chatter_user_id } });
@@ -293,8 +302,10 @@ export default class FirstWordService {
 
         // If replay message does not empty -> Send message to Twitch
         if (message) {
+            const greetCount = await this.firstWordRepository.getGreetCount(e.chatter_user_id, e.broadcaster_user_id)
             const replaceMap = {
-                "{{user_name}}": e.chatter_user_name
+                "{{user_name}}": e.chatter_user_name,
+                "{{greet_count}}": (greetCount?.count || 0).toString()
             }
             message = mapMessageVariables(message, replaceMap)
             this.logger.debug({ message: "send chat message", data: { broadcaster_user_id: e.broadcaster_user_id, message } });

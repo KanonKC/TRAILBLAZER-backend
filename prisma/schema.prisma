@@ -126,6 +126,7 @@ model FirstWord {
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   first_word_custom_replies FirstWordCustomReply[]
+  greet_counts              FirstWordGreetCount[]
 }
 
 model FirstWordChatter {
@@ -155,6 +156,19 @@ model FirstWordCustomReply {
   updated_at                DateTime      @updatedAt
 
   @@unique([twitch_chatter_id, first_word_id])
+}
+
+model FirstWordGreetCount {
+  id                Int       @id @default(autoincrement())
+  twitch_chatter_id String
+  twitch_channel_id String
+  count             Int       @default(0)
+  first_word_id     String
+  first_word        FirstWord @relation(fields: [first_word_id], references: [id], onDelete: Cascade)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@unique([twitch_chatter_id, twitch_channel_id])
 }
 
 model ClipShoutout {
