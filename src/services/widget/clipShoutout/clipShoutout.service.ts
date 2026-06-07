@@ -141,7 +141,7 @@ export default class ClipShoutoutService {
                         userId: csConfig.widget.owner_id
                     }))
                 } catch (err) {
-                    this.logger.error({ message: "Publish clip shoutout failed", error: err as Error });
+                    this.logger.error({ message: "Publish clip shoutout failed", error: String(err) });
                 }
             }
         }
