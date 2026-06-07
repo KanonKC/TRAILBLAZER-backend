@@ -1,0 +1,31 @@
+meta {
+  name: Get Clip
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{TwitchGQLBaseURL}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "operationName": "VideoAccessToken_Clip",
+    "variables": {
+      "slug": "PeacefulCreativeSageYee-cltdWyJHnUx3MSku"
+    },
+    "extensions": {
+      "persistedQuery": {
+        "version": 1,
+        "sha256Hash": "{{TwitchGQL256Hash}}"
+      }
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

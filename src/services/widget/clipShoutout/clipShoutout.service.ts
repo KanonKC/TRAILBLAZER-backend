@@ -70,7 +70,7 @@ export default class ClipShoutoutService {
         // Check if the raid has already been raided (Twitch sometimes sends duplicate events)
         const cooldownCacheKey = `clip_shoutout:shoutout_cooldown:${event.broadcaster_user_id}:${event.raid.user_id}`
         const cachedCooldown = await redis.get(cooldownCacheKey)
-        if (cachedCooldown) {
+        if (cachedCooldown && event.chatter_user_id !== "0") {
             this.logger.info({ message: "Shoutout cooldown was not expired", data: { event } });
             return
         }
@@ -129,16 +129,20 @@ export default class ClipShoutoutService {
             }
 
             if (clips.data.length > 0) {
-                const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
-                this.logger.info({ message: "Playing video clip", data: { title: selectedClip.title, id: selectedClip.id } });
-                const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
-                this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
-                this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
-                await publisher.publish("clip-shoutout-clip", JSON.stringify({
-                    url: clipProductionUrl,
-                    duration: selectedClip.duration,
-                    userId: csConfig.widget.owner_id
-                }))
+                try {
+                    const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
+                    this.logger.info({ message: "Get video clip", data: { title: selectedClip.title, id: selectedClip.id } });
+                    const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
+                    this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
+                    this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
+                    await publisher.publish("clip-shoutout-clip", JSON.stringify({
+                        url: clipProductionUrl,
+                        duration: selectedClip.duration,
+                        userId: csConfig.widget.owner_id
+                    }))
+                } catch (err) {
+                    this.logger.error({ message: "Publish clip shoutout failed", error: err as Error });
+                }
             }
         }
 

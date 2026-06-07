@@ -23,7 +23,8 @@ export default class TwitchGql {
         const body = {
             "operationName": "VideoAccessToken_Clip",
             "variables": {
-                "slug": slug
+                "slug": slug,
+                "platform": "web"
             },
             "extensions": {
                 "persistedQuery": {
