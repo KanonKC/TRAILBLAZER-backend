@@ -16,6 +16,7 @@ export default class TwitchChannelRedemptionAddEvent {
     }
 
     async handle(req: FastifyRequest, res: FastifyReply) {
+        console.log("handle event channelRedem")
         this.logger.setContext("event.twitch.channelRedemptionAdd.handle");
         const body = req.body as any
 

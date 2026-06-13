@@ -5,15 +5,24 @@ import { SpotifySongRequestWidget } from "@/repositories/spotifySongRequest/resp
 import { UpdateSpotifySongRequest } from "@/repositories/spotifySongRequest/request";
 import UserRepository from "@/repositories/user/user.repository";
 import WidgetService from "@/services/widget/widget.service";
-import { NotFoundError, BadRequestError } from "@/errors";
+import { ForbiddenError, NotFoundError } from "@/errors";
 import { randomBytes } from "node:crypto";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
-import { twitchAppAPI } from "@/libs/twurple";
+import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import AuthService from "@/services/auth/auth.service";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
 import { mapMessageVariables } from "@/utils/message";
 import { Track } from "@spotify/web-api-ts-sdk";
 import { InsertSpotifyTrackResponse } from "./response";
+
+export interface CreateSpotifySongRequestServiceRequest {
+    twitch_id: string;
+    owner_id: string;
+    twitchRewardId?: string;
+    twitchBotId?: string;
+    invalidMessage?: string;
+    successMessage?: string;
+}
 
 export default class SpotifySongRequestService {
 
@@ -37,6 +46,80 @@ export default class SpotifySongRequestService {
         this.spotify = spotify;
         this.widgetService = widgetService;
         this.authService = authService;
+    }
+
+    async create(request: CreateSpotifySongRequestServiceRequest): Promise<SpotifySongRequestWidget> {
+        this.logger.setContext("service.spotifySongRequest.create");
+        this.logger.info({ message: "Creating spotify song request config", data: { request } });
+
+        const user = await this.userRepository.get(request.owner_id);
+        if (!user) {
+            this.logger.warn({ message: "User not found", data: { request } });
+            throw new NotFoundError("User not found");
+        }
+
+        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
+        console.log("UserSubs", userSubs.data.map(u => ({...u})))
+        const enabledSubs = userSubs.data.filter(sub => sub.status === "enabled");
+        const hasChatMessageSub = enabledSubs.some(sub => sub.type === "channel.chat.message");
+        if (!hasChatMessageSub) {
+            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-chat-message");
+            await twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents(user.twitch_id, tsp);
+        }
+
+        const res = await this.spotifyRepository.create({
+            twitch_id: request.twitch_id,
+            owner_id: request.owner_id,
+            overlay_key: randomBytes(16).toString("hex"),
+            twitchRewardId: request.twitchRewardId,
+            twitchBotId: request.twitchBotId,
+            invalidMessage: request.invalidMessage,
+            successMessage: request.successMessage,
+        });
+
+        await this.widgetService.setInitialEnabled(res.widget_id, user.id);
+        this.logger.info({ message: "Spotify song request config created", data: { userId: user.id } });
+        return res;
+    }
+
+    async getByUserId(userId: string): Promise<SpotifySongRequestWidget> {
+        this.logger.setContext("service.spotifySongRequest.getByUserId");
+        this.logger.info({ message: "Getting spotify song request config", data: { userId } });
+        const config = await this.spotifyRepository.getByOwnerId(userId);
+        if (!config) {
+            this.logger.error({ message: "Spotify song request config not found", data: { userId } });
+            throw new NotFoundError("Spotify song request config not found");
+        }
+        this.logger.info({ message: "Got spotify song request config", data: { userId, config } });
+        return config;
+    }
+
+    async update(userId: string, data: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+        this.logger.setContext("service.spotifySongRequest.update");
+        this.logger.info({ message: "Updating spotify song request config", data: { userId, data } });
+        const existing = await this.getByUserId(userId);
+        this.authorize(userId, existing);
+        const updated = await this.spotifyRepository.update(existing.id, data);
+        this.logger.info({ message: "Spotify song request config updated", data: { userId } });
+        return updated;
+    }
+
+    async delete(userId: string): Promise<void> {
+        this.logger.setContext("service.spotifySongRequest.delete");
+        this.logger.info({ message: "Deleting spotify song request config", data: { userId } });
+        const existing = await this.spotifyRepository.getByOwnerId(userId);
+        if (!existing) {
+            return;
+        }
+        this.authorize(userId, existing);
+        await this.spotifyRepository.delete(existing.id);
+        this.logger.info({ message: "Spotify song request config deleted", data: { userId } });
+    }
+
+    private authorize(userId: string, config: SpotifySongRequestWidget): void {
+        if (config.widget.owner_id !== userId) {
+            throw new ForbiddenError("You do not own this resource");
+        }
     }
 
     async getByTwitchId(twitchId: string) {
@@ -79,6 +162,7 @@ export default class SpotifySongRequestService {
     }
 
     async handleTwitchEvent(e: TwitchChannelChatMessageEventRequest) {
+        console.log("Handle Twitch Spotify Event")
         if (!e.channel_points_custom_reward_id) {
             return;
         }
@@ -111,6 +195,7 @@ export default class SpotifySongRequestService {
         let message = config.success_message;
         let insertResponse: InsertSpotifyTrackResponse | null = null;
         try {
+            console.log("--- Start ---")
             insertResponse = await this.insertSpotifyTrack(config.widget.owner_id, e.message.text);
         } catch (err) {
             message = config.invalid_message;

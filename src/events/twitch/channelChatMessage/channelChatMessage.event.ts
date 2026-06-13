@@ -20,6 +20,7 @@ export default class TwitchChannelChatMessageEvent {
     }
 
     async handle(req: FastifyRequest, res: FastifyReply) {
+        console.log("handle event chatMessage")
         this.logger.setContext("event.twitch.channelChatMessage.handle");
         const body = req.body as any
 
