@@ -3,5 +3,6 @@ export enum WidgetTypeSlug {
     CLIP_SHOUTOUT = "clip-shoutout",
     RANDOM_DBD_PERK = "random-dbd-perk",
     DROP_IMAGE = "drop-image",
-    EXPORT_VIDEO = "export-video"
+    EXPORT_VIDEO = "export-video",
+    SPOTIFY_SONG_REQUEST = "spotify-song-request",
 }
