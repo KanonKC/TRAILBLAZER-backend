@@ -230,6 +230,7 @@ server.delete("/api/v1/uploaded-files/:id", uploadedFileController.delete.bind(u
 
 server.get("/api/v1/twitch/channel-rewards", twitchController.listChannelRewards.bind(twitchController));
 server.get("/api/v1/twitch/user", twitchController.getUser.bind(twitchController));
+server.get("/api/v1/twitch/event-subs", twitchController.listEventSubs.bind(twitchController));
 server.post("/api/v1/twitch/export-videos", twitchGqlController.exportVideoToYoutube.bind(twitchGqlController));
 
 server.get("/api/v1/linked-accounts", linkedAccountController.list.bind(linkedAccountController));

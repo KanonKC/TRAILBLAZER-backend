@@ -59,7 +59,6 @@ export default class SpotifySongRequestService {
         }
 
         const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        console.log("UserSubs", userSubs.data.map(u => ({...u})))
         const enabledSubs = userSubs.data.filter(sub => sub.status === "enabled");
         const hasChatMessageSub = enabledSubs.some(sub => sub.type === "channel.chat.message");
         if (!hasChatMessageSub) {
@@ -132,19 +131,24 @@ export default class SpotifySongRequestService {
         try {
             const spotifyAPI = await this.spotify.createUserAPI(userId);
 
+            console.log("Pass authen")
+
             let track: Track | null = null;
 
+            console.log("Pass authen1")
             if (query.startsWith("https://open.spotify.com/track")) {
                 const id = query.split("/").pop()?.split("?")[0];
                 if (!id) {
                     throw new Error("Invalid Spotify URL")
-                } ;
+                };
+                console.log("Pass authen 2", id, spotifyAPI)
                 track = await spotifyAPI.tracks.get(id);
             } else {
                 const search = await spotifyAPI.search(query, ["track"]);
                 if (!search.tracks || search.tracks.items.length === 0) {
                     throw new Error("Track not found")
                 }
+                console.log("Pass authen 3", search)
                 track = search.tracks.items[0];
             }
 
@@ -152,11 +156,13 @@ export default class SpotifySongRequestService {
                 throw new Error("Track not found");
             };
 
+            console.log("Add URI", track)
             await spotifyAPI.player.addItemToPlaybackQueue(track.uri);
 
             return { track };
         } catch (error) {
-            this.logger.error({ message: "Failed to insert spotify track", error: error as Error, data: { userId, query } });
+            console.log("Failed insert layer", error)
+            this.logger.error({ message: "Failed to insert spotify track", error: String(error), data: { userId, query } });
             throw error;
         }
     }
@@ -183,7 +189,8 @@ export default class SpotifySongRequestService {
             return;
         }
 
-        const twitchUserAPI = await this.authService.createTwitchUserAPI(config.widget.owner_id)
+        console.log("Handle Twitch Spotify Event 2")
+        const twitchUserAPI = await this.authService.createTwitchUserAPI(config.widget.twitch_id)
 
         const sendChatMessageOptions: HelixSendChatMessageAsAppParams = {}
         if (e.message_id.startsWith("test-message-id")) {
@@ -191,13 +198,14 @@ export default class SpotifySongRequestService {
         } else {
             sendChatMessageOptions.replyParentMessageId = e.message_id;
         }
-        
+
         let message = config.success_message;
         let insertResponse: InsertSpotifyTrackResponse | null = null;
         try {
             console.log("--- Start ---")
             insertResponse = await this.insertSpotifyTrack(config.widget.owner_id, e.message.text);
         } catch (err) {
+            // console.log("FAILED", err)
             message = config.invalid_message;
         }
 
@@ -209,7 +217,7 @@ export default class SpotifySongRequestService {
             "{{track_name}}": insertResponse.track.name,
             "{{track_artist}}": insertResponse.track.artists.map((artist) => artist.name).join(", "),
         }
-        
+
         if (config.twitch_bot_id && message) {
             const formatMessage = mapMessageVariables(message, replaceMap)
             twitchUserAPI.chat.sendChatMessageAsApp(

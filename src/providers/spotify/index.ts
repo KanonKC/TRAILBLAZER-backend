@@ -1,9 +1,7 @@
 import Configurations from "@/config/index";
 import TLogger, { Layer } from "@/logging/logger";
 import LinkedAccountRepository from "@/repositories/linkedAccount/linkedAccount.repository";
-import { AccessToken, SpotifyApi } from "@spotify/web-api-ts-sdk";
-import axios from "axios";
-import { SpotifyTokenResponse } from "./response";
+import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 
 export default class Spotify {
 
@@ -31,27 +29,12 @@ export default class Spotify {
             throw new Error("No refresh token found")
         }
 
-        const url = "https://accounts.spotify.com/api/token";
-
-        const payload = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: {
-                grant_type: 'refresh_token',
-                refresh_token: refreshToken,
-                client_id: this.cfg.spotify.clientId
-            },
-        }
-
-        const response = await axios.post<SpotifyTokenResponse>(url, payload)
-        const accessToken = response.data.access_token as unknown as AccessToken
-
-        const spotifyApi = SpotifyApi.withAccessToken(this.cfg.spotify.clientId, accessToken)
-
-        return spotifyApi
+        return SpotifyApi.withAccessToken(this.cfg.spotify.clientId, {
+            access_token: "",
+            token_type: "Bearer",
+            expires_in: 0,
+            refresh_token: refreshToken,
+        })
     }
-
 
 }

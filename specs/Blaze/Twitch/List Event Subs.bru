@@ -1,0 +1,16 @@
+meta {
+  name: List Event Subs
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{BaseURL}}/api/v1/twitch/event-subs
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
