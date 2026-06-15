@@ -13,7 +13,7 @@ export default class SpotifySongRequestRepository {
                 twitch_bot_id: request.twitchBotId,
                 invalid_message: request.invalidMessage,
                 success_message: request.successMessage,
-                noActiveMessage: request.noActiveMessage,
+                no_active_message: request.noActiveMessage,
                 widget: {
                     create: {
                         twitch_id: request.twitch_id,

@@ -50,10 +50,12 @@ export default class SpotifySongRequestController {
     }
 
     async get(req: FastifyRequest, res: FastifyReply) {
+        console.log("Call get")
         this.logger.setContext("controller.spotifySongRequest.get");
         this.logger.info({ message: "Getting spotify song request config" });
         const user = getUserFromRequest(req);
         if (!user) {
+            console.log("UNauth")
             this.logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
@@ -61,8 +63,10 @@ export default class SpotifySongRequestController {
         try {
             const config = await this.spotifySongRequestService.getByUserId(user.id);
             this.logger.info({ message: "Successfully retrieved spotify song request", data: { userId: user.id } });
+            console.log("Config", config)
             res.send(config);
         } catch (error) {
+            console.log("err", error)
             this.logger.error({ message: "Failed to get spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
@@ -81,7 +85,7 @@ export default class SpotifySongRequestController {
         }
 
         try {
-            const request = updateSpotifySongRequestSchema.parse(req.body);
+            const request = updateSpotifySongRequestSchema.parse(req.body);request
             const updated = await this.spotifySongRequestService.update(user.id, request);
             this.logger.info({ message: "Successfully updated spotify song request", data: { userId: user.id } });
             res.send(updated);

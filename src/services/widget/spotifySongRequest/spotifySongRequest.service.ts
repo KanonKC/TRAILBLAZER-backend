@@ -74,9 +74,9 @@ export default class SpotifySongRequestService {
             overlay_key: randomBytes(16).toString("hex"),
             twitchRewardId: request.twitchRewardId,
             twitchBotId: request.twitchBotId,
-            invalidMessage: request.invalidMessage,
-            successMessage: request.successMessage,
-            noActiveMessage: request.noActiveMessage,
+            invalidMessage: request.invalidMessage || "เกิดข้อผิดพลาดในการใส่เพลง ลองใหม่อีกครั้ง",
+            successMessage: request.successMessage || "เพิ่มเพลง {{track_name}} - {{track_artist}} แล้ว",
+            noActiveMessage: request.noActiveMessage || "ตอนนี้ยังไม่สามารถใส่เพลงได้ เนื่องจากยังไม่ได้เปิด Spotify",
         });
 
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
@@ -222,7 +222,7 @@ export default class SpotifySongRequestService {
         } catch (err) {
             console.log("FAILED", err)
             if (err instanceof NoActiveDeviceError) {
-                message = config.noActiveMessage ?? "ลืมเปิดเครื่อง"
+                message = config.no_active_message;
             } else {
                 message = config.invalid_message;
             }

@@ -284,14 +284,14 @@ model ReferralCode {
 }
 
 model SpotifySongRequest {
-  id               String   @id @default(uuid())
-  twitch_reward_id String?  @unique
-  twitch_bot_id    String?
-  invalid_message  String?
-  success_message  String?
-  noActiveMessage  String?
-  widget_id        String   @unique
-  widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id                String   @id @default(uuid())
+  twitch_reward_id  String?  @unique
+  twitch_bot_id     String?
+  invalid_message   String?
+  success_message   String?
+  no_active_message String?
+  widget_id         String   @unique
+  widget            Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 }

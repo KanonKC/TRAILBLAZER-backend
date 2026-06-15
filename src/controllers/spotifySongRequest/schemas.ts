@@ -7,7 +7,7 @@ export const createSpotifySongRequestSchema = z.object({
     twitch_bot_id: z.string().optional().nullable(),
     invalid_message: z.string().optional().nullable(),
     success_message: z.string().optional().nullable(),
-    noActiveMessage: z.string().optional().nullable(),
+    no_active_message: z.string().optional().nullable(),
 });
 
 export const updateSpotifySongRequestSchema = z.object({
@@ -15,7 +15,7 @@ export const updateSpotifySongRequestSchema = z.object({
     twitch_bot_id: z.string().optional().nullable(),
     invalid_message: z.string().optional().nullable(),
     success_message: z.string().optional().nullable(),
-    noActiveMessage: z.string().optional().nullable(),
+    no_active_message: z.string().optional().nullable(),
     enabled: z.boolean().optional(),
     overlay_key: z.string().optional(),
 });
