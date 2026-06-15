@@ -14,6 +14,7 @@ import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/end
 import { mapMessageVariables } from "@/utils/message";
 import { Track } from "@spotify/web-api-ts-sdk";
 import { InsertSpotifyTrackResponse } from "./response";
+import { NoActiveDeviceError } from "./error";
 
 export interface CreateSpotifySongRequestServiceRequest {
     twitch_id: string;
@@ -22,6 +23,7 @@ export interface CreateSpotifySongRequestServiceRequest {
     twitchBotId?: string;
     invalidMessage?: string;
     successMessage?: string;
+    noActiveMessage?: string;
 }
 
 export default class SpotifySongRequestService {
@@ -74,6 +76,7 @@ export default class SpotifySongRequestService {
             twitchBotId: request.twitchBotId,
             invalidMessage: request.invalidMessage,
             successMessage: request.successMessage,
+            noActiveMessage: request.noActiveMessage,
         });
 
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
@@ -141,7 +144,7 @@ export default class SpotifySongRequestService {
                 if (!id) {
                     throw new Error("Invalid Spotify URL")
                 };
-                console.log("Pass authen 2", id, spotifyAPI)
+                console.log("Pass authen 2")
                 track = await spotifyAPI.tracks.get(id);
             } else {
                 const search = await spotifyAPI.search(query, ["track"]);
@@ -156,12 +159,24 @@ export default class SpotifySongRequestService {
                 throw new Error("Track not found");
             };
 
-            console.log("Add URI", track)
-            await spotifyAPI.player.addItemToPlaybackQueue(track.uri);
-
-            return { track };
+            try {
+                const spotifyRes = await spotifyAPI.player.addItemToPlaybackQueue(track.uri);
+                console.log("Done", spotifyRes)
+            } catch (err) {
+                // console.log("Spotify Failed", err)
+                if (String(err).includes("Unexpected token") || String(err).includes("Unexpected non-whitespace")) {
+                    // Free to go!
+                } else if (String(err).includes("NO_ACTIVE_DEVICE")) {
+                    throw new NoActiveDeviceError()
+                }
+            }
+            console.log("Return Track to function")
+            return {
+                name: track.album.name,
+                artists: track.artists.map(a => a.name),
+                url: track.external_urls.spotify
+            };
         } catch (error) {
-            console.log("Failed insert layer", error)
             this.logger.error({ message: "Failed to insert spotify track", error: String(error), data: { userId, query } });
             throw error;
         }
@@ -205,27 +220,32 @@ export default class SpotifySongRequestService {
             console.log("--- Start ---")
             insertResponse = await this.insertSpotifyTrack(config.widget.owner_id, e.message.text);
         } catch (err) {
-            // console.log("FAILED", err)
-            message = config.invalid_message;
-        }
-
-        if (!insertResponse) {
-            return
+            console.log("FAILED", err)
+            if (err instanceof NoActiveDeviceError) {
+                message = config.noActiveMessage ?? "ลืมเปิดเครื่อง"
+            } else {
+                message = config.invalid_message;
+            }
         }
 
         const replaceMap = {
-            "{{track_name}}": insertResponse.track.name,
-            "{{track_artist}}": insertResponse.track.artists.map((artist) => artist.name).join(", "),
+            "{{track_name}}": insertResponse?.name,
+            "{{track_artist}}": insertResponse?.artists.join(", "),
         }
 
+        console.log("Replace Map", replaceMap)
+
         if (config.twitch_bot_id && message) {
+            console.log("Before format")
             const formatMessage = mapMessageVariables(message, replaceMap)
-            twitchUserAPI.chat.sendChatMessageAsApp(
+            console.log("After format", formatMessage)
+            await twitchAppAPI.chat.sendChatMessageAsApp(
                 config.twitch_bot_id,
                 config.widget.twitch_id,
                 formatMessage,
                 sendChatMessageOptions
             )
+            console.log("Send complete!!!")
         }
     }
 }

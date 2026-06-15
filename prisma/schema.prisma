@@ -289,6 +289,7 @@ model SpotifySongRequest {
   twitch_bot_id    String?
   invalid_message  String?
   success_message  String?
+  noActiveMessage  String?
   widget_id        String   @unique
   widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at       DateTime @default(now())

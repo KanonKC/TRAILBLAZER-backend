@@ -40,6 +40,7 @@ export default class TwitchChannelChatMessageEvent {
                     this.spotifySongRequestService.handleTwitchEvent(event),
                 ])
             } catch (err: any) {
+                console.log("Handle layer failed", err)
                 this.logger.error({ message: "Handle event failed", error: err })
             }
             res.status(204).send()
