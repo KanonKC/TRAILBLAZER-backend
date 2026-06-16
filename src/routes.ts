@@ -28,6 +28,10 @@ import DropImageService from "./services/widget/dropImage/dropImage.service";
 import ExportVideoService from "./services/widget/exportVideo/exportVideo.service";
 import { UploadedFileService } from "./services/uploadedFile/uploadedFile.service";
 import ReferralService from "./services/referral/referral.service";
+import SpotifySongRequestRepository from "./repositories/spotifySongRequest/spotifySongRequest.repository";
+import SpotifySongRequestService from "./services/widget/spotifySongRequest/spotifySongRequest.service";
+import SpotifySongRequestController from "./controllers/spotifySongRequest/spotifySongRequest.controller";
+import SpotifyProvider from "./providers/spotify/index";
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -96,6 +100,9 @@ const uploadedFileService = new UploadedFileService(config, uploadedFileReposito
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth, spotifyOAuth);
 const exportVideoService = new ExportVideoService(exportVideoRepository, userService, authService, widgetService, twitchGql);
+const spotifyProvider = new SpotifyProvider(config, linkedAccountRepository);
+const spotifySongRequestRepository = new SpotifySongRequestRepository();
+const spotifySongRequestService = new SpotifySongRequestService(spotifySongRequestRepository, userRepository, spotifyProvider, widgetService, authService);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
@@ -116,9 +123,10 @@ const twitchController = new TwitchController(twitchService);
 const linkedAccountController = new LinkedAccountController(linkedAccountService);
 const twitchGqlController = new TwitchGqlController(twitchGql);
 const exportVideoController = new ExportVideoController(exportVideoService);
+const spotifySongRequestController = new SpotifySongRequestController(spotifySongRequestService);
 
 // Event Layer
-const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService)
+const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService, spotifySongRequestService)
 const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService);
 const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService);
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(clipShoutoutService);
@@ -190,6 +198,12 @@ server.put("/api/v1/drop-image", dropImageController.update.bind(dropImageContro
 server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bind(dropImageController));
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
 
+server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.bind(spotifySongRequestController));
+server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
+server.put("/api/v1/spotify-song-request", spotifySongRequestController.update.bind(spotifySongRequestController));
+server.delete("/api/v1/spotify-song-request", spotifySongRequestController.delete.bind(spotifySongRequestController));
+server.post("/api/v1/spotify-song-request/test", spotifySongRequestController.test.bind(spotifySongRequestController));
+
 server.post("/api/v1/export-video", exportVideoController.create.bind(exportVideoController));
 server.get("/api/v1/export-video", exportVideoController.get.bind(exportVideoController));
 server.put("/api/v1/export-video", exportVideoController.update.bind(exportVideoController));
@@ -217,6 +231,7 @@ server.delete("/api/v1/uploaded-files/:id", uploadedFileController.delete.bind(u
 
 server.get("/api/v1/twitch/channel-rewards", twitchController.listChannelRewards.bind(twitchController));
 server.get("/api/v1/twitch/user", twitchController.getUser.bind(twitchController));
+server.get("/api/v1/twitch/event-subs", twitchController.listEventSubs.bind(twitchController));
 server.post("/api/v1/twitch/export-videos", twitchGqlController.exportVideoToYoutube.bind(twitchGqlController));
 
 server.get("/api/v1/linked-accounts", linkedAccountController.list.bind(linkedAccountController));

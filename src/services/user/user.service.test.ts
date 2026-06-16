@@ -3,11 +3,12 @@ import UserRepository from "@/repositories/user/user.repository";
 import AuthRepository from "@/repositories/auth/auth.repository";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
+import ReferralService from "../referral/referral.service";
 import redis, { TTL } from "@/libs/redis";
 import { twitchAppAPI } from "@/libs/twurple";
 import { exchangeCode, getTokenInfo } from "@twurple/auth";
 import { signAccessToken, generateRefreshToken } from "@/libs/jwt";
-import { NotFoundError, UnauthorizedError } from "@/errors";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/errors";
 import { UserTier } from "./constant";
 import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
@@ -59,6 +60,7 @@ describe("UserService", () => {
     let mockAuthRepo: jest.Mocked<AuthRepository>;
     let mockAuthService: jest.Mocked<AuthService>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockReferralService: jest.Mocked<ReferralService>;
     let mockCfg: any;
 
     beforeEach(() => {
@@ -68,6 +70,7 @@ describe("UserService", () => {
             getByTwitchId: jest.fn(),
             update: jest.fn(),
             listExpired: jest.fn(),
+            listShowcase: jest.fn(),
         } as any;
         mockAuthRepo = {
             create: jest.fn(),
@@ -81,6 +84,9 @@ describe("UserService", () => {
             disableAll: jest.fn(),
             getQuota: jest.fn().mockResolvedValue({ total_quota: 1, used_quota: 0, remaining_quota: 1 }),
         } as any;
+        mockReferralService = {
+            handleReferralRegistration: jest.fn(),
+        } as any;
         mockCfg = {
             twitch: {
                 clientId: "client_id",
@@ -92,6 +98,7 @@ describe("UserService", () => {
 
         service = new UserService(mockCfg, mockUserRepo, mockAuthRepo, mockAuthService);
         service.setWidgetService(mockWidgetService);
+        service.setReferralService(mockReferralService);
         jest.clearAllMocks();
     });
 
@@ -138,6 +145,36 @@ describe("UserService", () => {
 
             await service.login(loginReq);
             // Should not throw
+        });
+
+        it("should handle referral registration for new users with a ref code", async () => {
+            (exchangeCode as jest.Mock).mockResolvedValue({ accessToken: "at", refreshToken: "rt", expiresIn: 3600 });
+            (getTokenInfo as jest.Mock).mockResolvedValue({ userId: "t1" });
+            (twitchAppAPI.users.getUserById as jest.Mock).mockResolvedValue({
+                id: "t1", name: "user1", displayName: "User1", profilePictureUrl: "pic"
+            });
+            mockUserRepo.getByTwitchId.mockResolvedValue(null); // new user
+            mockUserRepo.upsert.mockResolvedValue({ id: "u1", username: "user1", twitch_id: "t1", tier: 0 } as any);
+            mockUserRepo.get.mockResolvedValue({ id: "u1", username: "user1", twitch_id: "t1", tier: 0, extra_widget_quota: 1 } as any);
+
+            await service.login({ ...loginReq, ref: "referrer_code" });
+
+            expect(mockReferralService.handleReferralRegistration).toHaveBeenCalledWith("referrer_code", "u1");
+            expect(mockUserRepo.get).toHaveBeenCalledWith("u1");
+        });
+
+        it("should skip referral registration for existing users", async () => {
+            (exchangeCode as jest.Mock).mockResolvedValue({ accessToken: "at", refreshToken: "rt", expiresIn: 3600 });
+            (getTokenInfo as jest.Mock).mockResolvedValue({ userId: "t1" });
+            (twitchAppAPI.users.getUserById as jest.Mock).mockResolvedValue({
+                id: "t1", name: "user1", displayName: "User1", profilePictureUrl: "pic"
+            });
+            mockUserRepo.getByTwitchId.mockResolvedValue({ id: "u1" } as any); // existing user
+            mockUserRepo.upsert.mockResolvedValue({ id: "u1", username: "user1", twitch_id: "t1", tier: 0 } as any);
+
+            await service.login({ ...loginReq, ref: "referrer_code" });
+
+            expect(mockReferralService.handleReferralRegistration).not.toHaveBeenCalled();
         });
     });
 
@@ -192,6 +229,15 @@ describe("UserService", () => {
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ id: "u1" }));
             const result = await service.get("u1");
             expect(result.id).toBe("u1");
+            expect(mockUserRepo.get).not.toHaveBeenCalled();
+        });
+
+        it("should fetch from repo and cache on cache miss", async () => {
+            (redis.get as jest.Mock).mockResolvedValue(null);
+            mockUserRepo.get.mockResolvedValue({ id: "u1" } as any);
+            const result = await service.get("u1");
+            expect(result.id).toBe("u1");
+            expect(redis.set).toHaveBeenCalledWith("user:id:u1", expect.any(String), TTL.ONE_DAY);
         });
 
         it("should throw NotFoundError if repo returns null", async () => {
@@ -206,6 +252,13 @@ describe("UserService", () => {
             mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
             await service.update("u1", { username: "new" });
             expect(redis.del).toHaveBeenCalledTimes(3);
+        });
+
+        it("should also clear showcase cache when is_showcase is updated", async () => {
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+            await service.update("u1", { is_showcase: true });
+            expect(redis.del).toHaveBeenCalledWith("user:showcase");
+            expect(redis.del).toHaveBeenCalledTimes(4);
         });
 
         it("should convert prisma error", async () => {
@@ -261,6 +314,113 @@ describe("UserService", () => {
             expect(result).toBe(0);
             expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier: 0, tier_expire_at: null }, undefined);
         });
+
+        it("should only update tier (no expire date change) when existing expire is still ahead of new one", async () => {
+            (redis.get as jest.Mock).mockResolvedValue(null);
+            const farFuture = new Date(Date.now() + 999999999);
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1", tier: 1, tier_expire_at: farFuture } as any);
+            const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue({ tier: "1000" }) } };
+            mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+
+            const result = await service.getTier("u1", { forceTwitch: true });
+            expect(result).toBe(1);
+            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier: 1 }, undefined);
+        });
+
+        it("should bypass cache when forceTwitch is true", async () => {
+            (redis.get as jest.Mock).mockResolvedValue("2"); // cache has tier 2
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1", tier: 2, tier_expire_at: null } as any);
+            const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue(null) } };
+            mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+
+            const result = await service.getTier("u1", { forceTwitch: true });
+            expect(result).toBe(0);
+            expect(mockAuthService.createTwitchUserAPI).toHaveBeenCalled();
+        });
+    });
+
+    describe("getTierFromTwitch", () => {
+        it("should throw ForbiddenError on missing scope error", async () => {
+            const mockAPI = {
+                subscriptions: {
+                    checkUserSubscription: jest.fn().mockRejectedValue(new Error("user:read:subscriptions scope missing")),
+                },
+            };
+            mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
+
+            await expect(service.getTierFromTwitch("t1")).rejects.toThrow(ForbiddenError);
+        });
+
+        it("should re-throw other errors from Twitch API", async () => {
+            const mockAPI = {
+                subscriptions: {
+                    checkUserSubscription: jest.fn().mockRejectedValue(new Error("Network failure")),
+                },
+            };
+            mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
+
+            await expect(service.getTierFromTwitch("t1")).rejects.toThrow("Network failure");
+        });
+    });
+
+    describe("hasTwitchGqlToken", () => {
+        it("should return true when token exists", async () => {
+            mockAuthRepo.getByUserId = jest.fn().mockResolvedValue({ twitch_gql_token: "token123" });
+            const result = await service.hasTwitchGqlToken("u1");
+            expect(result).toBe(true);
+        });
+
+        it("should return false when token is absent", async () => {
+            mockAuthRepo.getByUserId = jest.fn().mockResolvedValue({ twitch_gql_token: null });
+            const result = await service.hasTwitchGqlToken("u1");
+            expect(result).toBe(false);
+        });
+
+        it("should return false when auth record is missing", async () => {
+            mockAuthRepo.getByUserId = jest.fn().mockResolvedValue(null);
+            const result = await service.hasTwitchGqlToken("u1");
+            expect(result).toBe(false);
+        });
+    });
+
+    describe("getMaxStorageMB", () => {
+        it("should return base storage for tier below PRO", async () => {
+            (redis.get as jest.Mock).mockResolvedValue(null);
+            mockUserRepo.get.mockResolvedValue({ id: "u1", tier: 0, max_storage_mb: 100 } as any);
+
+            const result = await service.getMaxStorageMB("u1");
+            expect(result).toBe(100);
+        });
+
+        it("should return base + 45 MB for PRO tier and above", async () => {
+            (redis.get as jest.Mock).mockResolvedValue(null);
+            mockUserRepo.get.mockResolvedValue({ id: "u1", tier: UserTier.PRO_TIER, max_storage_mb: 100 } as any);
+
+            const result = await service.getMaxStorageMB("u1");
+            expect(result).toBe(145);
+        });
+    });
+
+    describe("listShowcase", () => {
+        it("should return cached showcase", async () => {
+            const cached = { data: [{ id: "u1" }] };
+            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(cached));
+
+            const result = await service.listShowcase();
+            expect(result).toEqual(cached);
+            expect(mockUserRepo.listShowcase).not.toHaveBeenCalled();
+        });
+
+        it("should fetch from repo and cache on miss", async () => {
+            (redis.get as jest.Mock).mockResolvedValue(null);
+            mockUserRepo.listShowcase.mockResolvedValue([{ id: "u1" }]);
+
+            const result = await service.listShowcase();
+            expect(result).toEqual({ data: [{ id: "u1" }] });
+            expect(redis.set).toHaveBeenCalledWith("user:showcase", expect.any(String), TTL.ONE_DAY);
+        });
     });
 
     describe("adjustTierAndWidgets", () => {
@@ -269,7 +429,7 @@ describe("UserService", () => {
             await expect(service.adjustTierAndWidgets("u1")).rejects.toThrow("WidgetService is not initialized");
         });
 
-        it("should disable all widgets if active widgets > 1 and tier < 1", async () => {
+        it("should disable all widgets if used quota exceeds total quota after tier update", async () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
             const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue(null) } };
             mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
@@ -280,19 +440,63 @@ describe("UserService", () => {
 
             expect(mockWidgetService.disableAll).toHaveBeenCalledWith("u1");
         });
+
+        it("should not disable widgets if quota is not exceeded", async () => {
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
+            const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue({ tier: "1000" }) } };
+            mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
+            mockWidgetService.getQuota.mockResolvedValue({ total_quota: 3, used_quota: 1, remaining_quota: 2 });
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+
+            await service.adjustTierAndWidgets("u1");
+
+            expect(mockWidgetService.disableAll).not.toHaveBeenCalled();
+        });
+
+        it("should disable all and set tier to 0 on UnauthorizedError", async () => {
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
+            mockAuthService.createTwitchUserAPI.mockRejectedValue(new UnauthorizedError("no token"));
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+
+            await service.adjustTierAndWidgets("u1");
+
+            expect(mockWidgetService.disableAll).toHaveBeenCalledWith("u1");
+            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier: 0, tier_expire_at: null }, undefined);
+        });
+
+        it("should disable all and set tier to 0 on ForbiddenError", async () => {
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
+            mockAuthService.createTwitchUserAPI.mockRejectedValue(new ForbiddenError("no scope"));
+            mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
+
+            await service.adjustTierAndWidgets("u1");
+
+            expect(mockWidgetService.disableAll).toHaveBeenCalledWith("u1");
+            expect(mockUserRepo.update).toHaveBeenCalledWith("u1", { tier: 0, tier_expire_at: null }, undefined);
+        });
+
+        it("should re-throw unexpected errors", async () => {
+            mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
+            mockAuthService.createTwitchUserAPI.mockRejectedValue(new Error("Unexpected"));
+
+            await expect(service.adjustTierAndWidgets("u1")).rejects.toThrow("Unexpected");
+        });
     });
 
     describe("bulkAdjustTierAndWidgets", () => {
+        it("should throw if widget service missing", async () => {
+            service.setWidgetService(undefined as any);
+            await expect(service.bulkAdjustTierAndWidgets()).rejects.toThrow("WidgetService is not initialized");
+        });
+
         it("should loop until no expired users", async () => {
             mockUserRepo.listExpired
                 .mockResolvedValueOnce([{ id: "u1" }, { id: "u2" }] as any)
                 .mockResolvedValueOnce([] as any);
-            
-            // Mock adjustTierAndWidgets internal dependencies
+
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
             const mockAPI = { subscriptions: { checkUserSubscription: jest.fn().mockResolvedValue(null) } };
             mockAuthService.createTwitchUserAPI.mockResolvedValue(mockAPI as any);
-            mockWidgetService.getTotalByOwnerId.mockResolvedValue(0);
             mockUserRepo.update.mockResolvedValue({ twitch_id: "t1" } as any);
 
             await service.bulkAdjustTierAndWidgets();
@@ -300,7 +504,20 @@ describe("UserService", () => {
             expect(mockUserRepo.listExpired).toHaveBeenCalledTimes(2);
         });
 
-        it("should throw error if failed", async () => {
+        it("should add failing users to processedIds and continue loop", async () => {
+            mockUserRepo.listExpired
+                .mockResolvedValueOnce([{ id: "u1" }] as any)
+                .mockResolvedValueOnce([] as any);
+
+            mockUserRepo.get.mockRejectedValue(new Error("DB failure"));
+
+            await service.bulkAdjustTierAndWidgets();
+
+            // Second call should pass processedIds containing "u1"
+            expect(mockUserRepo.listExpired).toHaveBeenNthCalledWith(2, { page: 1, limit: 10 }, ["u1"]);
+        });
+
+        it("should throw error if listExpired itself fails", async () => {
             mockUserRepo.listExpired.mockRejectedValue(new Error("Loop Error"));
             await expect(service.bulkAdjustTierAndWidgets()).rejects.toThrow("Loop Error");
         });

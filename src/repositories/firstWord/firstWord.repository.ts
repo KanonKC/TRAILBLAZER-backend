@@ -1,5 +1,5 @@
 import { prisma } from "@/libs/prisma";
-import { FirstWord, FirstWordChatter, FirstWordCustomReply } from "generated/prisma/client";
+import { FirstWord, FirstWordChatter, FirstWordCustomReply, FirstWordGreetCount } from "generated/prisma/client";
 import { AddChatter, CreateCustomReply, CreateFirstWord, UpdateCustomReply, UpdateFirstWord, ListCustomerReplyRequest } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { FirstWordWidget } from "./response";
@@ -221,5 +221,36 @@ export default class FirstWordRepository {
         })
 
         return [data, count]
+    }
+
+    async createOrIncrementGreetCount(firstWordId: string, chatterId: string, channelId: string): Promise<void> {
+        await prisma.firstWordGreetCount.upsert({
+            where: {
+                twitch_chatter_id_twitch_channel_id: {
+                    twitch_chatter_id: chatterId,
+                    twitch_channel_id: channelId
+                }
+            },
+            update: {
+                count: { increment: 1 }
+            },
+            create: {
+                twitch_chatter_id: chatterId,
+                twitch_channel_id: channelId,
+                count: 1,
+                first_word_id: firstWordId
+            }
+        });
+    }
+
+    async getGreetCount(chatterId: string, channelId: string): Promise<FirstWordGreetCount | null> {
+        return prisma.firstWordGreetCount.findUnique({
+            where: {
+                twitch_chatter_id_twitch_channel_id: {
+                    twitch_chatter_id: chatterId,
+                    twitch_channel_id: channelId
+                }
+            }
+        });
     }
 }

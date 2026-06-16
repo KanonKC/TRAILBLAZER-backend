@@ -3,16 +3,19 @@ import { TwitchChannelChatMessageEventRequest } from "./request";
 import FirstWordService from "@/services/widget/firstWord/firstWord.service";
 import TLogger, { Layer } from "@/logging/logger";
 import DropImageService from "@/services/widget/dropImage/dropImage.service";
+import SpotifySongRequestService from "@/services/widget/spotifySongRequest/spotifySongRequest.service";
 
 export default class TwitchChannelChatMessageEvent {
 
     private readonly firstWordService: FirstWordService;
     private readonly dropImageService: DropImageService;
+    private readonly spotifySongRequestService: SpotifySongRequestService;
     private readonly logger: TLogger;
 
-    constructor(firstWordService: FirstWordService, dropImageService: DropImageService) {
+    constructor(firstWordService: FirstWordService, dropImageService: DropImageService, spotifySongRequestService: SpotifySongRequestService) {
         this.firstWordService = firstWordService;
         this.dropImageService = dropImageService;
+        this.spotifySongRequestService = spotifySongRequestService;
         this.logger = new TLogger(Layer.EVENT);
     }
 
@@ -29,11 +32,11 @@ export default class TwitchChannelChatMessageEvent {
         const event = body.event as TwitchChannelChatMessageEventRequest
 
         if (body.subscription.status === "enabled") {
-            // this.logger.info({ message: "Handling chat message event", data: event });
             try {
                 await Promise.allSettled([
                     this.firstWordService.greetNewChatter(event),
-                    this.dropImageService.handleDropImage(event)
+                    this.dropImageService.handleDropImage(event),
+                    this.spotifySongRequestService.handleTwitchEvent(event),
                 ])
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })

@@ -5,6 +5,8 @@ import { HelixUserData } from "@twurple/api/lib/interfaces/endpoints/user.extern
 import { NotFoundError, TError } from "@/errors";
 import { HelixErrorResponse } from "./response";
 import { ListChannelRewardsOptions } from "./request";
+import { HelixEventSubSubscriptionData } from "@twurple/api/lib/interfaces/endpoints/eventSub.external";
+import { twitchAppAPI } from "@/libs/twurple";
 
 export default class TwitchService {
     private readonly authService: AuthService;
@@ -71,6 +73,17 @@ export default class TwitchService {
                 throw new NotFoundError("Twitch user not found")
             }
             return res[rawDataSymbol]
+        } catch (error) {
+            throw await this.convertHelixError(error)
+        }
+    }
+
+    async listEventSubs(twitchId: string): Promise<{
+        data: HelixEventSubSubscriptionData[];
+    }> {
+        try {
+            const res = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId)
+            return { data: res.data.map(r => r[rawDataSymbol]) }
         } catch (error) {
             throw await this.convertHelixError(error)
         }

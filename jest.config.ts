@@ -9,4 +9,5 @@ export default {
     transform: {
         "^.+\\.ts$": "ts-jest",
     },
+    setupFiles: ["<rootDir>/src/test/setup.ts"],
 };

@@ -82,21 +82,22 @@ model UploadedFile {
 }
 
 model Widget {
-  id               String         @id @default(uuid())
-  twitch_id        String
-  enabled          Boolean        @default(true)
-  overlay_key      String?        @unique
-  owner_id         String
-  owner            User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  first_word       FirstWord?
-  clip_shoutout    ClipShoutout?
-  created_at       DateTime       @default(now())
-  updated_at       DateTime       @updatedAt
-  widget_type_slug String?
-  widget_type      WidgetType?    @relation(fields: [widget_type_slug], references: [slug])
-  randomDbdPerk    RandomDbdPerk?
-  dropImage        DropImage?
-  exportVideo      ExportVideo?
+  id                 String              @id @default(uuid())
+  twitch_id          String
+  enabled            Boolean             @default(true)
+  overlay_key        String?             @unique
+  owner_id           String
+  owner              User                @relation(fields: [owner_id], references: [id])
+  first_word         FirstWord?
+  clip_shoutout      ClipShoutout?
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+  widget_type_slug   String?
+  widget_type        WidgetType?         @relation(fields: [widget_type_slug], references: [slug])
+  randomDbdPerk      RandomDbdPerk?
+  dropImage          DropImage?
+  exportVideo        ExportVideo?
+  spotifySongRequest SpotifySongRequest?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -126,6 +127,7 @@ model FirstWord {
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   first_word_custom_replies FirstWordCustomReply[]
+  greet_counts              FirstWordGreetCount[]
 }
 
 model FirstWordChatter {
@@ -155,6 +157,19 @@ model FirstWordCustomReply {
   updated_at                DateTime      @updatedAt
 
   @@unique([twitch_chatter_id, first_word_id])
+}
+
+model FirstWordGreetCount {
+  id                Int       @id @default(autoincrement())
+  twitch_chatter_id String
+  twitch_channel_id String
+  count             Int       @default(0)
+  first_word_id     String
+  first_word        FirstWord @relation(fields: [first_word_id], references: [id], onDelete: Cascade)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@unique([twitch_chatter_id, twitch_channel_id])
 }
 
 model ClipShoutout {
@@ -266,4 +281,17 @@ model ReferralCode {
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   code       String   @unique
   created_at DateTime @default(now())
+}
+
+model SpotifySongRequest {
+  id                String   @id @default(uuid())
+  twitch_reward_id  String?  @unique
+  twitch_bot_id     String?
+  invalid_message   String?
+  success_message   String?
+  no_active_message String?
+  widget_id         String   @unique
+  widget            Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 }
