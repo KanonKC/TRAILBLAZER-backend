@@ -37,7 +37,6 @@ export default class SpotifySongRequestController {
             this.logger.info({ message: "Successfully created spotify song request", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
-            console.log("error", error)
             this.logger.error({ message: "Failed to create spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
@@ -50,12 +49,10 @@ export default class SpotifySongRequestController {
     }
 
     async get(req: FastifyRequest, res: FastifyReply) {
-        console.log("Call get")
         this.logger.setContext("controller.spotifySongRequest.get");
         this.logger.info({ message: "Getting spotify song request config" });
         const user = getUserFromRequest(req);
         if (!user) {
-            console.log("UNauth")
             this.logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
@@ -63,10 +60,8 @@ export default class SpotifySongRequestController {
         try {
             const config = await this.spotifySongRequestService.getByUserId(user.id);
             this.logger.info({ message: "Successfully retrieved spotify song request", data: { userId: user.id } });
-            console.log("Config", config)
             res.send(config);
         } catch (error) {
-            console.log("err", error)
             this.logger.error({ message: "Failed to get spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
@@ -85,7 +80,7 @@ export default class SpotifySongRequestController {
         }
 
         try {
-            const request = updateSpotifySongRequestSchema.parse(req.body);request
+            const request = updateSpotifySongRequestSchema.parse(req.body);
             const updated = await this.spotifySongRequestService.update(user.id, request);
             this.logger.info({ message: "Successfully updated spotify song request", data: { userId: user.id } });
             res.send(updated);
@@ -94,6 +89,28 @@ export default class SpotifySongRequestController {
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
+            if (error instanceof TError) {
+                return res.status(error.status).send(error.toJSON());
+            }
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
+
+    async test(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.spotifySongRequest.test");
+        this.logger.info({ message: "Testing spotify song request" });
+        const user = getUserFromRequest(req);
+        if (!user) {
+            this.logger.warn({ message: "Unauthorized access attempt" });
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        try {
+            await this.spotifySongRequestService.test(user.id);
+            this.logger.info({ message: "Test completed", data: { userId: user.id } });
+            res.status(204).send();
+        } catch (error) {
+            this.logger.error({ message: "Test failed", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }

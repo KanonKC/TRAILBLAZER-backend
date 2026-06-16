@@ -20,7 +20,6 @@ export default class TwitchChannelChatMessageEvent {
     }
 
     async handle(req: FastifyRequest, res: FastifyReply) {
-        console.log("handle event chatMessage")
         this.logger.setContext("event.twitch.channelChatMessage.handle");
         const body = req.body as any
 
@@ -40,7 +39,6 @@ export default class TwitchChannelChatMessageEvent {
                     this.spotifySongRequestService.handleTwitchEvent(event),
                 ])
             } catch (err: any) {
-                console.log("Handle layer failed", err)
                 this.logger.error({ message: "Handle event failed", error: err })
             }
             res.status(204).send()

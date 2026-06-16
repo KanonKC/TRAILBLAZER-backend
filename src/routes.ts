@@ -202,6 +202,7 @@ server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.
 server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
 server.put("/api/v1/spotify-song-request", spotifySongRequestController.update.bind(spotifySongRequestController));
 server.delete("/api/v1/spotify-song-request", spotifySongRequestController.delete.bind(spotifySongRequestController));
+server.post("/api/v1/spotify-song-request/test", spotifySongRequestController.test.bind(spotifySongRequestController));
 
 server.post("/api/v1/export-video", exportVideoController.create.bind(exportVideoController));
 server.get("/api/v1/export-video", exportVideoController.get.bind(exportVideoController));

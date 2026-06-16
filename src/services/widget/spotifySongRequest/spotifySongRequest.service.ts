@@ -128,30 +128,57 @@ export default class SpotifySongRequestService {
         return this.spotifyRepository.getByTwitchId(twitchId);
     }
 
+    async test(userId: string): Promise<void> {
+        this.logger.setContext("service.spotifySongRequest.test");
+        this.logger.info({ message: "Running test insert", data: { userId } });
+        const config = await this.getByUserId(userId);
+        this.authorize(userId, config);
+        if (!config.twitch_reward_id) {
+            throw new Error("No reward configured");
+        }
+        const fakeEvent: TwitchChannelChatMessageEventRequest = {
+            broadcaster_user_id: config.widget.twitch_id,
+            broadcaster_user_login: "",
+            broadcaster_user_name: "",
+            chatter_user_id: config.widget.twitch_id,
+            chatter_user_login: "",
+            chatter_user_name: "",
+            message_id: `test-message-id-${Date.now()}`,
+            message: { text: "https://open.spotify.com/track/0CWAQlHsvfqcKJVVz9up2R", fragments: [] },
+            color: "",
+            badges: [],
+            message_type: "text",
+            cheer: null,
+            reply: null,
+            channel_points_custom_reward_id: config.twitch_reward_id,
+            source_broadcaster_user_id: null,
+            source_broadcaster_user_login: null,
+            source_broadcaster_user_name: null,
+            source_message_id: null,
+            source_badges: null,
+        };
+        await this.handleTwitchEvent(fakeEvent);
+    }
+
     async insertSpotifyTrack(userId: string, query: string): Promise<InsertSpotifyTrackResponse> {
         this.logger.setContext("service.spotifySongRequest.insertSpotifyTrack");
         this.logger.info({ message: "Inserting spotify track to queue", data: { userId, query } });
         try {
             const spotifyAPI = await this.spotify.createUserAPI(userId);
 
-            console.log("Pass authen")
-
             let track: Track | null = null;
 
-            console.log("Pass authen1")
             if (query.startsWith("https://open.spotify.com/track")) {
                 const id = query.split("/").pop()?.split("?")[0];
                 if (!id) {
                     throw new Error("Invalid Spotify URL")
                 };
-                console.log("Pass authen 2")
                 track = await spotifyAPI.tracks.get(id);
             } else {
                 const search = await spotifyAPI.search(query, ["track"]);
                 if (!search.tracks || search.tracks.items.length === 0) {
                     throw new Error("Track not found")
                 }
-                console.log("Pass authen 3", search)
                 track = search.tracks.items[0];
             }
 
@@ -160,19 +187,16 @@ export default class SpotifySongRequestService {
             };
 
             try {
-                const spotifyRes = await spotifyAPI.player.addItemToPlaybackQueue(track.uri);
-                console.log("Done", spotifyRes)
+                await spotifyAPI.player.addItemToPlaybackQueue(track.uri);
             } catch (err) {
-                // console.log("Spotify Failed", err)
+                // TODO: Find way to improve this!
                 if (String(err).includes("Unexpected token") || String(err).includes("Unexpected non-whitespace")) {
-                    // Free to go!
                 } else if (String(err).includes("NO_ACTIVE_DEVICE")) {
                     throw new NoActiveDeviceError()
                 }
             }
-            console.log("Return Track to function")
             return {
-                name: track.album.name,
+                name: track.name,
                 artists: track.artists.map(a => a.name),
                 url: track.external_urls.spotify
             };
@@ -183,7 +207,6 @@ export default class SpotifySongRequestService {
     }
 
     async handleTwitchEvent(e: TwitchChannelChatMessageEventRequest) {
-        console.log("Handle Twitch Spotify Event")
         if (!e.channel_points_custom_reward_id) {
             return;
         }
@@ -204,7 +227,6 @@ export default class SpotifySongRequestService {
             return;
         }
 
-        console.log("Handle Twitch Spotify Event 2")
         const twitchUserAPI = await this.authService.createTwitchUserAPI(config.widget.twitch_id)
 
         const sendChatMessageOptions: HelixSendChatMessageAsAppParams = {}
@@ -217,10 +239,9 @@ export default class SpotifySongRequestService {
         let message = config.success_message;
         let insertResponse: InsertSpotifyTrackResponse | null = null;
         try {
-            console.log("--- Start ---")
             insertResponse = await this.insertSpotifyTrack(config.widget.owner_id, e.message.text);
         } catch (err) {
-            console.log("FAILED", err)
+            this.logger.error({ message: "Failed to insert track during event handling", error: err as Error });
             if (err instanceof NoActiveDeviceError) {
                 message = config.no_active_message;
             } else {
@@ -233,19 +254,14 @@ export default class SpotifySongRequestService {
             "{{track_artist}}": insertResponse?.artists.join(", "),
         }
 
-        console.log("Replace Map", replaceMap)
-
         if (config.twitch_bot_id && message) {
-            console.log("Before format")
             const formatMessage = mapMessageVariables(message, replaceMap)
-            console.log("After format", formatMessage)
             await twitchAppAPI.chat.sendChatMessageAsApp(
                 config.twitch_bot_id,
                 config.widget.twitch_id,
                 formatMessage,
                 sendChatMessageOptions
             )
-            console.log("Send complete!!!")
         }
     }
 }
