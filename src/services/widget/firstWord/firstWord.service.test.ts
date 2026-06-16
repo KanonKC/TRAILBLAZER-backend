@@ -80,6 +80,8 @@ describe("FirstWordService", () => {
             updateCustomReply: jest.fn(),
             deleteCustomReply: jest.fn(),
             listChatters: jest.fn(),
+            createOrIncrementGreetCount: jest.fn(),
+            getGreetCount: jest.fn().mockResolvedValue({ count: 0 }),
         } as any;
         mockUserRepo = {
             get: jest.fn(),
