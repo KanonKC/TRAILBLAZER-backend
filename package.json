@@ -26,6 +26,7 @@
     "@newrelic/winston-enricher": "^4.0.1",
     "@prisma/adapter-pg": "7.2.0",
     "@prisma/client": "7.2.0",
+    "@spotify/web-api-ts-sdk": "^1.2.0",
     "@twurple/api": "^7.4.0",
     "@twurple/api-call": "^7.4.0",
     "@twurple/auth": "^7.4.0",

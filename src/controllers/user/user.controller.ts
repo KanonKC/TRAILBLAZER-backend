@@ -30,7 +30,7 @@ export default class UserController {
         this.logger.info({ message: "Login attempt initiated" });
         try {
             const query = loginSchema.parse(req.query);
-            
+
             // Extract ref from state if present (format: nonce:ref)
             let ref: string | undefined = undefined;
             if (query.state && query.state.includes(":")) {
@@ -64,7 +64,6 @@ export default class UserController {
                 domain: this.cfg.rootDomain,
                 maxAge: 60 * 60 * 24 * 30 // 30 days
             });
-
             res.redirect(this.cfg.frontendOrigin);
             this.logger.info({ message: "Login successful", data: user });
         } catch (err) {
@@ -199,7 +198,7 @@ export default class UserController {
             const user = await this.userService.get(decoded.id);
             const code = await this.referralService.getOrCreateCode(user.id, user.twitch_id);
             const status = await this.referralService.getReferralStatus(user.id);
-            
+
             res.send({ ...status, code });
         } catch (err) {
             this.logger.error({ message: "Failed to get referral status", error: err as string | Error });
