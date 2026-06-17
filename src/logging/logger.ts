@@ -19,6 +19,10 @@ interface LogMeta {
     error?: Error | string
 }
 
+interface SetContextOptions {
+    silent?: boolean
+}
+
 export default class TLogger {
     private readonly layer: Layer
     private context: string
@@ -29,13 +33,16 @@ export default class TLogger {
         this.transactionId = ""
     }
 
-    public setContext(context: string): TLogger {
+    public setContext(context: string, options?: SetContextOptions): TLogger {
         this.context = context
         try {
             this.transactionId = randomUUID()
         } catch (e) {
             // Fallback for environments/mocks where randomUUID is missing
             this.transactionId = Date.now().toString()
+        }
+        if (!options || !options.silent) {
+            this.info({ message: `Init: ${context}` })
         }
         return this
     }

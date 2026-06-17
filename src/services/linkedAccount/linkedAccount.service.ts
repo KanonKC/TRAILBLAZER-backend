@@ -60,15 +60,18 @@ export default class LinkedAccountService {
 
         const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, platform);
         if (existing) {
+            this.logger.warn({ message: "Account already bound", data: { userId, platform } });
             throw new BadRequestError(`Account already bound to ${platform}`);
         }
 
         const { accessToken, refreshToken, expiresAt } = await this.exchangeCode(platform as Platform, code, codeVerifier);
+        this.logger.info({ message: "OAuth code exchanged successfully" });
 
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
         const profile = await this.fetchPlatformProfile(platform as Platform, accessToken);
+        this.logger.info({ message: "Fetched platform profile", data: { platformUserId: profile.platform_user_id, platformUsername: profile.platform_username } });
 
         const linkedAccount = await this.linkedAccountRepository.create({
             user_id: userId,
@@ -157,9 +160,9 @@ export default class LinkedAccountService {
         for (const account of accounts) {
             try {
                 this.logger.info({ message: "Refreshing token for account", data: { id: account.id, platform: account.platform } });
-                
+
                 const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(account.platform as Platform, account.refresh_token!);
-                
+
                 await this.linkedAccountRepository.update(account.id, {
                     token_expires_at: expiresAt,
                     refresh_token: refreshToken || account.refresh_token
@@ -169,12 +172,12 @@ export default class LinkedAccountService {
                 const redisKey = `linked_account:access_token:${account.platform}:${account.user_id}`;
                 await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
-                this.logger.info({ message: "Successfully refreshed token", data: { accountId: account.id, platform: account.platform }});
+                this.logger.info({ message: "Successfully refreshed token", data: { accountId: account.id, platform: account.platform } });
             } catch (error) {
-                this.logger.error({ 
-                    message: "Failed to refresh token", 
-                    data: { accountId: account.id, platform: account.platform }, 
-                    error: error as Error 
+                this.logger.error({
+                    message: "Failed to refresh token",
+                    data: { accountId: account.id, platform: account.platform },
+                    error: error as Error
                 });
             }
         }
@@ -310,10 +313,10 @@ export default class LinkedAccountService {
                 platform_avatar_url: channel.snippet.thumbnails?.default?.url || null,
             };
         } catch (error: any) {
-            this.logger.error({ 
-                message: "Failed to fetch YouTube profile", 
-                data: error.response?.data, 
-                error: error as Error 
+            this.logger.error({
+                message: "Failed to fetch YouTube profile",
+                data: error.response?.data,
+                error: error as Error
             });
             throw new BadRequestError("Failed to fetch user profile from YouTube");
         }
@@ -336,10 +339,10 @@ export default class LinkedAccountService {
                 platform_avatar_url: avatarUrl,
             };
         } catch (error: any) {
-            this.logger.error({ 
-                message: "Failed to fetch Discord profile", 
-                data: error.response?.data, 
-                error: error as Error 
+            this.logger.error({
+                message: "Failed to fetch Discord profile",
+                data: error.response?.data,
+                error: error as Error
             });
             throw new BadRequestError("Failed to fetch user profile from Discord");
         }
@@ -360,10 +363,10 @@ export default class LinkedAccountService {
                 platform_avatar_url: avatarUrl,
             };
         } catch (error: any) {
-            this.logger.error({ 
-                message: "Failed to fetch Spotify profile", 
-                data: error.response?.data, 
-                error: error as Error 
+            this.logger.error({
+                message: "Failed to fetch Spotify profile",
+                data: error.response?.data,
+                error: error as Error
             });
             throw new BadRequestError("Failed to fetch user profile from Spotify");
         }

@@ -138,7 +138,6 @@ export default class UserService {
             throw new NotFoundError("User not found");
         }
 
-
         const newAccessToken = signAccessToken({
             id: user.id,
             username: user.username,
