@@ -122,17 +122,20 @@ export default class ClipShoutoutService {
             const filters: HelixPaginatedClipFilter = {
                 isFeatured: csConfig.enabled_highlight_only
             }
-
+            this.logger.info({ message: "Clip enabled. Fetching clips from Twitch.", data: { raid_id: event.raid.user_id, filters } });
             let clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
             if (clips.data.length === 0 && filters.isFeatured) {
                 clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id)
             }
+            this.logger.info({ message: "Got clips from Twitch", data: { total_clips: clips.data.length } });
 
             if (clips.data.length > 0) {
                 try {
                     const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
                     this.logger.info({ message: "Get video clip", data: { title: selectedClip.title, id: selectedClip.id } });
+                    console.log(">>>> 1", selectedClip)
                     const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
+                    console.log(">>>> 2", clipProductionUrl)
                     this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
                     this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
                     await publisher.publish("clip-shoutout-clip", JSON.stringify({
