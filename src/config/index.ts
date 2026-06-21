@@ -1,4 +1,7 @@
+import { Environment } from "@/constants/environment";
+
 export default interface Configurations {
+    env: Environment;
     origin: string;
     rootDomain: string;
     jwtSecret: string;

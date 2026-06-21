@@ -1,9 +1,11 @@
 import type Configurations from "@/config/index";
 import { configDotenv } from "dotenv";
+import { makeEnvironment } from "./constants/environment";
 
 configDotenv()
 
 const config: Configurations = {
+    env: makeEnvironment(process.env.ENV || ""),
     origin: process.env.ORIGIN || "",
     rootDomain: process.env.ROOT_DOMAIN || "",
     jwtSecret: process.env.JWT_SECRET || "",
