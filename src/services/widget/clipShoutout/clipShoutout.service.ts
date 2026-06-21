@@ -4,7 +4,7 @@ import UserRepository from "@/repositories/user/user.repository";
 import { randomBytes } from "crypto";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import { TwitchChannelChatNotificationEventRequest } from "@/events/twitch/channelChatNotification/request";
-import { HelixPaginatedClipFilter } from "@twurple/api";
+import { HelixClip, HelixPaginatedClipFilter, HelixPaginatedResult } from "@twurple/api";
 import { mapMessageVariables } from "@/utils/message";
 import redis, { publisher, TTL } from "@/libs/redis";
 import { ClipShoutout } from "generated/prisma/client";
@@ -123,19 +123,23 @@ export default class ClipShoutoutService {
                 isFeatured: csConfig.enabled_highlight_only
             }
             this.logger.info({ message: "Clip enabled. Fetching clips from Twitch.", data: { raid_id: event.raid.user_id, filters } });
-            let clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
-            if (clips.data.length === 0 && filters.isFeatured) {
-                clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id)
-            }
-            this.logger.info({ message: "Got clips from Twitch", data: { total_clips: clips.data.length } });
+            let clips: HelixPaginatedResult<HelixClip> | null = null
 
-            if (clips.data.length > 0) {
+            try {
+                clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
+                if (clips.data.length === 0 && filters.isFeatured) {
+                    clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id)
+                }
+            } catch (err) {
+                this.logger.error({ message: "Failed to get clip from Twitch", error: String(err) })
+            }
+
+            if (clips && clips.data.length > 0) {
+                this.logger.info({ message: "Got clips from Twitch", data: { total_clips: clips.data.length } });
                 try {
                     const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
                     this.logger.info({ message: "Get video clip", data: { title: selectedClip.title, id: selectedClip.id } });
-                    console.log(">>>> 1", selectedClip)
                     const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
-                    console.log(">>>> 2", clipProductionUrl)
                     this.logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
                     this.logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
                     await publisher.publish("clip-shoutout-clip", JSON.stringify({
