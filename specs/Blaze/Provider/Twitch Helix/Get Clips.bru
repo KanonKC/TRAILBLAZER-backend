@@ -1,0 +1,29 @@
+meta {
+  name: Get Clips
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://api.twitch.tv/helix/clips?broadcaster_id=135783794&is_featured=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  broadcaster_id: 135783794
+  is_featured: true
+}
+
+headers {
+  Client-ID: fhyisx1qq289z9kt4g8bq1sj3jcsnf
+}
+
+auth:bearer {
+  token: {{TwitchAppOAuthToken}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

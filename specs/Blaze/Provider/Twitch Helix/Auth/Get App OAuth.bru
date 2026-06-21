@@ -1,0 +1,39 @@
+meta {
+  name: Get App OAuth
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://id.twitch.tv/oauth2/token?client_id={{TwitchClientID}}&client_secret={{TwitchSecret}}&grant_type=client_credentials
+  body: none
+  auth: inherit
+}
+
+params:query {
+  client_id: {{TwitchClientID}}
+  client_secret: {{TwitchSecret}}
+  grant_type: client_credentials
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:json {
+  {
+    "client_id": "fhyisx1qq289z9kt4g8bq1sj3jcsnf",
+    "client_secret": "89yzagl4k4dk53rni4jan7prigoewu",
+    "grant_type": "client_credentials"
+  }
+}
+
+script:post-response {
+  const data = res.getBody();
+  bru.setEnvVar("TwitchAppOAuthToken", data.access_token)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
