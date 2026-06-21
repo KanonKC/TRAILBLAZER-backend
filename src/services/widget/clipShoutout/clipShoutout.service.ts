@@ -4,7 +4,7 @@ import UserRepository from "@/repositories/user/user.repository";
 import { randomBytes } from "crypto";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import { TwitchChannelChatNotificationEventRequest } from "@/events/twitch/channelChatNotification/request";
-import { HelixClip, HelixPaginatedClipFilter, HelixPaginatedResult, UserIdResolvable } from "@twurple/api";
+import { HelixClip, HelixPaginatedClipFilter, HelixPaginatedResult } from "@twurple/api";
 import { mapMessageVariables } from "@/utils/message";
 import redis, { publisher, TTL } from "@/libs/redis";
 import { ClipShoutout } from "generated/prisma/client";
@@ -15,8 +15,6 @@ import { NotFoundError, ForbiddenError } from "@/errors";
 import { ClipShoutoutWidget } from "@/repositories/clipShoutout/response";
 import Configurations from "@/config/index";
 import WidgetService from "../widget.service";
-import axios from "axios";
-import { error } from "console";
 
 export default class ClipShoutoutService {
     private readonly cfg: Configurations
@@ -105,7 +103,12 @@ export default class ClipShoutoutService {
             const twitchUserAPI = await this.authService.createTwitchUserAPI(senderId)
             await twitchUserAPI.chat.shoutoutUser(csConfig.widget.twitch_id, event.raid.user_id)
         } catch (err) {
-            this.logger.error({ message: "Shoutout failed", error: err as Error });
+            const e = err as Error & { code?: string; cause?: unknown }
+            this.logger.error({
+                message: "Shoutout failed",
+                data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                error: e
+            });
         }
 
         if (csConfig.reply_message) {
@@ -116,7 +119,16 @@ export default class ClipShoutoutService {
             }
             const message = mapMessageVariables(csConfig.reply_message, replaceMap)
             this.logger.info({ message: "Sending reply", data: { twitch_bot_id: csConfig.twitch_bot_id, broadcaster_user_id: event.broadcaster_user_id, message } });
-            await twitchAppAPI.chat.sendChatMessageAsApp(senderId, event.broadcaster_user_id, message)
+            try {
+                await twitchAppAPI.chat.sendChatMessageAsApp(senderId, event.broadcaster_user_id, message)
+            } catch (err) {
+                const e = err as Error & { code?: string; cause?: unknown }
+                this.logger.error({
+                    message: "Send reply failed",
+                    data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                    error: e
+                });
+            }
         }
 
         if (csConfig.enabled_clip) {
@@ -128,12 +140,17 @@ export default class ClipShoutoutService {
             let clips: HelixPaginatedResult<HelixClip> | null = null
 
             try {
-                clips = await this.tempGetClipsForBroadcaster(event.raid.user_id, filters)
+                clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id, filters)
                 if (clips.data.length === 0 && filters.isFeatured) {
-                    clips = await this.tempGetClipsForBroadcaster(event.raid.user_id)
+                    clips = await twitchAppAPI.clips.getClipsForBroadcaster(event.raid.user_id)
                 }
             } catch (err) {
-                this.logger.error({ message: "Failed to get clip from Twitch", error: String(err) })
+                const e = err as Error & { code?: string; cause?: unknown }
+                this.logger.error({
+                    message: "Failed to get clip from Twitch",
+                    data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                    error: e
+                })
             }
 
             if (clips && clips.data.length > 0) {
@@ -249,24 +266,5 @@ export default class ClipShoutoutService {
 
         if (!config) return false;
         return config.widget.overlay_key === key;
-    }
-
-    private async tempGetClipsForBroadcaster(broadcaster: UserIdResolvable, filter?: HelixPaginatedClipFilter): Promise<HelixPaginatedResult<HelixClip>> {
-        this.logger.setContext("service.clipShoutout.tempGetClipsForBroadcaster");
-        try {
-            const response = await axios.get<HelixPaginatedResult<HelixClip>>("https://api.twitch.tv/helix/clips", {
-                params: {
-                    broadcaster_id: broadcaster,
-                    is_featured: filter?.isFeatured || false
-                },
-                headers: {
-                    "Client-ID": this.cfg.twitch.clientId
-                }
-            })
-            return response.data
-        } catch (err) {
-            this.logger.error({ message: "Failed to get clips", error: String(error) });
-            throw err
-        }
     }
 }

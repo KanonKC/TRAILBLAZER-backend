@@ -46,4 +46,10 @@ class UnauthorizedError extends TError {
     }
 }
 
-export { TError, ForbiddenError, NotFoundError, BadRequestError, InternalServerError, UnauthorizedError }
+class BadGatewayError extends TError {
+    constructor(message?: string) {
+        super({ message: message ?? "Bad Gateway", status: 502 })
+    }
+}
+
+export { TError, ForbiddenError, NotFoundError, BadRequestError, InternalServerError, UnauthorizedError, BadGatewayError }

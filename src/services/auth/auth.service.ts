@@ -40,7 +40,12 @@ export default class AuthService {
                 }
                 // Delete invalid token
             } catch (error) {
-                logger.error({ message: "Error on getTwitchAccessToken", error: error as Error });
+                const e = error as Error & { code?: string; cause?: unknown }
+                logger.error({
+                    message: "Error on getTwitchAccessToken",
+                    data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                    error: e
+                });
             }
             // Otherwise continue
             await redis.del(cacheKey)
@@ -62,12 +67,24 @@ export default class AuthService {
             await this.logout(user.id)
             throw new UnauthorizedError("Refresh token not found");
         }
-        const newToken = await refreshUserToken(
-            this.cfg.twitch.clientId,
-            this.cfg.twitch.clientSecret,
-            auth.twitch_refresh_token
-        )
-        logger.info({ message: "newToken", data: newToken });
+        const refreshStart = Date.now()
+        let newToken
+        try {
+            newToken = await refreshUserToken(
+                this.cfg.twitch.clientId,
+                this.cfg.twitch.clientSecret,
+                auth.twitch_refresh_token
+            )
+        } catch (err) {
+            const e = err as Error & { code?: string; cause?: unknown }
+            logger.error({
+                message: "refreshUserToken failed",
+                data: { ms: Date.now() - refreshStart, name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                error: e
+            })
+            throw err
+        }
+        logger.info({ message: "newToken", data: { ms: Date.now() - refreshStart } });
         try {
             if (auth.twitch_refresh_token !== newToken.refreshToken) {
                 await this.authRepository.updateTwitchToken(auth.id, {
@@ -85,6 +102,7 @@ export default class AuthService {
 
     async createTwitchUserAPI(userId: string): Promise<ApiClient> {
         logger.setContext("service.auth.createTwitchUserAPI");
+        logger.info({ message: "Creating Twitch user API", data: { userId } });
         const token = await this.getTwitchAccessToken(userId)
         return createTwitchUserAPI(token)
     }

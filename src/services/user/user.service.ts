@@ -9,7 +9,7 @@ import { User } from "generated/prisma/client";
 import TLogger, { Layer } from "@/logging/logger";
 import { GetTierOptions, LoginRequest } from "./request";
 import { generateRefreshToken, signAccessToken } from "@/libs/jwt";
-import { ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
+import { BadGatewayError, ForbiddenError, NotFoundError, TError, UnauthorizedError } from "@/errors";
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
 import ReferralService from "../referral/referral.service";
@@ -44,23 +44,60 @@ export default class UserService {
         this.referralService = referralService;
     }
 
+    /**
+     * Wrap a Twitch HTTP call with timing + structured logging, and translate
+     * low-level network failures (e.g. node-fetch "Premature close") into a 502
+     * so callers don't treat them as a client error and retry with the same
+     * single-use authorize code (which then yields "400 Invalid Authorize Code").
+     */
+    private async callTwitch<T>(step: string, fn: () => Promise<T>): Promise<T> {
+        const start = Date.now()
+        try {
+            const result = await fn()
+            this.logger.debug({ message: "Twitch call ok", data: { step, ms: Date.now() - start } })
+            return result
+        } catch (err) {
+            const e = err as Error & { code?: string; cause?: unknown }
+            this.logger.error({
+                message: "Twitch call failed",
+                data: { step, ms: Date.now() - start, name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
+                error: e
+            })
+            if (this.isNetworkError(e)) {
+                throw new BadGatewayError(`Twitch upstream failed at ${step}`)
+            }
+            throw err
+        }
+    }
+
+    private isNetworkError(err: Error & { code?: string; cause?: unknown }): boolean {
+        const haystack = `${err.name} ${err.message} ${err.code ?? ""} ${String(err.cause ?? "")}`.toLowerCase()
+        return haystack.includes("premature close")
+            || haystack.includes("err_stream_premature_close")
+            || haystack.includes("fetcherror")
+            || haystack.includes("fetch failed")
+            || haystack.includes("econnreset")
+            || haystack.includes("socket hang up")
+            || haystack.includes("etimedout")
+    }
+
     async login(request: LoginRequest): Promise<{ accessToken: string, refreshToken: string, user: User }> {
         this.logger.setContext("service.user.login")
-        const token = await exchangeCode(
+        const token = await this.callTwitch("exchangeCode", () => exchangeCode(
             this.cfg.twitch.clientId,
             this.cfg.twitch.clientSecret,
             request.code,
             this.cfg.twitch.redirectUrl
-        )
+        ))
         this.logger.debug({ message: "Received twitch token" });
 
-        const tokenInfo = await getTokenInfo(token.accessToken, this.cfg.twitch.clientId)
+        const tokenInfo = await this.callTwitch("getTokenInfo", () => getTokenInfo(token.accessToken, this.cfg.twitch.clientId))
 
         if (!tokenInfo.userId) {
             throw new UnauthorizedError("Invalid token info")
         }
 
-        const twitchUser = await twitchAppAPI.users.getUserById(tokenInfo.userId)
+        const twitchUser = await this.callTwitch("users.getUserById", () => twitchAppAPI.users.getUserById(tokenInfo.userId!))
         if (!twitchUser) {
             throw new UnauthorizedError("Invalid Twitch user")
         }

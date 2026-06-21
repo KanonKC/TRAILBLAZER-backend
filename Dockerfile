@@ -1,5 +1,8 @@
 # Stage 1: Build
-FROM node:22-alpine AS builder
+# Pinned to exact patch (was moving tag node:22-alpine). A rebuild pulled a newer
+# Node 22.x patch whose HTTP/stream behavior triggered node-fetch "Premature close"
+# in twurple. 20.19.6 is the version proven working locally with the same env.
+FROM node:20.19.6-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +21,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Stage 2: Production
-FROM node:22-alpine
+FROM node:20.19.6-alpine
 
 WORKDIR /app
 
