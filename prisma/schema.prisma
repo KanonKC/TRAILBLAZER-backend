@@ -88,6 +88,7 @@ model Widget {
   overlay_key        String?             @unique
   owner_id           String
   owner              User                @relation(fields: [owner_id], references: [id])
+  triggered_count    Int                 @default(0)
   first_word         FirstWord?
   clip_shoutout      ClipShoutout?
   created_at         DateTime            @default(now())

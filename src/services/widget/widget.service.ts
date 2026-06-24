@@ -49,7 +49,7 @@ export default class WidgetService {
             const quota = baseQuota + user.extra_widget_quota;
 
             let currentWidgetCost = 1;
-            let willBeEnabled = isEnabling ?? true;
+            let willBeEnabled: boolean = isEnabling ?? true;
 
             if (widgetId) {
                 const currentWidget = await this.get(widgetId);
@@ -142,7 +142,7 @@ export default class WidgetService {
         }
     }
 
-    async get(widgetId: string) {
+    async get(widgetId: string): Promise<ExtendedWidget> {
         this.logger.setContext("service.widget.get");
         const cacheKey = `widget:${widgetId}`;
         const cachedWidget = await redis.get(cacheKey);
@@ -216,5 +216,16 @@ export default class WidgetService {
         const used_quota = await this.widgetRepository.getEnabledQuotaUsed(userId);
         const remaining_quota = Math.max(0, total_quota - used_quota);
         return { total_quota, used_quota, remaining_quota };
+    }
+
+    async increaseTriggeredCount(id: string): Promise<void> {
+        try {
+            await this.widgetRepository.increaseTriggeredCount(id)
+        } catch (err) {
+            const widget = await this.get(id)
+            this.logger.error({ message: "Failed to increase Widget triggered count", data: {
+                widget
+            }})
+        }
     }
 }

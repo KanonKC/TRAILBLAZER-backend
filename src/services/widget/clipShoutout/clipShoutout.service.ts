@@ -121,6 +121,7 @@ export default class ClipShoutoutService {
             this.logger.info({ message: "Sending reply", data: { twitch_bot_id: csConfig.twitch_bot_id, broadcaster_user_id: event.broadcaster_user_id, message } });
             try {
                 await twitchAppAPI.chat.sendChatMessageAsApp(senderId, event.broadcaster_user_id, message)
+                this.widgetService.increaseTriggeredCount(csConfig.widget_id)
             } catch (err) {
                 const e = err as Error & { code?: string; cause?: unknown }
                 this.logger.error({
