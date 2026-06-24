@@ -244,9 +244,10 @@ export default class DropImageService {
         }
 
         this.logger.info({ message: "All check passed, triggering DropImage", data: { url, userId: config.widget.owner_id } });
-        publisher.publish(`drop-image:image-url`, JSON.stringify({
+        await publisher.publish(`drop-image:image-url`, JSON.stringify({
             url: url,
             userId: config.widget.owner_id,
         }));
+        this.widgetService.increaseTriggeredCount(config.widget_id)
     }
 }

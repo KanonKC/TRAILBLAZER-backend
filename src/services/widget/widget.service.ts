@@ -217,4 +217,8 @@ export default class WidgetService {
         const remaining_quota = Math.max(0, total_quota - used_quota);
         return { total_quota, used_quota, remaining_quota };
     }
+
+    async increaseTriggeredCount(id: string): Promise<void> {
+        return this.widgetRepository.increaseTriggeredCount(id)
+    }
 }
