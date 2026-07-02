@@ -99,6 +99,7 @@ model Widget {
   dropImage          DropImage?
   exportVideo        ExportVideo?
   spotifySongRequest SpotifySongRequest?
+  endCredit          EndCredit?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -295,4 +296,30 @@ model SpotifySongRequest {
   widget            Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
+}
+
+model EndCredit {
+  id                     String                  @id @default(uuid())
+  widget                 Widget                  @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  widget_id              String                  @unique
+  followers_header       String?
+  subscribes_header      String?
+  raids_header           String?
+  bits_header            String?
+  viewers_header         String?
+  is_show_viewer_avatars Boolean                 @default(false)
+  created_at             DateTime                @default(now())
+  updated_at             DateTime                @updatedAt
+  endCreditViewerRecords EndCreditViewerRecord[]
+}
+
+model EndCreditViewerRecord {
+  id                  Int       @id @default(autoincrement())
+  viewer_id           String
+  action              Json      @db.JsonB
+  end_credit          EndCredit @relation(fields: [end_credit_id], references: [id], onDelete: Cascade)
+  end_credit_id       String
+  platform_created_at DateTime
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 }
