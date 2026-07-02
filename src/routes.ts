@@ -40,6 +40,9 @@ import SpotifySongRequestRepository from "./repositories/spotifySongRequest/spot
 import SpotifySongRequestService from "./services/widget/spotifySongRequest/spotifySongRequest.service";
 import SpotifySongRequestController from "./controllers/spotifySongRequest/spotifySongRequest.controller";
 import SpotifyProvider from "./providers/spotify/index";
+import EndCreditRepository from "./repositories/endCredit/endCredit.repository";
+import EndCreditService from "./services/widget/endCredit/endCredit.service";
+import EndCreditController from "./controllers/endCredit/endCredit.controller";
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -82,6 +85,7 @@ const authRepository = new AuthRepository();
 
 const clipShoutoutRepository = new ClipShoutoutRepository();
 const dropImageRepository = new DropImageRepository();
+const endCreditRepository = new EndCreditRepository();
 
 const randomDbdPerkRepository = new RandomDbdPerkRepository();
 const randomDBDKillerRepository = new RandomDBDKillerRepository();
@@ -105,6 +109,7 @@ const firstWordService = new FirstWordService(config, firstWordRepository, userR
 
 const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutRepository, userRepository, authService, twitchGql, widgetService);
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
+const endCreditService = new EndCreditService(endCreditRepository, userRepository, widgetService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
 const randomDBDKillerService = new RandomDBDKillerService(randomDBDKillerRepository, dbdKillerMasterRepository, userRepository, widgetService);
@@ -127,6 +132,7 @@ const clipShoutoutEventController = new ClipShoutoutEventController(clipShoutout
 
 const clipShoutoutController = new ClipShoutoutController(clipShoutoutService, clipShoutoutEventController);
 const dropImageController = new DropImageController(dropImageService);
+const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
@@ -222,6 +228,8 @@ server.get("/api/v1/drop-image", dropImageController.get.bind(dropImageControlle
 server.put("/api/v1/drop-image", dropImageController.update.bind(dropImageController));
 server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bind(dropImageController));
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
+
+server.post("/api/v1/end-credit", endCreditController.create.bind(endCreditController));
 
 server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.bind(spotifySongRequestController));
 server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
