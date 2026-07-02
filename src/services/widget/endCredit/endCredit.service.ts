@@ -86,6 +86,26 @@ export default class EndCreditService {
         }
     }
 
+    async recordViewerAction(twitchId: string, viewerId: string, action: object, platformCreatedAt: Date): Promise<void> {
+        this.logger.setContext("service.endCredit.recordViewerAction");
+        try {
+            const endCredit = await this.endCreditRepository.getByTwitchId(twitchId);
+            if (!endCredit) {
+                this.logger.warn({ message: "No end credit config for twitch_id", data: { twitchId } });
+                return;
+            }
+            await this.endCreditRepository.createViewerRecord({
+                end_credit_id: endCredit.id,
+                viewer_id: viewerId,
+                action,
+                platform_created_at: platformCreatedAt,
+            });
+            this.logger.info({ message: "Recorded end credit viewer action", data: { twitchId, viewerId } });
+        } catch (error) {
+            this.logger.error({ message: "Failed to record viewer action", error: error as Error, data: { twitchId, viewerId } });
+        }
+    }
+
     private async subscribeToEndCreditEvents(twitchId: string, userId: string): Promise<void> {
         this.logger.setContext("service.endCredit.subscribeToEndCreditEvents");
         for (const { eventType, route, subscribe } of END_CREDIT_EVENT_SUBSCRIPTIONS) {

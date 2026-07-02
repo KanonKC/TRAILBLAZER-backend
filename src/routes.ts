@@ -57,6 +57,10 @@ import TwitchGqlController from "./controllers/twitch/twitch-gql.controller";
 import TwitchChannelRedemptionAddEvent from "./events/twitch/channelRedemptionAdd/channelRedemptionAdd.event";
 import TwitchStreamOnlineEvent from "./events/twitch/streamOnline/streamOnline.event";
 import TwitchStreamOfflineEvent from "./events/twitch/streamOffline/streamOffline.event";
+import TwitchChannelFollowEvent from "./events/twitch/channelFollow/channelFollow.event";
+import TwitchChannelSubscribeEvent from "./events/twitch/channelSubscribe/channelSubscribe.event";
+import TwitchChannelRaidEvent from "./events/twitch/channelRaid/channelRaid.event";
+import TwitchChannelBitsUseEvent from "./events/twitch/channelBitsUse/channelBitsUse.event";
 import TwitchGql from "./providers/twitchGql";
 import AuthRepository from "./repositories/auth/auth.repository";
 import ClipShoutoutRepository from "./repositories/clipShoutout/clipShoutout.repository";
@@ -153,6 +157,10 @@ const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService);
 const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService);
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(clipShoutoutService);
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService, randomDBDKillerService);
+const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
+const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
+const twitchChannelRaidEvent = new TwitchChannelRaidEvent(endCreditService);
+const twitchChannelBitsUseEvent = new TwitchChannelBitsUseEvent(endCreditService);
 
 // Cron
 const tbCron = new TbCron(userService, linkedAccountService)
@@ -282,6 +290,10 @@ server.post("/webhook/v1/twitch/event-sub/stream-online", twitchStreamOnlineEven
 server.post("/webhook/v1/twitch/event-sub/stream-offline", twitchStreamOfflineEvent.handle.bind(twitchStreamOfflineEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-chat-notification", twitchChannelChatNotificationEvent.handle.bind(twitchChannelChatNotificationEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-redemption-add", twitchChannelRedemptionAddEvent.handle.bind(twitchChannelRedemptionAddEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-follow", twitchChannelFollowEvent.handle.bind(twitchChannelFollowEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-subscribe", twitchChannelSubscribeEvent.handle.bind(twitchChannelSubscribeEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-raid", twitchChannelRaidEvent.handle.bind(twitchChannelRaidEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-bits-use", twitchChannelBitsUseEvent.handle.bind(twitchChannelBitsUseEvent))
 
 tbCron.run()
 

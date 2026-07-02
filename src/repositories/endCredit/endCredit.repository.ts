@@ -1,7 +1,8 @@
 import { prisma } from "@/libs/prisma";
-import { CreateEndCredit } from "./request";
+import { CreateEndCredit, CreateEndCreditViewerRecord } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { EndCreditWidget } from "./response";
+import { EndCreditViewerRecord } from "generated/prisma/client";
 
 export default class EndCreditRepository {
 
@@ -56,6 +57,41 @@ export default class EndCreditRepository {
                         widget_type: true
                     }
                 },
+            }
+        });
+    }
+
+    async getByTwitchId(twitchId: string): Promise<EndCreditWidget | null> {
+        const widget = await prisma.widget.findUnique({
+            where: {
+                twitch_id_widget_type_slug: {
+                    twitch_id: twitchId,
+                    widget_type_slug: WidgetTypeSlug.END_CREDIT
+                }
+            }
+        });
+        if (!widget) {
+            return null;
+        }
+        return prisma.endCredit.findUnique({
+            where: { widget_id: widget.id },
+            include: {
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
+            }
+        });
+    }
+
+    async createViewerRecord(request: CreateEndCreditViewerRecord): Promise<EndCreditViewerRecord> {
+        return prisma.endCreditViewerRecord.create({
+            data: {
+                end_credit_id: request.end_credit_id,
+                viewer_id: request.viewer_id,
+                action: request.action,
+                platform_created_at: request.platform_created_at,
             }
         });
     }

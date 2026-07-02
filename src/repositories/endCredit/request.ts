@@ -9,3 +9,10 @@ export interface CreateEndCredit {
     viewers_header?: string | null;
     is_show_viewer_avatars?: boolean;
 }
+
+export interface CreateEndCreditViewerRecord {
+    end_credit_id: string;
+    viewer_id: string;
+    action: object;
+    platform_created_at: Date;
+}
