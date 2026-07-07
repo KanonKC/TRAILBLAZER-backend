@@ -16,6 +16,7 @@ export default class RandomDBDKillerRepository {
                     create: {
                         twitch_id: request.twitch_id,
                         owner_id: request.owner_id,
+                        overlay_key: request.overlay_key,
                         widget_type_slug: WidgetTypeSlug.RANDOM_DBD_KILLER,
                     }
                 }

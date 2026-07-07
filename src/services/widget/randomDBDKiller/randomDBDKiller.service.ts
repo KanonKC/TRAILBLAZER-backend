@@ -5,7 +5,7 @@ import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import DBDKillerMasterRepository from "@/repositories/dbdKillerMaster/dbdKillerMaster.repository";
 import RandomDBDKillerRepository from "@/repositories/randomDBDKiller/randomDBDKiller.repository";
-import { CreateRandomDBDKiller, UpdateRandomDBDKiller } from "@/repositories/randomDBDKiller/request";
+import { CreateRandomDBDKillerInput, UpdateRandomDBDKiller } from "@/repositories/randomDBDKiller/request";
 import { RandomDBDKillerWidget } from "@/repositories/randomDBDKiller/response";
 import UserRepository from "@/repositories/user/user.repository";
 import crypto from "crypto";
@@ -23,7 +23,7 @@ export default class RandomDBDKillerService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async create(request: CreateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async create(request: CreateRandomDBDKillerInput): Promise<RandomDBDKillerWidget> {
         this.logger.setContext("service.randomDBDKiller.create");
         const user = await this.userRepository.get(request.owner_id);
         if (!user) {
@@ -32,7 +32,10 @@ export default class RandomDBDKillerService {
 
         await this.subscribeToRedemptionEvents(user.twitch_id, user.id);
 
-        const res = await this.randomDBDKillerRepository.create(request);
+        const res = await this.randomDBDKillerRepository.create({
+            ...request,
+            overlay_key: crypto.randomBytes(16).toString("hex")
+        });
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
         return this.getByUserId(user.id);
     }
@@ -107,6 +110,15 @@ export default class RandomDBDKillerService {
             this.logger.warn({ message: "Killer master not found for slug", data: { slug: randomSlug } });
             return;
         }
+
+        console.log("Publish", {
+            userId: config.widget.owner_id,
+            killer: {
+                slug: killer.slug,
+                title: killer.title,
+                image_url: killer.image_url
+            }
+        })
 
         await publisher.publish("random-dbd-killer:result", JSON.stringify({
             userId: config.widget.owner_id,
