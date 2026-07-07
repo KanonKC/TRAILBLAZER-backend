@@ -17,4 +17,10 @@ export default class DBDKillerMasterRepository {
             where: { slug: { in: slugs } }
         });
     }
+
+    async list(): Promise<DBDKillerMaster[]> {
+        return prisma.dBDKillerMaster.findMany({
+            orderBy: { title: "asc" }
+        });
+    }
 }

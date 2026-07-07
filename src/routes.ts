@@ -5,6 +5,7 @@ import FirstWordController from "./controllers/firstWord/firstWord.controller";
 import RandomDbdPerkController from "./controllers/randomDbdPerk/randomDbdPerk.controller";
 import RandomDBDKillerController from "./controllers/randomDBDKiller/randomDBDKiller.controller";
 import RandomDBDKillerEventController from "./controllers/randomDBDKiller/randomDBDKiller.event.controller";
+import DBDKillerMasterController from "./controllers/dbdKillerMaster/dbdKillerMaster.controller";
 import UserController from "./controllers/user/user.controller";
 import ExportVideoController from "./controllers/exportVideo/exportVideo.controller";
 import AdminController from "./controllers/admin/admin.controller";
@@ -127,6 +128,7 @@ const dropImageEventController = new DropImageEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
+const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
 const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
@@ -207,6 +209,8 @@ server.get("/api/v1/random-dbd-killer", randomDBDKillerController.get.bind(rando
 server.put("/api/v1/random-dbd-killer", randomDBDKillerController.update.bind(randomDBDKillerController));
 server.post("/api/v1/random-dbd-killer/refresh-key", randomDBDKillerController.refreshKey.bind(randomDBDKillerController));
 server.delete("/api/v1/random-dbd-killer", randomDBDKillerController.delete.bind(randomDBDKillerController));
+
+server.get("/api/v1/dbd-killer-master", dbdKillerMasterController.list.bind(dbdKillerMasterController));
 
 server.post("/api/v1/drop-image", dropImageController.create.bind(dropImageController));
 server.get("/api/v1/drop-image", dropImageController.get.bind(dropImageController));
