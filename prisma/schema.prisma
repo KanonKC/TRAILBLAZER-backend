@@ -100,6 +100,7 @@ model Widget {
   exportVideo        ExportVideo?
   spotifySongRequest SpotifySongRequest?
   endCredit          EndCredit?
+  randomDBDKiller    RandomDBDKiller?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -322,4 +323,23 @@ model EndCreditViewerRecord {
   platform_created_at DateTime
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
+}
+
+model DBDKillerMaster {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique
+  title      String
+  image_url  String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model RandomDBDKiller {
+  id               String   @id @default(uuid())
+  widget_id        String   @unique
+  widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  twitch_reward_id String   @unique
+  killer_pool      String[]
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 }
