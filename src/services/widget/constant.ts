@@ -5,4 +5,5 @@ export enum WidgetTypeSlug {
     DROP_IMAGE = "drop-image",
     EXPORT_VIDEO = "export-video",
     SPOTIFY_SONG_REQUEST = "spotify-song-request",
+    RANDOM_DBD_KILLER = "random-dbd-killer",
 }
