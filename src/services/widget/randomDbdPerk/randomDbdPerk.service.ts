@@ -1,3 +1,4 @@
+import config from "@/config";
 import { NotFoundError } from "@/errors";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { TTL } from "@/libs/redis";
@@ -157,9 +158,9 @@ export default class RandomDbdPerkService {
     async getTotalPerkCount(type: string): Promise<number> {
         this.logger.setContext("service.randomDbdPerk.getTotalPerkCount");
         if (type === RandomDbdPerkClassType.KILLER) {
-            return 145
+            return config.randomDbdPerk.totalKillerPerkCount
         } else {
-            return 170
+            return config.randomDbdPerk.totalSurvivorPerkCount
         }
     }
 

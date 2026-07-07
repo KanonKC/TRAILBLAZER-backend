@@ -47,6 +47,10 @@ const config: Configurations = {
         clientId: process.env.SPOTIFY_CLIENT_ID || "",
         clientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
         redirectUrl: process.env.SPOTIFY_REDIRECT_URL || ""
+    },
+    randomDbdPerk: {
+        totalKillerPerkCount: Number(process.env.RANDOM_DBD_PERK_TOTAL_KILLER_PERK_COUNT) || 145,
+        totalSurvivorPerkCount: Number(process.env.RANDOM_DBD_PERK_TOTAL_SURVIVOR_PERK_COUNT) || 180
     }
 }
 

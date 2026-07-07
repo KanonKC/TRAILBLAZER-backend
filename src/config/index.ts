@@ -44,4 +44,8 @@ export default interface Configurations {
         clientSecret: string;
         redirectUrl: string;
     }
+    randomDbdPerk: {
+        totalKillerPerkCount: number;
+        totalSurvivorPerkCount: number;
+    }
 }
