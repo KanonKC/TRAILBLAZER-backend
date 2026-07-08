@@ -340,6 +340,7 @@ model RandomDBDKiller {
   widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   twitch_reward_id String?  @unique
   killer_pool      String[]
+  animation_style  String   @default("slot")
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 }
