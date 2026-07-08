@@ -338,7 +338,7 @@ model RandomDBDKiller {
   id               String   @id @default(uuid())
   widget_id        String   @unique
   widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
-  twitch_reward_id String   @unique
+  twitch_reward_id String?  @unique
   killer_pool      String[]
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
