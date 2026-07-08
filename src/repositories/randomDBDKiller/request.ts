@@ -1,3 +1,9 @@
+export enum RandomDBDKillerAnimationStyle {
+    SLOT = "slot",
+    FLIP = "flip",
+    ROULETTE = "roulette"
+}
+
 export interface CreateRandomDBDKiller {
     twitch_id: string;
     owner_id: string;
@@ -14,4 +20,5 @@ export interface CreateRandomDBDKillerInput {
 export interface UpdateRandomDBDKiller {
     twitch_reward_id?: string;
     killer_pool?: string[];
+    animation_style?: RandomDBDKillerAnimationStyle;
 }

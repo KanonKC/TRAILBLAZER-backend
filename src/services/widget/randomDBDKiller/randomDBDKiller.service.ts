@@ -111,14 +111,7 @@ export default class RandomDBDKillerService {
             return;
         }
 
-        console.log("Publish", {
-            userId: config.widget.owner_id,
-            killer: {
-                slug: killer.slug,
-                title: killer.title,
-                image_url: killer.image_url
-            }
-        })
+        const poolMasters = await this.dbdKillerMasterRepository.getBySlugs(config.killer_pool);
 
         await publisher.publish("random-dbd-killer:result", JSON.stringify({
             userId: config.widget.owner_id,
@@ -126,7 +119,13 @@ export default class RandomDBDKillerService {
                 slug: killer.slug,
                 title: killer.title,
                 image_url: killer.image_url
-            }
+            },
+            pool: poolMasters.map(k => ({
+                slug: k.slug,
+                title: k.title,
+                image_url: k.image_url
+            })),
+            animationStyle: config.animation_style
         }));
         this.widgetService.increaseTriggeredCount(config.widget_id);
     }

@@ -36,7 +36,8 @@ export default class RandomDBDKillerRepository {
             where: { id },
             data: {
                 twitch_reward_id: request.twitch_reward_id,
-                killer_pool: request.killer_pool
+                killer_pool: request.killer_pool,
+                animation_style: request.animation_style
             },
             include: {
                 widget: {

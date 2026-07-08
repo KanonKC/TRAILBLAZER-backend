@@ -48,7 +48,11 @@ export default class RandomDBDKillerEventController {
                 if (payload.userId === userId) {
                     res.sse({
                         event: "killer-result",
-                        data: JSON.stringify({ killer: payload.killer })
+                        data: JSON.stringify({
+                            killer: payload.killer,
+                            pool: payload.pool,
+                            animationStyle: payload.animationStyle
+                        })
                     });
                 }
             });
