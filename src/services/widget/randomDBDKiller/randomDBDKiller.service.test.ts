@@ -34,6 +34,7 @@ jest.mock("@/libs/twurple", () => ({
 
 jest.mock("crypto", () => ({
     randomUUID: jest.fn().mockReturnValue("mocked_uuid"),
+    randomBytes: jest.fn().mockReturnValue({ toString: () => "mocked_overlay_key" }),
 }));
 
 describe("RandomDBDKillerService", () => {
@@ -89,7 +90,7 @@ describe("RandomDBDKillerService", () => {
 
             const result = await service.create(request);
 
-            expect(mockRepo.create).toHaveBeenCalledWith(request);
+            expect(mockRepo.create).toHaveBeenCalledWith({ ...request, overlay_key: "mocked_overlay_key" });
             expect(result).toBeDefined();
         });
 

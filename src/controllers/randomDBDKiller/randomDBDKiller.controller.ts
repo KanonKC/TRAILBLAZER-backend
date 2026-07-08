@@ -46,7 +46,7 @@ export default class RandomDBDKillerController {
         }
 
         try {
-            const request = createRandomDBDKillerSchema.parse(req.body);
+            const request = createRandomDBDKillerSchema.parse(req.body ?? {});
             const result = await this.service.create({
                 owner_id: user.id,
                 twitch_id: user.twitchId,
