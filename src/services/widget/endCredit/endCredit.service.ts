@@ -36,6 +36,11 @@ const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
         route: "/webhook/v1/twitch/event-sub/channel-bits-use",
         subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
     },
+    {
+        eventType: "channel.chat.notification",
+        route: "/webhook/v1/twitch/event-sub/channel-chat-notification",
+        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelChatNotificationEvents(twitchId, transport),
+    }
 ];
 
 export default class EndCreditService {
