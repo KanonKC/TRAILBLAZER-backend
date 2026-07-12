@@ -1,7 +1,8 @@
 export enum RandomDBDKillerAnimationStyle {
     SLOT = "slot",
     FLIP = "flip",
-    ROULETTE = "roulette"
+    ROULETTE = "roulette",
+    FRAME = "frame"
 }
 
 export interface CreateRandomDBDKiller {
