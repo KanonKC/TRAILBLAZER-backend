@@ -11,6 +11,8 @@ import UserRepository from "@/repositories/user/user.repository";
 import crypto from "crypto";
 import WidgetService from "../widget.service";
 
+const CHAT_MESSAGE_DELAY_MS = 10_000;
+
 export default class RandomDBDKillerService {
     private readonly logger: TLogger;
 
@@ -128,6 +130,17 @@ export default class RandomDBDKillerService {
             animationStyle: config.animation_style
         }));
         this.widgetService.increaseTriggeredCount(config.widget_id);
+
+        const message = `Random Killer: ${killer.title}`;
+        const senderId = event.broadcaster_user_id;
+        setTimeout(async () => {
+            try {
+                this.logger.info({ message: "Sending chat message", data: { message } });
+                await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message);
+            } catch (error) {
+                this.logger.error({ message: "Failed to send chat message", data: { error } });
+            }
+        }, CHAT_MESSAGE_DELAY_MS);
     }
 
     private async subscribeToRedemptionEvents(twitchId: string, userId: string): Promise<void> {

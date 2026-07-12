@@ -28,6 +28,9 @@ jest.mock("@/libs/twurple", () => ({
             getSubscriptionsForUser: jest.fn(),
             subscribeToChannelRedemptionAddEvents: jest.fn(),
         },
+        chat: {
+            sendChatMessageAsApp: jest.fn(),
+        },
     },
     createESTransport: jest.fn(),
 }));
@@ -211,17 +214,60 @@ describe("RandomDBDKillerService", () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" }
+                widget: { owner_id: "user_1" },
+                animation_style: "spin"
             } as any);
             mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
+            mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
 
             await service.randomizeKiller(event);
 
             expect(publisher.publish).toHaveBeenCalledWith("random-dbd-killer:result", JSON.stringify({
                 userId: "user_1",
-                killer: { slug: "trapper", title: "The Trapper", image_url: "url" }
+                killer: { slug: "trapper", title: "The Trapper", image_url: "url" },
+                pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
+                animationStyle: "spin"
             }));
             expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith("widget_1");
+        });
+
+        it("should send a chat message announcing the result after a 10s delay", async () => {
+            jest.useFakeTimers();
+            mockRepo.getByTwitchRewardId.mockResolvedValue({
+                widget_id: "widget_1",
+                killer_pool: ["trapper"],
+                widget: { owner_id: "user_1" }
+            } as any);
+            mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
+            mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
+
+            await service.randomizeKiller(event);
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+
+            await jest.advanceTimersByTimeAsync(10_000);
+
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
+                "broadcaster_1",
+                "broadcaster_1",
+                "Random Killer: The Trapper"
+            );
+            jest.useRealTimers();
+        });
+
+        it("should not throw if sending the chat message fails", async () => {
+            jest.useFakeTimers();
+            mockRepo.getByTwitchRewardId.mockResolvedValue({
+                widget_id: "widget_1",
+                killer_pool: ["trapper"],
+                widget: { owner_id: "user_1" }
+            } as any);
+            mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
+            mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
+            (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockRejectedValue(new Error("Chat Error"));
+
+            await service.randomizeKiller(event);
+            await expect(jest.advanceTimersByTimeAsync(10_000)).resolves.not.toThrow();
+            jest.useRealTimers();
         });
     });
 
