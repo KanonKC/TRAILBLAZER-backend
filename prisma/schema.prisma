@@ -110,7 +110,12 @@ model WidgetType {
   id           Int      @id @default(autoincrement())
   slug         String   @unique
   display_name String
+  description  String?
   cost         Int      @default(1)
+  icon_url     String?
+  theme_color  String?
+  href         String?
+  is_active    Boolean  @default(true)
   widgets      Widget[]
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt

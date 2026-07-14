@@ -6,6 +6,7 @@ import RandomDbdPerkController from "./controllers/randomDbdPerk/randomDbdPerk.c
 import RandomDBDKillerController from "./controllers/randomDBDKiller/randomDBDKiller.controller";
 import RandomDBDKillerEventController from "./controllers/randomDBDKiller/randomDBDKiller.event.controller";
 import DBDKillerMasterController from "./controllers/dbdKillerMaster/dbdKillerMaster.controller";
+import WidgetTypeController from "./controllers/widgetType/widgetType.controller";
 import UserController from "./controllers/user/user.controller";
 import ExportVideoController from "./controllers/exportVideo/exportVideo.controller";
 import AdminController from "./controllers/admin/admin.controller";
@@ -19,6 +20,7 @@ import FirstWordRepository from "./repositories/firstWord/firstWord.repository";
 import RandomDbdPerkRepository from "./repositories/randomDbdPerk/randomDbdPerk.repository";
 import RandomDBDKillerRepository from "./repositories/randomDBDKiller/randomDBDKiller.repository";
 import DBDKillerMasterRepository from "./repositories/dbdKillerMaster/dbdKillerMaster.repository";
+import WidgetTypeRepository from "./repositories/widgetType/widgetType.repository";
 import UserRepository from "./repositories/user/user.repository";
 import WidgetRepository from "./repositories/widget/widget.repository";
 import DropImageRepository from "./repositories/dropImage/dropImage.repository";
@@ -84,6 +86,7 @@ const dropImageRepository = new DropImageRepository();
 const randomDbdPerkRepository = new RandomDbdPerkRepository();
 const randomDBDKillerRepository = new RandomDBDKillerRepository();
 const dbdKillerMasterRepository = new DBDKillerMasterRepository();
+const widgetTypeRepository = new WidgetTypeRepository();
 const widgetRepository = new WidgetRepository();
 const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
@@ -129,6 +132,7 @@ const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
+const widgetTypeController = new WidgetTypeController(widgetTypeRepository);
 const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
@@ -211,6 +215,7 @@ server.post("/api/v1/random-dbd-killer/refresh-key", randomDBDKillerController.r
 server.delete("/api/v1/random-dbd-killer", randomDBDKillerController.delete.bind(randomDBDKillerController));
 
 server.get("/api/v1/dbd-killer-master", dbdKillerMasterController.list.bind(dbdKillerMasterController));
+server.get("/api/v1/widget-types", widgetTypeController.list.bind(widgetTypeController));
 
 server.post("/api/v1/drop-image", dropImageController.create.bind(dropImageController));
 server.get("/api/v1/drop-image", dropImageController.get.bind(dropImageController));
