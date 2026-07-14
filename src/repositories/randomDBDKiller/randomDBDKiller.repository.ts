@@ -12,6 +12,7 @@ export default class RandomDBDKillerRepository {
         return prisma.randomDBDKiller.create({
             data: {
                 twitch_reward_id: request.twitch_reward_id,
+                animation_style: "frame",
                 widget: {
                     create: {
                         twitch_id: request.twitch_id,
