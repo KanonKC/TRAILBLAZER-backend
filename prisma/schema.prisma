@@ -106,15 +106,14 @@ model Widget {
   @@unique([owner_id, widget_type_slug])
 }
 
-// TODO: Rename displayName, createdAt, updatedAt to snake_case (display_name, created_at, updated_at)
 model WidgetType {
-  id          Int      @id @default(autoincrement())
-  slug        String   @unique
-  displayName String
-  cost        Int      @default(1)
-  widgets     Widget[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  slug         String   @unique
+  display_name String
+  cost         Int      @default(1)
+  widgets      Widget[]
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 }
 
 model FirstWord {
