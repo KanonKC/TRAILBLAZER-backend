@@ -10,6 +10,8 @@ import { RandomDBDKillerWidget } from "@/repositories/randomDBDKiller/response";
 import UserRepository from "@/repositories/user/user.repository";
 import crypto from "crypto";
 import WidgetService from "../widget.service";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { convertPrismaError } from "@/utils/error";
 
 const CHAT_MESSAGE_DELAY_MS = 10_000;
 
@@ -32,12 +34,25 @@ export default class RandomDBDKillerService {
             throw new NotFoundError("User not found");
         }
 
+        const existing = await this.randomDBDKillerRepository.getByOwnerId(request.owner_id);
+        if (existing) {
+            throw new BadRequestError("Random DBD Killer widget already exists for this user");
+        }
+
         await this.subscribeToRedemptionEvents(user.twitch_id, user.id);
 
-        const res = await this.randomDBDKillerRepository.create({
-            ...request,
-            overlay_key: crypto.randomBytes(16).toString("hex")
-        });
+        let res;
+        try {
+            res = await this.randomDBDKillerRepository.create({
+                ...request,
+                overlay_key: crypto.randomBytes(16).toString("hex")
+            });
+        } catch (error) {
+            if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+                throw convertPrismaError(error);
+            }
+            throw error;
+        }
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
         return this.getByUserId(user.id);
     }
@@ -52,6 +67,7 @@ export default class RandomDBDKillerService {
         await this.widgetService.authorizeOwnership(userId, existing.widget.id);
 
         if (request.killer_pool) {
+            request.killer_pool = [...new Set(request.killer_pool)];
             const masters = await this.dbdKillerMasterRepository.getBySlugs(request.killer_pool);
             const foundSlugs = new Set(masters.map(m => m.slug));
             const unknownSlugs = request.killer_pool.filter(slug => !foundSlugs.has(slug));
@@ -103,6 +119,15 @@ export default class RandomDBDKillerService {
 
         if (!config.killer_pool || config.killer_pool.length === 0) {
             this.logger.warn({ message: "Killer pool is empty", data: { widgetId: config.widget_id } });
+            try {
+                await twitchAppAPI.chat.sendChatMessageAsApp(
+                    event.broadcaster_user_id,
+                    event.broadcaster_user_id,
+                    "Random DBD Killer pool is not configured yet."
+                );
+            } catch (error) {
+                this.logger.error({ message: "Failed to send empty pool notice", data: { error } });
+            }
             return;
         }
 
@@ -129,7 +154,7 @@ export default class RandomDBDKillerService {
             })),
             animationStyle: config.animation_style
         }));
-        this.widgetService.increaseTriggeredCount(config.widget_id);
+        await this.widgetService.increaseTriggeredCount(config.widget_id);
 
         const message = `Random Killer: ${killer.title}`;
         const senderId = event.broadcaster_user_id;

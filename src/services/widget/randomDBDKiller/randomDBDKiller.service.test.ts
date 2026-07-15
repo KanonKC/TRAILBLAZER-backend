@@ -89,12 +89,36 @@ describe("RandomDBDKillerService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
             mockRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
-            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRepo.getByOwnerId
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
             const result = await service.create(request);
 
             expect(mockRepo.create).toHaveBeenCalledWith({ ...request, overlay_key: "mocked_overlay_key" });
             expect(result).toBeDefined();
+        });
+
+        it("should throw BadRequestError if widget already exists", async () => {
+            const mockUser = { id: "user_1", twitch_id: "twitch_1" };
+            mockUserRepo.get.mockResolvedValue(mockUser as any);
+            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+
+            await expect(service.create(request)).rejects.toThrow("Random DBD Killer widget already exists for this user");
+            expect(mockRepo.create).not.toHaveBeenCalled();
+        });
+
+        it("should translate a P2002 race on create into a TError instead of an opaque 500", async () => {
+            const mockUser = { id: "user_1", twitch_id: "twitch_1" };
+            mockUserRepo.get.mockResolvedValue(mockUser as any);
+            (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
+            mockRepo.getByOwnerId.mockResolvedValueOnce(null);
+
+            const { PrismaClientKnownRequestError } = require("@prisma/client/runtime/client");
+            const p2002 = new PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "0.0.0" });
+            mockRepo.create.mockRejectedValue(p2002);
+
+            await expect(service.create(request)).rejects.toMatchObject({ status: 400 });
         });
 
         it("should throw NotFoundError if user missing", async () => {
@@ -109,7 +133,9 @@ describe("RandomDBDKillerService", () => {
                 data: [{ type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' }]
             });
             mockRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
-            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRepo.getByOwnerId
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
             await service.create(request);
 

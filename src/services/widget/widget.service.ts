@@ -219,13 +219,12 @@ export default class WidgetService {
     }
 
     async increaseTriggeredCount(id: string): Promise<void> {
+        this.logger.setContext("service.widget.increaseTriggeredCount");
         try {
             await this.widgetRepository.increaseTriggeredCount(id)
+            await redis.del(`widget:${id}`)
         } catch (err) {
-            const widget = await this.get(id)
-            this.logger.error({ message: "Failed to increase Widget triggered count", data: {
-                widget
-            }})
+            this.logger.error({ message: "Failed to increase Widget triggered count", data: { widgetId: id }, error: err as Error });
         }
     }
 }

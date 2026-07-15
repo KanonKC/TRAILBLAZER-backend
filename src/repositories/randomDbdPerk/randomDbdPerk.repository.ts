@@ -169,7 +169,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async getClassByRewardId(rewardId: string) {
+    async getClassByRewardId(rewardId: string): Promise<RandomDbdPerkClass | null> {
         return prisma.randomDbdPerkClass.findUnique({
             where: {
                 twitch_reward_id: rewardId

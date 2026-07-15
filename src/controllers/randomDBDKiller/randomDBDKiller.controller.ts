@@ -55,7 +55,6 @@ export default class RandomDBDKillerController {
             this.logger.info({ message: "Successfully created random dbd killer config", data: { userId: user.id } });
             res.status(201).send(result);
         } catch (error) {
-            console.log("Error", error)
             if (error instanceof z.ZodError) {
                 this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });

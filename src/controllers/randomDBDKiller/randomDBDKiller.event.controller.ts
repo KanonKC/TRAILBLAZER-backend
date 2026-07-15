@@ -29,17 +29,6 @@ export default class RandomDBDKillerEventController {
                 return res.status(401).send({ message: "Invalid overlay key" });
             }
 
-            res.sse({
-                event: "connected",
-                data: "connected"
-            });
-
-            // Track connection
-            if (!this.connections.has(userId)) {
-                this.connections.set(userId, new Set());
-            }
-            this.connections.get(userId)!.add(res);
-
             const sub = subscriber.duplicate();
             await sub.connect();
 
@@ -56,6 +45,17 @@ export default class RandomDBDKillerEventController {
                     });
                 }
             });
+
+            res.sse({
+                event: "connected",
+                data: "connected"
+            });
+
+            // Track connection
+            if (!this.connections.has(userId)) {
+                this.connections.set(userId, new Set());
+            }
+            this.connections.get(userId)!.add(res);
 
             req.raw.on("close", () => {
                 sub.quit();

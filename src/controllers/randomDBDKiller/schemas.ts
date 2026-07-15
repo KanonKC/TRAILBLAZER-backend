@@ -7,6 +7,6 @@ export const createRandomDBDKillerSchema = z.object({
 
 export const updateRandomDBDKillerSchema = z.object({
     twitch_reward_id: z.string().optional(),
-    killer_pool: z.array(z.string()).optional(),
+    killer_pool: z.array(z.string()).max(60).optional(),
     animation_style: z.nativeEnum(RandomDBDKillerAnimationStyle).optional()
 });
