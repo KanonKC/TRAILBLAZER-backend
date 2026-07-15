@@ -195,6 +195,7 @@ export default class SpotifySongRequestService {
                     throw new NoActiveDeviceError()
                 }
             }
+
             return {
                 name: track.name,
                 artists: track.artists.map(a => a.name),
@@ -263,5 +264,7 @@ export default class SpotifySongRequestService {
                 sendChatMessageOptions
             )
         }
+
+        await this.widgetService.increaseTriggeredCount(config.widget_id)
     }
 }

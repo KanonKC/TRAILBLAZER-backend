@@ -121,6 +121,12 @@ export default class RandomDbdPerkService {
     async randomPerk(event: TwitchChannelRedemptionAddEventRequest): Promise<void> {
         this.logger.setContext("service.randomDbdPerk.randomPerk");
         const rewardId = event.reward.id
+
+        const config = await this.randomDbdPerkRepository.getByTwitchId(event.broadcaster_user_id)
+        if (!config) {
+            this.logger.warn({ message: "Random Dbd Perk widget not found", data: { twitchId: event.broadcaster_user_id } });
+            return;
+        }
         const randomClass = await this.randomDbdPerkRepository.getClassByRewardId(rewardId)
 
         if (!randomClass) {
@@ -150,6 +156,7 @@ export default class RandomDbdPerkService {
         try {
             this.logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
+            await this.widgetService.increaseTriggeredCount(config.widget_id)
         } catch (error) {
             this.logger.error({ message: "Failed to send chat message", data: { error } });
         }

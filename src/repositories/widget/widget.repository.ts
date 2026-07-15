@@ -107,4 +107,13 @@ export default class WidgetRepository {
         });
     }
 
+    async increaseTriggeredCount(id: string): Promise<void> {
+        await prisma.widget.update({
+            where: { id },
+            data: { triggered_count: {
+                increment: 1
+            } }
+        })
+    }
+
 }

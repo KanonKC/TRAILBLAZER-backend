@@ -329,6 +329,7 @@ export default class FirstWordService {
             this.logger.debug({ message: "published" });
         }
 
+        await this.widgetService.increaseTriggeredCount(firstWord.widget.id)
     }
 
     async resetChattersOnStartStream(e: TwitchStreamOnlineEventRequest): Promise<void> {

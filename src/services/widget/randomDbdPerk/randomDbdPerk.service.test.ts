@@ -43,6 +43,7 @@ describe("RandomDbdPerkService", () => {
         mockRandomDbdPerkRepo = {
             create: jest.fn(),
             getByOwnerId: jest.fn(),
+            getByTwitchId: jest.fn(),
             findById: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
@@ -172,6 +173,16 @@ describe("RandomDbdPerkService", () => {
             reward: { id: "reward_1" },
             broadcaster_user_id: "broadcaster_1",
         } as any;
+
+        beforeEach(() => {
+            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue({ id: "rw_1", widget_id: "widget_1", widget: { id: "widget_1" } } as any);
+        });
+
+        it("should return early if widget not found", async () => {
+            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue(null);
+            await service.randomPerk(event);
+            expect(mockRandomDbdPerkRepo.getClassByRewardId).not.toHaveBeenCalled();
+        });
 
         it("should return early if class not found", async () => {
             mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue(null);

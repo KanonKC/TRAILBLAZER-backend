@@ -10,6 +10,12 @@ export function convertPrismaError(error: PrismaClientKnownRequestError): TError
                 status: 404,
                 error_code: error.code
             })
+        case 'P2002':
+            return new TError({
+                message: `${modelName} already exists`,
+                status: 400,
+                error_code: error.code
+            })
         default:
             return new TError({
                 message: "Prisma unknown error",

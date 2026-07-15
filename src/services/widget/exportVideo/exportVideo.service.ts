@@ -190,6 +190,7 @@ export default class ExportVideoService {
                 }
             }
             await this.createHistory(userId, reqLog)
+            this.widgetService.increaseTriggeredCount(config.widget_id)
         } catch (err) {
             reqLog.status = "FAILED"
             reqLog.message = String(err)

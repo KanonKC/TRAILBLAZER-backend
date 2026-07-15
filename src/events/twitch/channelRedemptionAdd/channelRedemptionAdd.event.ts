@@ -1,17 +1,20 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import RandomDbdPerkService from "@/services/widget/randomDbdPerk/randomDbdPerk.service";
 import DropImageService from "@/services/widget/dropImage/dropImage.service";
+import RandomDBDKillerService from "@/services/widget/randomDBDKiller/randomDBDKiller.service";
 import TLogger, { Layer } from "@/logging/logger";
 import { TwitchChannelRedemptionAddEventRequest } from "./request";
 
 export default class TwitchChannelRedemptionAddEvent {
     private readonly randomDbdPerkService: RandomDbdPerkService;
     private readonly dropImageService: DropImageService;
+    private readonly randomDBDKillerService: RandomDBDKillerService;
     private readonly logger: TLogger;
 
-    constructor(randomDbdPerkService: RandomDbdPerkService, dropImageService: DropImageService) {
+    constructor(randomDbdPerkService: RandomDbdPerkService, dropImageService: DropImageService, randomDBDKillerService: RandomDBDKillerService) {
         this.randomDbdPerkService = randomDbdPerkService;
         this.dropImageService = dropImageService;
+        this.randomDBDKillerService = randomDBDKillerService;
         this.logger = new TLogger(Layer.EVENT);
     }
 
@@ -32,6 +35,7 @@ export default class TwitchChannelRedemptionAddEvent {
             try {
                 await Promise.allSettled([
                     this.randomDbdPerkService.randomPerk(event),
+                    this.randomDBDKillerService.randomizeKiller(event),
                 ])
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })

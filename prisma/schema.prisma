@@ -88,6 +88,7 @@ model Widget {
   overlay_key        String?             @unique
   owner_id           String
   owner              User                @relation(fields: [owner_id], references: [id])
+  triggered_count    Int                 @default(0)
   first_word         FirstWord?
   clip_shoutout      ClipShoutout?
   created_at         DateTime            @default(now())
@@ -98,20 +99,27 @@ model Widget {
   dropImage          DropImage?
   exportVideo        ExportVideo?
   spotifySongRequest SpotifySongRequest?
+  endCredit          EndCredit?
+  randomDBDKiller    RandomDBDKiller?
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
 }
 
-// TODO: Rename displayName, createdAt, updatedAt to snake_case (display_name, created_at, updated_at)
 model WidgetType {
-  id          Int      @id @default(autoincrement())
-  slug        String   @unique
-  displayName String
-  cost        Int      @default(1)
-  widgets     Widget[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  slug         String   @unique
+  display_name String
+  description  String?
+  cost         Int      @default(1)
+  icon_url     String?
+  theme_color  String?
+  href         String?
+  is_active    Boolean  @default(true)
+  is_display   Boolean  @default(true)
+  widgets      Widget[]
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 }
 
 model FirstWord {
@@ -294,4 +302,50 @@ model SpotifySongRequest {
   widget            Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
+}
+
+model EndCredit {
+  id                     String                  @id @default(uuid())
+  widget                 Widget                  @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  widget_id              String                  @unique
+  followers_header       String?
+  subscribes_header      String?
+  raids_header           String?
+  bits_header            String?
+  viewers_header         String?
+  is_show_viewer_avatars Boolean                 @default(false)
+  created_at             DateTime                @default(now())
+  updated_at             DateTime                @updatedAt
+  endCreditViewerRecords EndCreditViewerRecord[]
+}
+
+model EndCreditViewerRecord {
+  id                  Int       @id @default(autoincrement())
+  viewer_id           String
+  action              Json      @db.JsonB
+  end_credit          EndCredit @relation(fields: [end_credit_id], references: [id], onDelete: Cascade)
+  end_credit_id       String
+  platform_created_at DateTime
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+}
+
+model DBDKillerMaster {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique
+  title      String
+  image_url  String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model RandomDBDKiller {
+  id               String   @id @default(uuid())
+  widget_id        String   @unique
+  widget           Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  twitch_reward_id String?  @unique
+  killer_pool      String[]
+  animation_style  String   @default("frame")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 }
