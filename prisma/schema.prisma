@@ -116,6 +116,7 @@ model WidgetType {
   theme_color  String?
   href         String?
   is_active    Boolean  @default(true)
+  is_display   Boolean  @default(true)
   widgets      Widget[]
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
