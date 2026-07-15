@@ -76,8 +76,6 @@ pipeline {
                 '''
                 echo "🔼 Running Prisma migrations..."
                 sh 'docker compose exec -T app npx prisma migrate deploy || docker-compose exec -T app npx prisma migrate deploy'
-                echo "🌱 Running Prisma seed..."
-                sh 'docker compose exec -T app npm run prisma:seed || docker-compose exec -T app npm run prisma:seed'
             }
         }
     }
