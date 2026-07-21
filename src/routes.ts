@@ -26,6 +26,7 @@ import WidgetRepository from "./repositories/widget/widget.repository";
 import DropImageRepository from "./repositories/dropImage/dropImage.repository";
 import { UploadedFileRepository } from "./repositories/uploadedFile/uploadedFile.repository";
 import ReferralRepository from "./repositories/referral/referral.repository";
+import DiscordProvider from "./providers/discord";
 import ClipShoutoutService from "./services/widget/clipShoutout/clipShoutout.service";
 import FirstWordService from "./services/widget/firstWord/firstWord.service";
 import RandomDbdPerkService from "./services/widget/randomDbdPerk/randomDbdPerk.service";
@@ -93,10 +94,13 @@ const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
 const referralRepository = new ReferralRepository();
 
+// Provider Layer
+const discordProvider = new DiscordProvider(config);
+
 // Service Layer
 const systemService = new SystemService();
 const authService = new AuthService(config, authRepository, userRepository);
-const userService = new UserService(config, userRepository, authRepository, authService);
+const userService = new UserService(config, userRepository, authRepository, authService, discordProvider);
 const referralService = new ReferralService(referralRepository, userService);
 userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);

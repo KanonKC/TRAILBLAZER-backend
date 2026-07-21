@@ -38,6 +38,7 @@ export default interface Configurations {
         clientId: string;
         clientSecret: string;
         redirectUrl: string;
+        statWebhookUrl: string;
     }
     spotify: {
         clientId: string;

@@ -41,7 +41,8 @@ const config: Configurations = {
     discord: {
         clientId: process.env.DISCORD_CLIENT_ID || "",
         clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
-        redirectUrl: process.env.DISCORD_REDIRECT_URL || ""
+        redirectUrl: process.env.DISCORD_REDIRECT_URL || "",
+        statWebhookUrl: process.env.DISCORD_STAT_WEBHOOK_URL || ""
     },
     spotify: {
         clientId: process.env.SPOTIFY_CLIENT_ID || "",

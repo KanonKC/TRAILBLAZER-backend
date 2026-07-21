@@ -94,9 +94,16 @@ describe("UserService", () => {
                 redirectUrl: "redirect_url",
                 paymentChannelId: "payment_id",
             },
+            discord: {
+                clientId: "discord_client_id",
+                clientSecret: "discord_client_secret",
+                redirectUrl: "discord_redirect_url",
+                statWebhookUrl: "",
+            },
         };
 
-        service = new UserService(mockCfg, mockUserRepo, mockAuthRepo, mockAuthService);
+        const mockDiscordProvider = { sendStatMessage: jest.fn() } as any;
+        service = new UserService(mockCfg, mockUserRepo, mockAuthRepo, mockAuthService, mockDiscordProvider);
         service.setWidgetService(mockWidgetService);
         service.setReferralService(mockReferralService);
         jest.clearAllMocks();

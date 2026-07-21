@@ -13,6 +13,7 @@ import { BadGatewayError, ForbiddenError, NotFoundError, TError, UnauthorizedErr
 import AuthService from "../auth/auth.service";
 import WidgetService from "../widget/widget.service";
 import ReferralService from "../referral/referral.service";
+import DiscordProvider from "@/providers/discord";
 import { UserTier } from "./constant";
 import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
@@ -25,15 +26,17 @@ export default class UserService {
     private readonly authRepository: AuthRepository
     private readonly logger: TLogger
     private readonly authService: AuthService
+    private readonly discordProvider: DiscordProvider
     private widgetService?: WidgetService;
     private referralService?: ReferralService;
 
-    constructor(cfg: Configurations, userRepository: UserRepository, authRepository: AuthRepository, authService: AuthService) {
+    constructor(cfg: Configurations, userRepository: UserRepository, authRepository: AuthRepository, authService: AuthService, discordProvider: DiscordProvider) {
         this.cfg = cfg
         this.userRepository = userRepository
         this.authRepository = authRepository
         this.logger = new TLogger(Layer.SERVICE)
         this.authService = authService
+        this.discordProvider = discordProvider
     }
 
     public setWidgetService(widgetService: WidgetService) {
@@ -115,6 +118,10 @@ export default class UserService {
         
         const user = await this.userRepository.upsert(cr)
         this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
+
+        if (isNewUser) {
+            await this.discordProvider.sendStatMessage(`New user registered: **${user.display_name}** (\`${user.username}\`)`)
+        }
 
         if (isNewUser && request.ref && this.referralService) {
             await this.referralService.handleReferralRegistration(request.ref, user.id);
