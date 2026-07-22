@@ -13,6 +13,7 @@ import axios from "axios";
 import Sightengine from "@/providers/sightengine";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
+import CanvasService from "@/services/canvas/canvas.service";
 
 export default class DropImageService {
     private readonly logger: TLogger;
@@ -21,7 +22,8 @@ export default class DropImageService {
         private readonly dropImageRepository: DropImageRepository,
         private readonly userRepository: UserRepository,
         private readonly sightengine: Sightengine,
-        private readonly widgetService: WidgetService
+        private readonly widgetService: WidgetService,
+        private readonly canvasService?: CanvasService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
     }
@@ -249,5 +251,10 @@ export default class DropImageService {
             userId: config.widget.owner_id,
         }));
         this.widgetService.increaseTriggeredCount(config.widget_id)
+        await this.canvasService?.triggerForWidget(config.widget_id, {
+            username: event.chatter_user_login,
+            display_name: event.chatter_user_name,
+            image_url: url,
+        })
     }
 }

@@ -56,9 +56,18 @@ export class UploadedFileRepository {
             }
         }
 
-        if (request.types && request.types.length > 0) {
+        if (request.types && request.types.length > 0 && request.typePrefix) {
+            where.OR = [
+                { type: { in: request.types } },
+                { type: { startsWith: request.typePrefix } },
+            ]
+        } else if (request.types && request.types.length > 0) {
             where.type = {
                 in: request.types
+            }
+        } else if (request.typePrefix) {
+            where.type = {
+                startsWith: request.typePrefix
             }
         }
 

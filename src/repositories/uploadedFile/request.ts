@@ -16,4 +16,5 @@ export interface ListUploadedFileRequest {
     ownerId: string;
     search?: string;
     types?: string[];
+    typePrefix?: string;
 }

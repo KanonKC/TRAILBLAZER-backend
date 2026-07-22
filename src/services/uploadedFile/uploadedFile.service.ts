@@ -15,6 +15,12 @@ import path from "path"
 import UserService from "../user/user.service"
 import { UserTier } from "../user/constant"
 
+const TYPE_FILTERS: Record<string, { types?: string[]; prefix?: string }> = {
+    audio: { types: ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"], prefix: "audio/" },
+    image: { prefix: "image/" },
+    video: { prefix: "video/" },
+}
+
 export class UploadedFileService {
     private ufr: UploadedFileRepository
     private logger: TLogger;
@@ -121,9 +127,12 @@ export class UploadedFileService {
         this.logger.setContext("service.uploadedFile.list");
         this.logger.info({ message: "Listing uploaded files", data: { userId, filters, pagination } });
 
+        const typeFilter = filters.type ? TYPE_FILTERS[filters.type] : undefined;
+
         const req: ListUploadedFileRequest = {
             search: filters.search,
-            types: filters.type === "audio" ? ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"] : undefined,
+            types: typeFilter?.types,
+            typePrefix: typeFilter?.prefix,
             ownerId: userId
         }
 

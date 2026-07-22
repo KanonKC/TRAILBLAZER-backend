@@ -15,6 +15,7 @@ import { NotFoundError, ForbiddenError } from "@/errors";
 import { ClipShoutoutWidget } from "@/repositories/clipShoutout/response";
 import Configurations from "@/config/index";
 import WidgetService from "../widget.service";
+import CanvasService from "@/services/canvas/canvas.service";
 
 export default class ClipShoutoutService {
     private readonly cfg: Configurations
@@ -24,14 +25,16 @@ export default class ClipShoutoutService {
     private readonly twitchGql: TwitchGql;
     private readonly logger: TLogger;
     private readonly widgetService: WidgetService;
+    private readonly canvasService?: CanvasService;
 
-    constructor(cfg: Configurations, clipShoutoutRepository: ClipShoutoutRepository, userRepository: UserRepository, authService: AuthService, twitchGql: TwitchGql, widgetService: WidgetService) {
+    constructor(cfg: Configurations, clipShoutoutRepository: ClipShoutoutRepository, userRepository: UserRepository, authService: AuthService, twitchGql: TwitchGql, widgetService: WidgetService, canvasService?: CanvasService) {
         this.cfg = cfg;
         this.clipShoutoutRepository = clipShoutoutRepository;
         this.userRepository = userRepository;
         this.authService = authService;
         this.twitchGql = twitchGql;
         this.widgetService = widgetService;
+        this.canvasService = canvasService;
         this.logger = new TLogger(Layer.SERVICE);
     }
 
@@ -167,6 +170,11 @@ export default class ClipShoutoutService {
                         duration: selectedClip.duration,
                         userId: csConfig.widget.owner_id
                     }))
+                    await this.canvasService?.triggerForWidget(csConfig.widget_id, {
+                        username: event.raid.user_login,
+                        display_name: event.raid.user_name,
+                        clip_title: selectedClip.title,
+                    })
                 } catch (err) {
                     this.logger.error({ message: "Publish clip shoutout failed", error: String(err) });
                 }

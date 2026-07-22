@@ -30,6 +30,17 @@ export default class UserRepository {
         return prisma.user.findUnique({ where: { twitch_id: twitchId }, include: { auth: true } })
     }
 
+    async getByCanvasOverlayKey(overlayKey: string): Promise<User | null> {
+        return prisma.user.findUnique({ where: { canvas_overlay_key: overlayKey } })
+    }
+
+    async updateCanvasOverlayKey(id: string, overlayKey: string): Promise<void> {
+        await prisma.user.update({
+            where: { id },
+            data: { canvas_overlay_key: overlayKey },
+        })
+    }
+
     async count(): Promise<number> {
         return prisma.user.count();
     }

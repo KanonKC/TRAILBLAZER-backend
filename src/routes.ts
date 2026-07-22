@@ -40,6 +40,10 @@ import SpotifySongRequestRepository from "./repositories/spotifySongRequest/spot
 import SpotifySongRequestService from "./services/widget/spotifySongRequest/spotifySongRequest.service";
 import SpotifySongRequestController from "./controllers/spotifySongRequest/spotifySongRequest.controller";
 import SpotifyProvider from "./providers/spotify/index";
+import CanvasRepository from "./repositories/canvas/canvas.repository";
+import CanvasService from "./services/canvas/canvas.service";
+import CanvasController from "./controllers/canvas/canvas.controller";
+import CanvasEventController from "./controllers/canvas/canvas.event.controller";
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -92,6 +96,7 @@ const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
 const referralRepository = new ReferralRepository();
+const canvasRepository = new CanvasRepository();
 
 // Service Layer
 const systemService = new SystemService();
@@ -101,13 +106,14 @@ const referralService = new ReferralService(referralRepository, userService);
 userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);
 userService.setWidgetService(widgetService);
-const firstWordService = new FirstWordService(config, firstWordRepository, userRepository, widgetService);
+const canvasService = new CanvasService(canvasRepository, userRepository, widgetRepository);
+const firstWordService = new FirstWordService(config, firstWordRepository, userRepository, widgetService, canvasService);
 
-const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutRepository, userRepository, authService, twitchGql, widgetService);
-const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
+const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutRepository, userRepository, authService, twitchGql, widgetService, canvasService);
+const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService, canvasService);
 
-const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
-const randomDBDKillerService = new RandomDBDKillerService(randomDBDKillerRepository, dbdKillerMasterRepository, userRepository, widgetService);
+const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService, canvasService);
+const randomDBDKillerService = new RandomDBDKillerService(randomDBDKillerRepository, dbdKillerMasterRepository, userRepository, widgetService, canvasService);
 const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
 const linkedAccountService = new LinkedAccountService(config, linkedAccountRepository, googleOAuth, discordOAuth, spotifyOAuth);
@@ -140,6 +146,8 @@ const linkedAccountController = new LinkedAccountController(linkedAccountService
 const twitchGqlController = new TwitchGqlController(twitchGql);
 const exportVideoController = new ExportVideoController(exportVideoService);
 const spotifySongRequestController = new SpotifySongRequestController(spotifySongRequestService);
+const canvasController = new CanvasController(canvasService);
+const canvasEventController = new CanvasEventController(canvasService);
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService, spotifySongRequestService)
@@ -263,11 +271,24 @@ server.get("/api/v1/linked-accounts", linkedAccountController.list.bind(linkedAc
 server.post("/api/v1/linked-accounts/:platform/bind", linkedAccountController.bind.bind(linkedAccountController));
 server.delete("/api/v1/linked-accounts/:platform", linkedAccountController.unbind.bind(linkedAccountController));
 
+server.get("/api/v1/canvases", canvasController.list.bind(canvasController));
+server.post("/api/v1/canvases", canvasController.create.bind(canvasController));
+server.get("/api/v1/canvases/variables", canvasController.getVariables.bind(canvasController));
+server.get("/api/v1/canvases/:id", canvasController.get.bind(canvasController));
+server.put("/api/v1/canvases/:id", canvasController.update.bind(canvasController));
+server.delete("/api/v1/canvases/:id", canvasController.delete.bind(canvasController));
+server.post("/api/v1/canvases/:id/test", canvasController.test.bind(canvasController));
+server.get("/api/v1/canvases/:id/links", canvasController.getLinks.bind(canvasController));
+server.put("/api/v1/canvases/:id/links", canvasController.updateLinks.bind(canvasController));
+server.get("/api/v1/canvas-overlay", canvasController.getOverlayKey.bind(canvasController));
+server.post("/api/v1/canvas-overlay/refresh-key", canvasController.refreshOverlayKey.bind(canvasController));
+
 server.register(FastifySSEPlugin);
 server.get("/api/v1/events/first-word/:userId", firstWordEventController.sse.bind(firstWordEventController));
 server.get("/api/v1/events/clip-shoutout/:userId", clipShoutoutEventController.sse.bind(clipShoutoutEventController));
 server.get("/api/v1/events/drop-image/:userId", dropImageEventController.sse.bind(dropImageEventController));
 server.get("/api/v1/events/random-dbd-killer/:userId", randomDBDKillerEventController.sse.bind(randomDBDKillerEventController));
+server.get("/api/v1/events/canvas/:userId", canvasEventController.sse.bind(canvasEventController));
 
 server.post("/webhook/v1/twitch/event-sub/channel-chat-message", twitchChannelChatMessageEvent.handle.bind(twitchChannelChatMessageEvent))
 server.post("/webhook/v1/twitch/event-sub/stream-online", twitchStreamOnlineEvent.handle.bind(twitchStreamOnlineEvent))

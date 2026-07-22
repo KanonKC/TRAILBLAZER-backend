@@ -18,19 +18,22 @@ import { ForbiddenError, NotFoundError, TError } from "@/errors";
 import { ListResponse, Pagination } from "../../response";
 
 import WidgetService from "../widget.service";
+import CanvasService from "@/services/canvas/canvas.service";
 
 export default class FirstWordService {
     private readonly cfg: Configurations
     private readonly firstWordRepository: FirstWordRepository;
     private readonly userRepository: UserRepository;
     private readonly widgetService: WidgetService;
+    private readonly canvasService?: CanvasService;
     private readonly logger = new TLogger(Layer.SERVICE);
 
-    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService) {
+    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService, canvasService?: CanvasService) {
         this.cfg = cfg;
         this.firstWordRepository = firstWordRepository;
         this.userRepository = userRepository;
         this.widgetService = widgetService;
+        this.canvasService = canvasService;
     }
 
     async create(request: CreateFirstWordRequest): Promise<FirstWordWidget> {
@@ -330,6 +333,11 @@ export default class FirstWordService {
         }
 
         await this.widgetService.increaseTriggeredCount(firstWord.widget.id)
+        await this.canvasService?.triggerForWidget(firstWord.widget.id, {
+            username: e.chatter_user_login ?? e.chatter_user_name,
+            display_name: e.chatter_user_name,
+            message: e.message?.text ?? "",
+        })
     }
 
     async resetChattersOnStartStream(e: TwitchStreamOnlineEventRequest): Promise<void> {

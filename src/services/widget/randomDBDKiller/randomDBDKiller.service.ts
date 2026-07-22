@@ -12,6 +12,7 @@ import crypto from "crypto";
 import WidgetService from "../widget.service";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
+import CanvasService from "@/services/canvas/canvas.service";
 
 const CHAT_MESSAGE_DELAY_MS = 10_000;
 
@@ -22,7 +23,8 @@ export default class RandomDBDKillerService {
         private readonly randomDBDKillerRepository: RandomDBDKillerRepository,
         private readonly dbdKillerMasterRepository: DBDKillerMasterRepository,
         private readonly userRepository: UserRepository,
-        private readonly widgetService: WidgetService
+        private readonly widgetService: WidgetService,
+        private readonly canvasService?: CanvasService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
     }
@@ -155,6 +157,11 @@ export default class RandomDBDKillerService {
             animationStyle: config.animation_style
         }));
         await this.widgetService.increaseTriggeredCount(config.widget_id);
+        await this.canvasService?.triggerForWidget(config.widget_id, {
+            username: event.user_login,
+            display_name: event.user_name,
+            result_name: killer.title,
+        });
 
         const message = `Random Killer: ${killer.title}`;
         const senderId = event.broadcaster_user_id;

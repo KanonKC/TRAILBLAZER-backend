@@ -12,17 +12,20 @@ import { capitalize } from "@/utils/message";
 import crypto from "crypto";
 import WidgetService from "../widget.service";
 import { DbdPerkPagination, ExtendedRandomDbdPerk } from "./response";
+import CanvasService from "@/services/canvas/canvas.service";
 
 export default class RandomDbdPerkService {
     private readonly randomDbdPerkRepository: RandomDbdPerkRepository;
     private readonly userRepository: UserRepository;
     private readonly widgetService: WidgetService;
+    private readonly canvasService?: CanvasService;
     private readonly logger: TLogger;
 
-    constructor(randomDbdPerkRepository: RandomDbdPerkRepository, userRepository: UserRepository, widgetService: WidgetService) {
+    constructor(randomDbdPerkRepository: RandomDbdPerkRepository, userRepository: UserRepository, widgetService: WidgetService, canvasService?: CanvasService) {
         this.randomDbdPerkRepository = randomDbdPerkRepository;
         this.userRepository = userRepository;
         this.widgetService = widgetService;
+        this.canvasService = canvasService;
         this.logger = new TLogger(Layer.SERVICE);
     }
 
@@ -157,6 +160,11 @@ export default class RandomDbdPerkService {
             this.logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
             await this.widgetService.increaseTriggeredCount(config.widget_id)
+            await this.canvasService?.triggerForWidget(config.widget_id, {
+                username: event.user_login,
+                display_name: event.user_name,
+                result_name: message,
+            })
         } catch (error) {
             this.logger.error({ message: "Failed to send chat message", data: { error } });
         }
