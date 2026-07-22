@@ -90,11 +90,29 @@ describe("CanvasService", () => {
 
     describe("get", () => {
         it("returns canvas when owner matches", async () => {
-            mockCanvasRepo.getWithLinks.mockResolvedValue({ id: "canvas_1", owner_id: "user_1", links: [] } as any);
+            mockCanvasRepo.getWithLinks.mockResolvedValue({ id: "canvas_1", owner_id: "user_1", elements: [], links: [] } as any);
 
             const result = await service.get("canvas_1", "user_1");
 
             expect(result.id).toBe("canvas_1");
+        });
+
+        it("attaches a signed media URL to each element so the editor can render it", async () => {
+            (s3.getSignedURL as jest.Mock).mockResolvedValue("https://signed.example.com/pic.png");
+            mockCanvasRepo.getWithLinks.mockResolvedValue({
+                id: "canvas_1",
+                owner_id: "user_1",
+                links: [],
+                elements: [
+                    { id: "el_1", type: "image", media_key: "users/user_1/abc", media: { id: "f1", key: "users/user_1/abc", name: "pic.png", type: "image/png" } },
+                    { id: "el_2", type: "text", media_key: null, media: null },
+                ],
+            } as any);
+
+            const result = await service.get("canvas_1", "user_1");
+
+            expect(result.elements[0].media?.url).toBe("https://signed.example.com/pic.png");
+            expect(result.elements[1].media).toBeNull();
         });
 
         it("throws ForbiddenError when owner does not match", async () => {

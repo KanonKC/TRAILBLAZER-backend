@@ -5,7 +5,14 @@ import { publisher } from "@/libs/redis";
 import TLogger, { Layer } from "@/logging/logger";
 import CanvasRepository from "@/repositories/canvas/canvas.repository";
 import { CanvasElementInput, CreateCanvas, UpdateCanvas } from "@/repositories/canvas/request";
-import { CanvasWithElements, CanvasWithLinks } from "@/repositories/canvas/response";
+import {
+    CanvasElementWithMedia,
+    CanvasElementResponse,
+    CanvasResponse,
+    CanvasWithElements,
+    CanvasWithLinks,
+    CanvasWithLinksResponse,
+} from "@/repositories/canvas/response";
 import UserRepository from "@/repositories/user/user.repository";
 import WidgetRepository from "@/repositories/widget/widget.repository";
 import { MAX_CANVAS_PER_TIER, UserTier } from "@/services/user/constant";
@@ -37,6 +44,23 @@ export default class CanvasService {
         }
     }
 
+    /**
+     * Attaches a signed URL to each element's media so the editor can render the
+     * actual image/video instead of just a filename. Mirrors uploadedFile.extend().
+     */
+    private async extendElement(el: CanvasElementWithMedia): Promise<CanvasElementResponse> {
+        if (!el.media) {
+            return { ...el, media: null };
+        }
+        const url = await s3.getSignedURL(el.media.key, { expiresIn: MEDIA_URL_EXPIRES_IN });
+        return { ...el, media: { ...el.media, url } };
+    }
+
+    private async extend<T extends CanvasWithElements>(canvas: T): Promise<T & CanvasResponse> {
+        const elements = await Promise.all(canvas.elements.map((el) => this.extendElement(el)));
+        return { ...canvas, elements } as T & CanvasResponse;
+    }
+
     async create(userId: string, request: Omit<CreateCanvas, "owner_id">): Promise<CanvasWithElements> {
         this.logger.setContext("service.canvas.create");
         const user = await this.userRepository.get(userId);
@@ -55,19 +79,20 @@ export default class CanvasService {
         return this.canvasRepository.create({ ...request, owner_id: userId });
     }
 
-    async get(id: string, userId: string): Promise<CanvasWithLinks> {
+    async get(id: string, userId: string): Promise<CanvasWithLinksResponse> {
         this.logger.setContext("service.canvas.get");
         const canvas = await this.canvasRepository.getWithLinks(id);
         if (!canvas) {
             throw new NotFoundError("Canvas not found");
         }
         this.authorize(userId, canvas);
-        return canvas;
+        return this.extend(canvas);
     }
 
-    async list(userId: string): Promise<CanvasWithElements[]> {
+    async list(userId: string): Promise<CanvasResponse[]> {
         this.logger.setContext("service.canvas.list");
-        return this.canvasRepository.listByOwnerId(userId);
+        const canvases = await this.canvasRepository.listByOwnerId(userId);
+        return Promise.all(canvases.map((canvas) => this.extend(canvas)));
     }
 
     async update(id: string, userId: string, request: UpdateCanvas): Promise<CanvasWithElements> {
