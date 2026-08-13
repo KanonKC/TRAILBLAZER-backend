@@ -326,7 +326,8 @@ model EndCredit {
 model EndCreditViewerRecord {
   id                  Int       @id @default(autoincrement())
   viewer_id           String
-  action              Json      @db.JsonB
+  type                String
+  value               String
   end_credit          EndCredit @relation(fields: [end_credit_id], references: [id], onDelete: Cascade)
   end_credit_id       String
   platform_created_at DateTime
