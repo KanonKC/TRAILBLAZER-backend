@@ -90,7 +90,8 @@ export default class EndCreditRepository {
             data: {
                 end_credit_id: request.end_credit_id,
                 viewer_id: request.viewer_id,
-                action: request.action,
+                type: request.type,
+                value: request.value,
                 platform_created_at: request.platform_created_at,
             }
         });

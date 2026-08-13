@@ -27,7 +27,7 @@ export default class TwitchChannelSubscribeEvent {
         if (body.subscription.status === "enabled") {
             this.logger.info({ message: "Handling channel subscribe event", data: event })
             try {
-                await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, event, new Date())
+                await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, "channel.subscribe", event.tier, new Date())
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })
             }

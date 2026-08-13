@@ -13,6 +13,7 @@ export interface CreateEndCredit {
 export interface CreateEndCreditViewerRecord {
     end_credit_id: string;
     viewer_id: string;
-    action: object;
+    type: string;
+    value: string;
     platform_created_at: Date;
 }

@@ -27,7 +27,7 @@ export default class TwitchChannelFollowEvent {
         if (body.subscription.status === "enabled") {
             this.logger.info({ message: "Handling channel follow event", data: event })
             try {
-                await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, event, new Date(event.followed_at))
+                await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, "channel.follow", event.user_name, new Date(event.followed_at))
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })
             }

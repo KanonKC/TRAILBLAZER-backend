@@ -16,26 +16,26 @@ interface EndCreditEventSubscription {
 }
 
 const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
-    {
-        eventType: "channel.follow",
-        route: "/webhook/v1/twitch/event-sub/channel-follow",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelFollowEvents(twitchId, transport),
-    },
-    {
-        eventType: "channel.subscribe",
-        route: "/webhook/v1/twitch/event-sub/channel-subscribe",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelSubscriptionEvents(twitchId, transport),
-    },
-    {
-        eventType: "channel.raid",
-        route: "/webhook/v1/twitch/event-sub/channel-raid",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsTo(twitchId, transport),
-    },
-    {
-        eventType: "channel.bits.use",
-        route: "/webhook/v1/twitch/event-sub/channel-bits-use",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
-    },
+    // {
+    //     eventType: "channel.follow",
+    //     route: "/webhook/v1/twitch/event-sub/channel-follow",
+    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelFollowEvents(twitchId, transport),
+    // },
+    // {
+    //     eventType: "channel.subscribe",
+    //     route: "/webhook/v1/twitch/event-sub/channel-subscribe",
+    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelSubscriptionEvents(twitchId, transport),
+    // },
+    // {
+    //     eventType: "channel.raid",
+    //     route: "/webhook/v1/twitch/event-sub/channel-raid",
+    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsTo(twitchId, transport),
+    // },
+    // {
+    //     eventType: "channel.bits.use",
+    //     route: "/webhook/v1/twitch/event-sub/channel-bits-use",
+    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
+    // },
     {
         eventType: "channel.chat.notification",
         route: "/webhook/v1/twitch/event-sub/channel-chat-notification",
@@ -91,7 +91,7 @@ export default class EndCreditService {
         }
     }
 
-    async recordViewerAction(twitchId: string, viewerId: string, action: object, platformCreatedAt: Date): Promise<void> {
+    async recordViewerAction(twitchId: string, viewerId: string, type: string, value: string, platformCreatedAt: Date): Promise<void> {
         this.logger.setContext("service.endCredit.recordViewerAction");
         try {
             const endCredit = await this.endCreditRepository.getByTwitchId(twitchId);
@@ -102,7 +102,8 @@ export default class EndCreditService {
             await this.endCreditRepository.createViewerRecord({
                 end_credit_id: endCredit.id,
                 viewer_id: viewerId,
-                action,
+                type,
+                value,
                 platform_created_at: platformCreatedAt,
             });
             this.logger.info({ message: "Recorded end credit viewer action", data: { twitchId, viewerId } });

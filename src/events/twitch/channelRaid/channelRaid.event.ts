@@ -27,7 +27,7 @@ export default class TwitchChannelRaidEvent {
         if (body.subscription.status === "enabled") {
             this.logger.info({ message: "Handling channel raid event", data: event })
             try {
-                await this.endCreditService.recordViewerAction(event.to_broadcaster_user_id, event.from_broadcaster_user_id, event, new Date())
+                await this.endCreditService.recordViewerAction(event.to_broadcaster_user_id, event.from_broadcaster_user_id, "channel.raid", String(event.viewers), new Date())
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })
             }
