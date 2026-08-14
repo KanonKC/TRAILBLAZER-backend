@@ -27,7 +27,7 @@ export default class TwitchChannelBitsUseEvent {
         if (body.subscription.status === "enabled") {
             this.logger.info({ message: "Handling channel bits use event", data: event })
             try {
-                await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, "channel.bits.use", String(event.bits), new Date())
+                await this.endCreditService.handleTwitchChannelBitsUseEvent(event)
             } catch (err: any) {
                 this.logger.error({ message: "Handle event failed", error: err })
             }

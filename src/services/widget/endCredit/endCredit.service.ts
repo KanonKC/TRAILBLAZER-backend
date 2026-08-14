@@ -8,6 +8,10 @@ import WidgetService from "../widget.service";
 import { randomBytes } from "node:crypto";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import { EndCreditSubscriptionError } from "./error";
+import { TwitchChannelChatNotificationEventRequest } from "@/events/twitch/channelChatNotification/request";
+import { TwitchChannelFollowEventRequest } from "@/events/twitch/channelFollow/request";
+import { TwitchChannelBitsUseEventRequest } from "@/events/twitch/channelBitsUse/request";
+import { parseRFC3339 } from "@/utils/time";
 
 interface EndCreditEventSubscription {
     eventType: string;
@@ -16,11 +20,11 @@ interface EndCreditEventSubscription {
 }
 
 const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
-    // {
-    //     eventType: "channel.follow",
-    //     route: "/webhook/v1/twitch/event-sub/channel-follow",
-    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelFollowEvents(twitchId, transport),
-    // },
+    {
+        eventType: "channel.follow",
+        route: "/webhook/v1/twitch/event-sub/channel-follow",
+        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelFollowEvents(twitchId, transport),
+    },
     // {
     //     eventType: "channel.subscribe",
     //     route: "/webhook/v1/twitch/event-sub/channel-subscribe",
@@ -31,11 +35,11 @@ const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
     //     route: "/webhook/v1/twitch/event-sub/channel-raid",
     //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsTo(twitchId, transport),
     // },
-    // {
-    //     eventType: "channel.bits.use",
-    //     route: "/webhook/v1/twitch/event-sub/channel-bits-use",
-    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
-    // },
+    {
+        eventType: "channel.bits.use",
+        route: "/webhook/v1/twitch/event-sub/channel-bits-use",
+        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
+    },
     {
         eventType: "channel.chat.notification",
         route: "/webhook/v1/twitch/event-sub/channel-chat-notification",
@@ -125,4 +129,31 @@ export default class EndCreditService {
             }
         }
     }
+
+    async handleTwitchChannelChatNotificationEvent(event: TwitchChannelChatNotificationEventRequest): Promise<void> {
+
+        const now = new Date()
+        let type = ""
+        let value = ""
+
+        if (event.notice_type === "sub" || event.notice_type === "resub") {
+            type = "sub"
+            value = String(event.sub?.duration_months || event.resub?.cumulative_months || 0)
+        } else if (event.notice_type === "raid") {
+            type = "raid"
+            value = String(event.raid?.viewer_count || 0)
+        }
+
+        await this.recordViewerAction(event.broadcaster_user_id, event.chatter_user_id, type, value, now)
+    }
+
+    async handleTwitchChannelFollowEvent(event: TwitchChannelFollowEventRequest): Promise<void> {
+        await this.recordViewerAction(event.broadcaster_user_id, event.user_id, "follow", "", parseRFC3339(event.followed_at))
+    }
+
+    async handleTwitchChannelBitsUseEvent(event: TwitchChannelBitsUseEventRequest): Promise<void> {
+        const now = new Date()
+        await this.recordViewerAction(event.broadcaster_user_id, event.user_id, "bit", String(event.bits), now)
+    }
+
 }
