@@ -172,4 +172,27 @@ export default class EndCreditController {
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
+
+    async test(req: FastifyRequest, res: FastifyReply) {
+        this.logger.setContext("controller.endCredit.test");
+        this.logger.info({ message: "Testing end credit widget" });
+        const user = getUserFromRequest(req);
+        if (!user) {
+            this.logger.warn({ message: "Unauthorized access attempt" });
+            return res.status(401).send({ message: "Unauthorized" });
+        }
+
+        try {
+            await this.endCreditService.test(user.id);
+            this.logger.info({ message: "Successfully inserted test end credit records", data: { userId: user.id } });
+            res.status(204).send();
+        } catch (error) {
+            if (error instanceof TError) {
+                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                return res.status(error.status).send(error.toJSON());
+            }
+            this.logger.error({ message: "Failed to test end credit widget", data: { userId: user.id }, error: error as Error });
+            res.status(500).send({ message: "Internal Server Error" });
+        }
+    }
 }

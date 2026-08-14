@@ -50,6 +50,7 @@ import multipart from "@fastify/multipart";
 import { FastifySSEPlugin } from "fastify-sse-v2";
 import ClipShoutoutEventController from "./controllers/clipShoutout/clipShoutout.event.controller";
 import DropImageEventController from "./controllers/dropImage/dropImage.event.controller";
+import EndCreditEventController from "./controllers/endCredit/endCredit.event.controller";
 import FirstWordEventController from "./controllers/firstWord/firstWord.event.controller";
 import SystemController from "./controllers/system/system.controller";
 import TwitchController from "./controllers/twitch/twitch.controller";
@@ -138,6 +139,7 @@ const clipShoutoutController = new ClipShoutoutController(clipShoutoutService, c
 const dropImageController = new DropImageController(dropImageService);
 const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
+const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
@@ -242,6 +244,7 @@ server.get("/api/v1/end-credit", endCreditController.get.bind(endCreditControlle
 server.put("/api/v1/end-credit", endCreditController.update.bind(endCreditController));
 server.post("/api/v1/end-credit/refresh-key", endCreditController.refreshKey.bind(endCreditController));
 server.delete("/api/v1/end-credit", endCreditController.delete.bind(endCreditController));
+server.post("/api/v1/end-credit/test", endCreditController.test.bind(endCreditController));
 
 server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.bind(spotifySongRequestController));
 server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
@@ -288,6 +291,7 @@ server.get("/api/v1/events/first-word/:userId", firstWordEventController.sse.bin
 server.get("/api/v1/events/clip-shoutout/:userId", clipShoutoutEventController.sse.bind(clipShoutoutEventController));
 server.get("/api/v1/events/drop-image/:userId", dropImageEventController.sse.bind(dropImageEventController));
 server.get("/api/v1/events/random-dbd-killer/:userId", randomDBDKillerEventController.sse.bind(randomDBDKillerEventController));
+server.get("/api/v1/events/end-credit/:userId", endCreditEventController.sse.bind(endCreditEventController));
 server.get("/api/v1/end-credit/:userId/records", endCreditController.getRecords.bind(endCreditController));
 
 server.post("/webhook/v1/twitch/event-sub/channel-chat-message", twitchChannelChatMessageEvent.handle.bind(twitchChannelChatMessageEvent))

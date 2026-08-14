@@ -15,6 +15,10 @@ import { TwitchChannelBitsUseEventRequest } from "@/events/twitch/channelBitsUse
 import { parseRFC3339 } from "@/utils/time";
 import { EndCreditViewerRecord } from "generated/prisma/client";
 import { EnrichedEndCreditViewerRecord } from "./response";
+import { publisher } from "@/libs/redis";
+import { TwitchChannelRaidEventRequest } from "@/events/twitch/channelRaid/request";
+
+export const END_CREDIT_ROLL_CHANNEL = "end-credit:roll";
 
 interface EndCreditEventSubscription {
     eventType: string;
@@ -33,11 +37,12 @@ const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
     //     route: "/webhook/v1/twitch/event-sub/channel-subscribe",
     //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelSubscriptionEvents(twitchId, transport),
     // },
-    // {
-    //     eventType: "channel.raid",
-    //     route: "/webhook/v1/twitch/event-sub/channel-raid",
-    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsTo(twitchId, transport),
-    // },
+    {
+        // Outgoing raid — the streamer raids someone else, which is what triggers the credit roll.
+        eventType: "channel.raid",
+        route: "/webhook/v1/twitch/event-sub/channel-raid",
+        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsFrom(twitchId, transport),
+    },
     {
         eventType: "channel.bits.use",
         route: "/webhook/v1/twitch/event-sub/channel-bits-use",
@@ -218,6 +223,89 @@ export default class EndCreditService {
                 avatar_url: profile?.profilePictureUrl ?? null,
             };
         });
+    }
+
+    /**
+     * Pushes a credit roll built from mock viewers to the overlay.
+     * Nothing is written to the database, so a test never pollutes the real credits.
+     */
+    async test(userId: string): Promise<void> {
+        this.logger.setContext("service.endCredit.test");
+        this.logger.info({ message: "Pushing mock end credit roll", data: { userId } });
+        try {
+            const endCredit = await this.endCreditRepository.getByOwnerId(userId);
+            if (!endCredit) {
+                throw new NotFoundError("End Credit config not found");
+            }
+            await this.widgetService.authorizeOwnership(userId, endCredit.widget.id);
+
+            const mockNames = ["NightOwlGamer", "PixelWitch", "SirLagsalot", "MochiMochi", "CaptainRewind", "GlitchGoblin"];
+            const now = new Date();
+            const mockRecord = (index: number, type: string, value: string): EnrichedEndCreditViewerRecord => ({
+                id: index,
+                viewer_id: `mock-${index}`,
+                type,
+                value,
+                end_credit_id: endCredit.id,
+                platform_created_at: now,
+                display_name: mockNames[index % mockNames.length],
+                avatar_url: null,
+            });
+
+            const records: EnrichedEndCreditViewerRecord[] = [
+                mockRecord(0, "follow", ""),
+                mockRecord(1, "follow", ""),
+                mockRecord(2, "sub", "3"),
+                mockRecord(3, "sub", "1"),
+                mockRecord(4, "raid", "42"),
+                mockRecord(5, "bit", "500"),
+            ];
+
+            await this.publishRoll(userId, endCredit, records);
+        } catch (error) {
+            this.logger.error({ message: "Failed to push mock end credit roll", error: error as Error, data: { userId } });
+            throw error;
+        }
+    }
+
+    /**
+     * Triggered when the streamer raids another channel — rolls the credits for the stream that just ended.
+     */
+    async handleTwitchChannelRaidEvent(event: TwitchChannelRaidEventRequest): Promise<void> {
+        this.logger.setContext("service.endCredit.handleTwitchChannelRaidEvent");
+        try {
+            const endCredit = await this.endCreditRepository.getByTwitchId(event.from_broadcaster_user_id);
+            if (!endCredit) {
+                this.logger.info({ message: "No end credit config for raider, skipping", data: { twitchId: event.from_broadcaster_user_id } });
+                return;
+            }
+            if (!endCredit.widget.enabled) {
+                this.logger.info({ message: "End credit widget disabled, skipping", data: { widgetId: endCredit.widget.id } });
+                return;
+            }
+
+            const records = await this.endCreditRepository.getViewerRecordsByEndCreditId(endCredit.id);
+            const enriched = await this.enrichRecordsWithTwitchProfile(records);
+
+            await this.publishRoll(endCredit.widget.owner_id, endCredit, enriched);
+            await this.widgetService.increaseTriggeredCount(endCredit.widget_id);
+        } catch (error) {
+            this.logger.error({ message: "Failed to handle raid event for end credit", error: error as Error, data: { event } });
+        }
+    }
+
+    private async publishRoll(userId: string, config: EndCreditWidget, records: EnrichedEndCreditViewerRecord[]): Promise<void> {
+        await publisher.publish(END_CREDIT_ROLL_CHANNEL, JSON.stringify({
+            userId,
+            records,
+            is_show_viewer_avatars: config.is_show_viewer_avatars,
+            followers_header: config.followers_header,
+            subscribes_header: config.subscribes_header,
+            raids_header: config.raids_header,
+            bits_header: config.bits_header,
+            viewers_header: config.viewers_header,
+        }));
+        this.logger.info({ message: "Published end credit roll", data: { userId, count: records.length } });
     }
 
     async recordViewerAction(twitchId: string, viewerId: string, type: string, value: string, platformCreatedAt: Date): Promise<void> {
