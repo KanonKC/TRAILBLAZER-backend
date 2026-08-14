@@ -1,5 +1,5 @@
 import { prisma } from "@/libs/prisma";
-import { CreateEndCredit, CreateEndCreditViewerRecord } from "./request";
+import { CreateEndCredit, CreateEndCreditViewerRecord, UpdateEndCredit } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { EndCreditWidget } from "./response";
 import { EndCreditViewerRecord } from "generated/prisma/client";
@@ -94,6 +94,57 @@ export default class EndCreditRepository {
                 value: request.value,
                 platform_created_at: request.platform_created_at,
             }
+        });
+    }
+
+    async getById(id: string): Promise<EndCreditWidget | null> {
+        return prisma.endCredit.findUnique({
+            where: { id },
+            include: {
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
+            }
+        });
+    }
+
+    async update(id: string, request: UpdateEndCredit): Promise<EndCreditWidget> {
+        const { overlay_key, ...endCreditData } = request;
+
+        const updateData: any = { ...endCreditData };
+        if (overlay_key !== undefined) {
+            updateData.widget = {
+                update: {
+                    overlay_key: overlay_key
+                }
+            };
+        }
+
+        return prisma.endCredit.update({
+            where: { id },
+            data: updateData,
+            include: {
+                widget: {
+                    include: {
+                        widget_type: true
+                    }
+                },
+            }
+        });
+    }
+
+    async delete(id: string): Promise<void> {
+        await prisma.endCredit.delete({
+            where: { id },
+        });
+    }
+
+    async getViewerRecordsByEndCreditId(endCreditId: string): Promise<EndCreditViewerRecord[]> {
+        return prisma.endCreditViewerRecord.findMany({
+            where: { end_credit_id: endCreditId },
+            orderBy: { platform_created_at: "asc" },
         });
     }
 }

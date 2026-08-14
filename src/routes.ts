@@ -113,7 +113,7 @@ const firstWordService = new FirstWordService(config, firstWordRepository, userR
 
 const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutRepository, userRepository, authService, twitchGql, widgetService);
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
-const endCreditService = new EndCreditService(endCreditRepository, userRepository, widgetService);
+const endCreditService = new EndCreditService(endCreditRepository, userRepository, widgetService, authService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
 const randomDBDKillerService = new RandomDBDKillerService(randomDBDKillerRepository, dbdKillerMasterRepository, userRepository, widgetService);
@@ -238,6 +238,10 @@ server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bin
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
 
 server.post("/api/v1/end-credit", endCreditController.create.bind(endCreditController));
+server.get("/api/v1/end-credit", endCreditController.get.bind(endCreditController));
+server.put("/api/v1/end-credit", endCreditController.update.bind(endCreditController));
+server.post("/api/v1/end-credit/refresh-key", endCreditController.refreshKey.bind(endCreditController));
+server.delete("/api/v1/end-credit", endCreditController.delete.bind(endCreditController));
 
 server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.bind(spotifySongRequestController));
 server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
@@ -284,6 +288,7 @@ server.get("/api/v1/events/first-word/:userId", firstWordEventController.sse.bin
 server.get("/api/v1/events/clip-shoutout/:userId", clipShoutoutEventController.sse.bind(clipShoutoutEventController));
 server.get("/api/v1/events/drop-image/:userId", dropImageEventController.sse.bind(dropImageEventController));
 server.get("/api/v1/events/random-dbd-killer/:userId", randomDBDKillerEventController.sse.bind(randomDBDKillerEventController));
+server.get("/api/v1/end-credit/:userId/records", endCreditController.getRecords.bind(endCreditController));
 
 server.post("/webhook/v1/twitch/event-sub/channel-chat-message", twitchChannelChatMessageEvent.handle.bind(twitchChannelChatMessageEvent))
 server.post("/webhook/v1/twitch/event-sub/stream-online", twitchStreamOnlineEvent.handle.bind(twitchStreamOnlineEvent))
