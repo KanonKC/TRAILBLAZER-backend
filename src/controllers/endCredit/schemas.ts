@@ -7,6 +7,10 @@ export const createEndCreditSchema = z.object({
     bits_header: z.string().max(500).nullable().optional(),
     viewers_header: z.string().max(500).nullable().optional(),
     is_show_viewer_avatars: z.boolean().optional(),
+    scroll_speed: z.number().int().min(20).max(200).optional(),
+    is_show_sub_months: z.boolean().optional(),
+    is_show_raid_count: z.boolean().optional(),
+    is_show_bits_amount: z.boolean().optional(),
 });
 
 export const updateEndCreditSchema = z.object({
@@ -16,6 +20,10 @@ export const updateEndCreditSchema = z.object({
     bits_header: z.string().max(500).nullable().optional(),
     viewers_header: z.string().max(500).nullable().optional(),
     is_show_viewer_avatars: z.boolean().optional(),
+    scroll_speed: z.number().int().min(20).max(200).optional(),
+    is_show_sub_months: z.boolean().optional(),
+    is_show_raid_count: z.boolean().optional(),
+    is_show_bits_amount: z.boolean().optional(),
     enabled: z.boolean().optional(),
 });
 

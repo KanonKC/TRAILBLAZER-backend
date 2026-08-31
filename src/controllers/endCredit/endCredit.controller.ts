@@ -162,6 +162,10 @@ export default class EndCreditController {
                 raids_header: config.raids_header,
                 bits_header: config.bits_header,
                 viewers_header: config.viewers_header,
+                scroll_speed: config.scroll_speed,
+                is_show_sub_months: config.is_show_sub_months,
+                is_show_raid_count: config.is_show_raid_count,
+                is_show_bits_amount: config.is_show_bits_amount,
             });
         } catch (error) {
             if (error instanceof TError) {

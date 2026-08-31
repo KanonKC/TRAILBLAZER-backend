@@ -8,6 +8,10 @@ export interface CreateEndCredit {
     bits_header?: string | null;
     viewers_header?: string | null;
     is_show_viewer_avatars?: boolean;
+    scroll_speed?: number;
+    is_show_sub_months?: boolean;
+    is_show_raid_count?: boolean;
+    is_show_bits_amount?: boolean;
 }
 
 export interface CreateEndCreditViewerRecord {
@@ -25,5 +29,9 @@ export interface UpdateEndCredit {
     bits_header?: string | null;
     viewers_header?: string | null;
     is_show_viewer_avatars?: boolean;
+    scroll_speed?: number;
+    is_show_sub_months?: boolean;
+    is_show_raid_count?: boolean;
+    is_show_bits_amount?: boolean;
     overlay_key?: string;
 }

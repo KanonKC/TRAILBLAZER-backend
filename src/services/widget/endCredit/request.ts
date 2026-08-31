@@ -6,6 +6,10 @@ export interface CreateEndCreditServiceRequest {
     bits_header?: string | null;
     viewers_header?: string | null;
     is_show_viewer_avatars?: boolean;
+    scroll_speed?: number;
+    is_show_sub_months?: boolean;
+    is_show_raid_count?: boolean;
+    is_show_bits_amount?: boolean;
 }
 
 export interface UpdateEndCreditServiceRequest {
@@ -15,4 +19,8 @@ export interface UpdateEndCreditServiceRequest {
     bits_header?: string | null;
     viewers_header?: string | null;
     is_show_viewer_avatars?: boolean;
+    scroll_speed?: number;
+    is_show_sub_months?: boolean;
+    is_show_raid_count?: boolean;
+    is_show_bits_amount?: boolean;
 }
