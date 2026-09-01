@@ -211,7 +211,7 @@ describe("AuthService", () => {
 
             await service.logout("u1");
 
-            expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:t1");
+            expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:v2:t1");
         });
 
         it("should throw NotFoundError if user not found", async () => {

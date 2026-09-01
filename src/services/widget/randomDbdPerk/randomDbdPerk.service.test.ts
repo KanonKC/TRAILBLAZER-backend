@@ -72,7 +72,7 @@ describe("RandomDbdPerkService", () => {
             const rw = { id: "rw_1" } as any;
             const result = await service.extend(rw);
             expect(result.totalKillerPerks).toBe(145);
-            expect(result.totalSurvivorPerks).toBe(170);
+            expect(result.totalSurvivorPerks).toBe(180);
         });
     });
 
