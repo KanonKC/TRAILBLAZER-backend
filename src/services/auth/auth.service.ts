@@ -9,6 +9,7 @@ import { ApiClient } from "@twurple/api";
 import { refreshUserToken } from "@twurple/auth";
 import { rawDataSymbol } from "@twurple/common";
 import { Auth } from "../../../generated/prisma/client";
+import { CacheKey } from "../cacheKey";
 
 const logger = new TLogger(Layer.SERVICE);
 
@@ -25,7 +26,7 @@ export default class AuthService {
     async getTwitchAccessToken(twitchId: string): Promise<string> {
         logger.setContext("service.auth.getTwitchAccessToken");
         logger.info({ message: "getTwitchAccessToken", data: { twitchId } });
-        const cacheKey = `auth:twitch_access_token:twitch_id:${twitchId}`;
+        const cacheKey = CacheKey.generateTwitchAccessTokenKey(twitchId);
         let token = await redis.get(cacheKey);
         if (token) {
             // Validate token
@@ -113,7 +114,7 @@ export default class AuthService {
         if (!user) {
             throw new NotFoundError("User not found");
         }
-        const cacheKey = `auth:twitch_access_token:twitch_id:${user.twitch_id}`;
+        const cacheKey = CacheKey.generateTwitchAccessTokenKey(user.twitch_id);
         await redis.del(cacheKey);
     }
 

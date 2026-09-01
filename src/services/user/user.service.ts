@@ -18,6 +18,7 @@ import { generateTierExpireDate } from "@/utils/time";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
 import { ListUserShowcaseResponse } from "./response";
+import { CacheKey } from "../cacheKey";
 
 export default class UserService {
     private readonly cfg: Configurations
@@ -141,8 +142,10 @@ export default class UserService {
         });
         const refreshToken = generateRefreshToken();
 
+        const cacheKey = CacheKey.generateTwitchAccessTokenKey(user.twitch_id)
+
         await redis.set(`refresh_token:${refreshToken}`, user.id, TTL.ONE_WEEK);
-        await redis.set(`auth:twitch_access_token:twitch_id:${user.twitch_id}`, token.accessToken, TTL.ONE_WEEK)
+        await redis.set(cacheKey, token.accessToken, TTL.ONE_WEEK)
 
         return { accessToken, refreshToken, user };
     }
