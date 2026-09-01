@@ -317,15 +317,15 @@ model EndCredit {
   raids_header           String?
   bits_header            String?
   viewers_header         String?
-  is_show_viewer_avatars Boolean                 @default(false)
+  is_show_viewer_avatars Boolean                 @default(true)
   scroll_speed           Int                     @default(60)
   is_show_followers      Boolean                 @default(true)
   is_show_subs           Boolean                 @default(true)
   is_show_raids          Boolean                 @default(true)
   is_show_bits           Boolean                 @default(true)
-  is_show_sub_months     Boolean                 @default(false)
-  is_show_raid_count     Boolean                 @default(false)
-  is_show_bits_amount    Boolean                 @default(false)
+  is_show_sub_months     Boolean                 @default(true)
+  is_show_raid_count     Boolean                 @default(true)
+  is_show_bits_amount    Boolean                 @default(true)
   created_at             DateTime                @default(now())
   updated_at             DateTime                @updatedAt
   endCreditViewerRecords EndCreditViewerRecord[]

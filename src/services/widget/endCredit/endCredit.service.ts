@@ -100,11 +100,11 @@ export default class EndCreditService {
                 raids_header: request.raids_header,
                 bits_header: request.bits_header,
                 viewers_header: request.viewers_header,
-                is_show_viewer_avatars: request.is_show_viewer_avatars,
+                is_show_viewer_avatars: request.is_show_viewer_avatars || true,
                 scroll_speed: request.scroll_speed,
-                is_show_sub_months: request.is_show_sub_months,
-                is_show_raid_count: request.is_show_raid_count,
-                is_show_bits_amount: request.is_show_bits_amount,
+                is_show_sub_months: request.is_show_sub_months || true,
+                is_show_raid_count: request.is_show_raid_count || true,
+                is_show_bits_amount: request.is_show_bits_amount || true,
             });
             await this.widgetService.setInitialEnabled(res.widget_id, user.id);
             return res;
