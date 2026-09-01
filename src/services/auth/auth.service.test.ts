@@ -6,6 +6,7 @@ import { createTwitchUserAPI } from "@/libs/twurple";
 import { refreshUserToken } from "@twurple/auth";
 import { NotFoundError, UnauthorizedError } from "@/errors";
 import { rawDataSymbol } from "@twurple/common";
+import { CacheKey } from "../cacheKey";
 
 jest.mock("@/libs/redis", () => ({
     get: jest.fn(),
@@ -58,7 +59,7 @@ describe("AuthService", () => {
 
     describe("getTwitchAccessToken", () => {
         const twitchId = "twitch_1";
-        const cacheKey = `auth:twitch_access_token:twitch_id:${twitchId}`;
+        const cacheKey = CacheKey.generateTwitchAccessTokenKey(twitchId);
 
         it("should return token from cache if valid", async () => {
             (redis.get as jest.Mock).mockResolvedValue("cached_token");
@@ -86,7 +87,7 @@ describe("AuthService", () => {
                 }),
             };
             (createTwitchUserAPI as jest.Mock).mockReturnValue(mockUserAPI);
-            
+
             // Mock subsequent flow to success
             mockUserRepo.getByTwitchId.mockResolvedValue({ id: "u1", auth: { twitch_refresh_token: "rt" } } as any);
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
@@ -102,7 +103,7 @@ describe("AuthService", () => {
                 getTokenInfo: jest.fn().mockRejectedValue(new Error("API Error")),
             };
             (createTwitchUserAPI as jest.Mock).mockReturnValue(mockUserAPI);
-            
+
             mockUserRepo.getByTwitchId.mockResolvedValue({ id: "u1", auth: { twitch_refresh_token: "rt" } } as any);
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
 
@@ -124,7 +125,7 @@ describe("AuthService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             mockUserRepo.get.mockResolvedValue(mockUser as any); // for logout call
             mockAuthRepo.create.mockResolvedValue({ id: "a1", twitch_refresh_token: null } as any);
-            
+
             await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
             expect(mockAuthRepo.create).toHaveBeenCalledWith("u1");
         });
@@ -141,12 +142,12 @@ describe("AuthService", () => {
 
         it("should refresh token successfully if not in cache", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
-            mockUserRepo.getByTwitchId.mockResolvedValue({ 
-                id: "u1", 
-                auth: { id: "a1", twitch_refresh_token: "rt", twitch_token_expires_at: new Date(Date.now() + 100000) } 
+            mockUserRepo.getByTwitchId.mockResolvedValue({
+                id: "u1",
+                auth: { id: "a1", twitch_refresh_token: "rt", twitch_token_expires_at: new Date(Date.now() + 100000) }
             } as any);
-            (refreshUserToken as jest.Mock).mockResolvedValue({ 
-                accessToken: "new_at", 
+            (refreshUserToken as jest.Mock).mockResolvedValue({
+                accessToken: "new_at",
                 refreshToken: "new_rt",
                 expiresIn: 3600
             });
@@ -162,12 +163,12 @@ describe("AuthService", () => {
 
         it("should refresh token successfully without expiresIn", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
-            mockUserRepo.getByTwitchId.mockResolvedValue({ 
-                id: "u1", 
-                auth: { id: "a1", twitch_refresh_token: "rt" } 
+            mockUserRepo.getByTwitchId.mockResolvedValue({
+                id: "u1",
+                auth: { id: "a1", twitch_refresh_token: "rt" }
             } as any);
-            (refreshUserToken as jest.Mock).mockResolvedValue({ 
-                accessToken: "new_at", 
+            (refreshUserToken as jest.Mock).mockResolvedValue({
+                accessToken: "new_at",
                 refreshToken: "new_rt",
                 expiresIn: null
             });
@@ -182,8 +183,8 @@ describe("AuthService", () => {
 
         it("should handle error during DB update after refresh", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
-            mockUserRepo.getByTwitchId.mockResolvedValue({ 
-                id: "u1", auth: { id: "a1", twitch_refresh_token: "rt" } 
+            mockUserRepo.getByTwitchId.mockResolvedValue({
+                id: "u1", auth: { id: "a1", twitch_refresh_token: "rt" }
             } as any);
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
             mockAuthRepo.updateTwitchToken.mockRejectedValue(new Error("DB Update Error"));
@@ -207,10 +208,10 @@ describe("AuthService", () => {
     describe("logout", () => {
         it("should logout successfully", async () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
-            
+
             await service.logout("u1");
 
-            expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:t1");
+            expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:v2:t1");
         });
 
         it("should throw NotFoundError if user not found", async () => {

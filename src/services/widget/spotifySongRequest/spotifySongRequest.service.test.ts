@@ -85,6 +85,7 @@ describe("SpotifySongRequestService", () => {
             setInitialEnabled: jest.fn(),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
+            increaseTriggeredCount: jest.fn(),
         } as any;
 
         mockAuthService = {

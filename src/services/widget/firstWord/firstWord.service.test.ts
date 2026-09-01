@@ -91,6 +91,7 @@ describe("FirstWordService", () => {
             setInitialEnabled: jest.fn(),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
+            increaseTriggeredCount: jest.fn(),
         } as any;
 
         service = new FirstWordService(mockCfg, mockFirstWordRepo, mockUserRepo, mockWidgetService);

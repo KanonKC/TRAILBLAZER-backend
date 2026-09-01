@@ -129,6 +129,16 @@ const widgetTypes = [
     href: "/dashboard/widgets/spotify-song-request",
     is_active: false,
   },
+  {
+    slug: "end-credit",
+    display_name: "End Credit",
+    description: "แสดงเครดิตท้ายสตรีมสรุปผู้ติดตามใหม่ สมาชิกใหม่ ผู้ที่ Raid เข้ามา และผู้สนับสนุน Bits ตลอดการสตรีม",
+    cost: 1,
+    icon_url: "https://cdn.trailblazer.bz/widgets/end-credit.png",
+    theme_color: "#eab308",
+    href: "/dashboard/widgets/end-credit",
+    is_active: false,
+  },
 ];
 
 async function main() {

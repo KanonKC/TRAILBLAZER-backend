@@ -40,6 +40,9 @@ import SpotifySongRequestRepository from "./repositories/spotifySongRequest/spot
 import SpotifySongRequestService from "./services/widget/spotifySongRequest/spotifySongRequest.service";
 import SpotifySongRequestController from "./controllers/spotifySongRequest/spotifySongRequest.controller";
 import SpotifyProvider from "./providers/spotify/index";
+import EndCreditRepository from "./repositories/endCredit/endCredit.repository";
+import EndCreditService from "./services/widget/endCredit/endCredit.service";
+import EndCreditController from "./controllers/endCredit/endCredit.controller";
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -47,6 +50,7 @@ import multipart from "@fastify/multipart";
 import { FastifySSEPlugin } from "fastify-sse-v2";
 import ClipShoutoutEventController from "./controllers/clipShoutout/clipShoutout.event.controller";
 import DropImageEventController from "./controllers/dropImage/dropImage.event.controller";
+import EndCreditEventController from "./controllers/endCredit/endCredit.event.controller";
 import FirstWordEventController from "./controllers/firstWord/firstWord.event.controller";
 import SystemController from "./controllers/system/system.controller";
 import TwitchController from "./controllers/twitch/twitch.controller";
@@ -54,6 +58,10 @@ import TwitchGqlController from "./controllers/twitch/twitch-gql.controller";
 import TwitchChannelRedemptionAddEvent from "./events/twitch/channelRedemptionAdd/channelRedemptionAdd.event";
 import TwitchStreamOnlineEvent from "./events/twitch/streamOnline/streamOnline.event";
 import TwitchStreamOfflineEvent from "./events/twitch/streamOffline/streamOffline.event";
+import TwitchChannelFollowEvent from "./events/twitch/channelFollow/channelFollow.event";
+import TwitchChannelSubscribeEvent from "./events/twitch/channelSubscribe/channelSubscribe.event";
+import TwitchChannelRaidEvent from "./events/twitch/channelRaid/channelRaid.event";
+import TwitchChannelBitsUseEvent from "./events/twitch/channelBitsUse/channelBitsUse.event";
 import TwitchGql from "./providers/twitchGql";
 import AuthRepository from "./repositories/auth/auth.repository";
 import ClipShoutoutRepository from "./repositories/clipShoutout/clipShoutout.repository";
@@ -82,6 +90,7 @@ const authRepository = new AuthRepository();
 
 const clipShoutoutRepository = new ClipShoutoutRepository();
 const dropImageRepository = new DropImageRepository();
+const endCreditRepository = new EndCreditRepository();
 
 const randomDbdPerkRepository = new RandomDbdPerkRepository();
 const randomDBDKillerRepository = new RandomDBDKillerRepository();
@@ -105,6 +114,7 @@ const firstWordService = new FirstWordService(config, firstWordRepository, userR
 
 const clipShoutoutService = new ClipShoutoutService(config, clipShoutoutRepository, userRepository, authService, twitchGql, widgetService);
 const dropImageService = new DropImageService(dropImageRepository, userRepository, sightengine, widgetService);
+const endCreditService = new EndCreditService(endCreditRepository, userRepository, widgetService, authService);
 
 const randomDbdPerkService = new RandomDbdPerkService(randomDbdPerkRepository, userRepository, widgetService);
 const randomDBDKillerService = new RandomDBDKillerService(randomDBDKillerRepository, dbdKillerMasterRepository, userRepository, widgetService);
@@ -127,7 +137,9 @@ const clipShoutoutEventController = new ClipShoutoutEventController(clipShoutout
 
 const clipShoutoutController = new ClipShoutoutController(clipShoutoutService, clipShoutoutEventController);
 const dropImageController = new DropImageController(dropImageService);
+const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
+const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
@@ -143,10 +155,14 @@ const spotifySongRequestController = new SpotifySongRequestController(spotifySon
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService, spotifySongRequestService)
-const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService);
+const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService, endCreditService);
 const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService);
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(clipShoutoutService);
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService, randomDBDKillerService);
+const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
+const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
+const twitchChannelRaidEvent = new TwitchChannelRaidEvent(endCreditService);
+const twitchChannelBitsUseEvent = new TwitchChannelBitsUseEvent(endCreditService);
 
 // Cron
 const tbCron = new TbCron(userService, linkedAccountService)
@@ -223,6 +239,13 @@ server.put("/api/v1/drop-image", dropImageController.update.bind(dropImageContro
 server.post("/api/v1/drop-image/refresh-key", dropImageController.refreshKey.bind(dropImageController));
 server.delete("/api/v1/drop-image", dropImageController.delete.bind(dropImageController));
 
+server.post("/api/v1/end-credit", endCreditController.create.bind(endCreditController));
+server.get("/api/v1/end-credit", endCreditController.get.bind(endCreditController));
+server.put("/api/v1/end-credit", endCreditController.update.bind(endCreditController));
+server.post("/api/v1/end-credit/refresh-key", endCreditController.refreshKey.bind(endCreditController));
+server.delete("/api/v1/end-credit", endCreditController.delete.bind(endCreditController));
+server.post("/api/v1/end-credit/test", endCreditController.test.bind(endCreditController));
+
 server.post("/api/v1/spotify-song-request", spotifySongRequestController.create.bind(spotifySongRequestController));
 server.get("/api/v1/spotify-song-request", spotifySongRequestController.get.bind(spotifySongRequestController));
 server.put("/api/v1/spotify-song-request", spotifySongRequestController.update.bind(spotifySongRequestController));
@@ -268,12 +291,18 @@ server.get("/api/v1/events/first-word/:userId", firstWordEventController.sse.bin
 server.get("/api/v1/events/clip-shoutout/:userId", clipShoutoutEventController.sse.bind(clipShoutoutEventController));
 server.get("/api/v1/events/drop-image/:userId", dropImageEventController.sse.bind(dropImageEventController));
 server.get("/api/v1/events/random-dbd-killer/:userId", randomDBDKillerEventController.sse.bind(randomDBDKillerEventController));
+server.get("/api/v1/events/end-credit/:userId", endCreditEventController.sse.bind(endCreditEventController));
+server.get("/api/v1/end-credit/:userId/records", endCreditController.getRecords.bind(endCreditController));
 
 server.post("/webhook/v1/twitch/event-sub/channel-chat-message", twitchChannelChatMessageEvent.handle.bind(twitchChannelChatMessageEvent))
 server.post("/webhook/v1/twitch/event-sub/stream-online", twitchStreamOnlineEvent.handle.bind(twitchStreamOnlineEvent))
 server.post("/webhook/v1/twitch/event-sub/stream-offline", twitchStreamOfflineEvent.handle.bind(twitchStreamOfflineEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-chat-notification", twitchChannelChatNotificationEvent.handle.bind(twitchChannelChatNotificationEvent))
 server.post("/webhook/v1/twitch/event-sub/channel-redemption-add", twitchChannelRedemptionAddEvent.handle.bind(twitchChannelRedemptionAddEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-follow", twitchChannelFollowEvent.handle.bind(twitchChannelFollowEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-subscribe", twitchChannelSubscribeEvent.handle.bind(twitchChannelSubscribeEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-raid", twitchChannelRaidEvent.handle.bind(twitchChannelRaidEvent))
+server.post("/webhook/v1/twitch/event-sub/channel-bits-use", twitchChannelBitsUseEvent.handle.bind(twitchChannelBitsUseEvent))
 
 tbCron.run()
 

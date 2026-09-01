@@ -66,6 +66,7 @@ describe("DropImageService", () => {
             setInitialEnabled: jest.fn(),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
+            increaseTriggeredCount: jest.fn(),
         } as any;
 
         service = new DropImageService(

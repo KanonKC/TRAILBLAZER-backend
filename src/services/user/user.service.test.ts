@@ -118,7 +118,7 @@ describe("UserService", () => {
             expect(result.accessToken).toBe("access_token");
             expect(mockUserRepo.upsert).toHaveBeenCalled();
             expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalled();
-            expect(redis.set).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:t1", "at", TTL.ONE_WEEK);
+            expect(redis.set).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:v2:t1", "at", TTL.ONE_WEEK);
         });
 
         it("should throw UnauthorizedError if token info missing userId", async () => {

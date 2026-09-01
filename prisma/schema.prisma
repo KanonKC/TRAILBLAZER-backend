@@ -21,6 +21,7 @@ model User {
   max_storage_mb     Int             @default(5)
   extra_widget_quota Int             @default(0)
   is_showcase        Boolean         @default(false)
+  canvas_overlay_key String?         @unique
   created_at         DateTime        @default(now())
   updated_at         DateTime        @updatedAt
   auth               Auth?
@@ -32,6 +33,7 @@ model User {
   referrals          Referral[]      @relation("Referrer")
   referred_by        Referral?       @relation("Referee")
   referral_code      ReferralCode?
+  canvases           Canvas[]
 }
 
 model Auth {
@@ -79,6 +81,7 @@ model UploadedFile {
   size_kb                   Int                    @default(0)
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
+  canvas_elements           CanvasElement[]
 }
 
 model Widget {
@@ -101,6 +104,7 @@ model Widget {
   spotifySongRequest SpotifySongRequest?
   endCredit          EndCredit?
   randomDBDKiller    RandomDBDKiller?
+  canvas_links       CanvasWidgetLink[]
 
   @@unique([twitch_id, widget_type_slug])
   @@unique([owner_id, widget_type_slug])
@@ -313,7 +317,15 @@ model EndCredit {
   raids_header           String?
   bits_header            String?
   viewers_header         String?
-  is_show_viewer_avatars Boolean                 @default(false)
+  is_show_viewer_avatars Boolean                 @default(true)
+  scroll_speed           Int                     @default(60)
+  is_show_followers      Boolean                 @default(true)
+  is_show_subs           Boolean                 @default(true)
+  is_show_raids          Boolean                 @default(true)
+  is_show_bits           Boolean                 @default(true)
+  is_show_sub_months     Boolean                 @default(true)
+  is_show_raid_count     Boolean                 @default(true)
+  is_show_bits_amount    Boolean                 @default(true)
   created_at             DateTime                @default(now())
   updated_at             DateTime                @updatedAt
   endCreditViewerRecords EndCreditViewerRecord[]
@@ -322,7 +334,8 @@ model EndCredit {
 model EndCreditViewerRecord {
   id                  Int       @id @default(autoincrement())
   viewer_id           String
-  action              Json      @db.JsonB
+  type                String
+  value               String
   end_credit          EndCredit @relation(fields: [end_credit_id], references: [id], onDelete: Cascade)
   end_credit_id       String
   platform_created_at DateTime
@@ -348,4 +361,69 @@ model RandomDBDKiller {
   animation_style  String   @default("frame")
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
+}
+
+model Canvas {
+  id              String             @id @default(uuid())
+  name            String
+  enabled         Boolean            @default(true)
+  duration_ms     Int                @default(5000)
+  owner_id        String
+  owner           User               @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  elements        CanvasElement[]
+  links           CanvasWidgetLink[]
+  triggered_count Int                @default(0)
+  created_at      DateTime           @default(now())
+  updated_at      DateTime           @updatedAt
+
+  @@index([owner_id])
+}
+
+model CanvasElement {
+  id        String @id @default(uuid())
+  canvas_id String
+  canvas    Canvas @relation(fields: [canvas_id], references: [id], onDelete: Cascade)
+
+  type String // "image" | "video" | "audio" | "text"
+
+  media_key String?
+  media     UploadedFile? @relation(fields: [media_key], references: [key], onDelete: SetNull)
+
+  text_content String?
+  text_style   Json?
+
+  x        Float @default(50)
+  y        Float @default(50)
+  width    Float @default(20)
+  height   Float @default(20)
+  rotation Float @default(0)
+  z_index  Int   @default(0)
+  opacity  Float @default(1)
+
+  start_delay_ms Int @default(0)
+  duration_ms    Int @default(3000)
+
+  enter_transition String @default("fade")
+  exit_transition  String @default("fade")
+  transition_ms    Int    @default(400)
+
+  volume Int     @default(100)
+  loop   Boolean @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([canvas_id])
+}
+
+model CanvasWidgetLink {
+  id         String   @id @default(uuid())
+  canvas_id  String
+  canvas     Canvas   @relation(fields: [canvas_id], references: [id], onDelete: Cascade)
+  widget_id  String
+  widget     Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@unique([canvas_id, widget_id])
+  @@index([widget_id])
 }
