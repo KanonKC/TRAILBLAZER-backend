@@ -25,12 +25,11 @@ export default class TwitchChannelSubscribeEvent {
         const event = body.event as TwitchChannelSubscribeEventRequest
 
         if (body.subscription.status === "enabled") {
+            // No-op: subs are recorded via channel.chat.notification instead (see
+            // EndCreditService.handleTwitchChannelChatNotificationEvent). This route/handler
+            // is not currently subscribed to in Twitch EventSub — kept as a placeholder for a
+            // future direct channel.subscribe integration.
             this.logger.info({ message: "Handling channel subscribe event", data: event })
-            try {
-                // await this.endCreditService.recordViewerAction(event.broadcaster_user_id, event.user_id, "channel.subscribe", event.tier, new Date())
-            } catch (err: any) {
-                this.logger.error({ message: "Handle event failed", error: err })
-            }
             res.status(204).send()
             return
         }

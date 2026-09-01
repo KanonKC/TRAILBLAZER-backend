@@ -43,6 +43,7 @@ export default class EndCreditEventController {
             this.connections.get(userId)!.add(res);
 
             const sub = subscriber.duplicate();
+            sub.on("error", (err) => this.logger.error({ message: "SSE Redis subscriber error", data: { userId }, error: err as Error }));
             await sub.connect();
 
             await sub.subscribe(END_CREDIT_ROLL_CHANNEL, (message) => {
@@ -57,7 +58,7 @@ export default class EndCreditEventController {
             });
 
             req.raw.on("close", () => {
-                sub.quit();
+                sub.quit().catch((err) => this.logger.error({ message: "Failed to quit SSE Redis subscriber", data: { userId }, error: err as Error }));
                 const userConns = this.connections.get(userId);
                 if (userConns) {
                     userConns.delete(res);

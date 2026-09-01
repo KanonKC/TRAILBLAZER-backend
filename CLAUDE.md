@@ -109,7 +109,7 @@ Services must call a private `authorize(userId, resource)` method after fetching
 
 ## Agent Workflows
 
-The `.agent/workflows/` directory ๑contains step-by-step guides for common tasks:
+The `.agent/workflows/` directory contains step-by-step guides for common tasks:
 - `create-new-widget-api.md` — Adding a new widget type end-to-end
 - `add-logger.md` — Adding structured logging to an existing file
 - `review-changes.md` — Code review checklist
