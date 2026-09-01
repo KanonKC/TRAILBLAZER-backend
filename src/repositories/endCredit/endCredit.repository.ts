@@ -18,6 +18,14 @@ export default class EndCreditRepository {
                 bits_header: request.bits_header,
                 viewers_header: request.viewers_header,
                 is_show_viewer_avatars: request.is_show_viewer_avatars,
+                scroll_speed: request.scroll_speed,
+                is_show_followers: request.is_show_followers,
+                is_show_subs: request.is_show_subs,
+                is_show_raids: request.is_show_raids,
+                is_show_bits: request.is_show_bits,
+                is_show_sub_months: request.is_show_sub_months,
+                is_show_raid_count: request.is_show_raid_count,
+                is_show_bits_amount: request.is_show_bits_amount,
                 widget: {
                     create: {
                         twitch_id: request.twitch_id,

@@ -195,11 +195,22 @@ export default class EndCreditService {
             }
             const records = await this.endCreditRepository.getViewerRecordsByEndCreditId(endCredit.id);
             const enriched = await this.enrichRecordsWithTwitchProfile(records);
-            return { records: enriched, config: endCredit };
+            return { records: this.filterRecordsBySectionToggle(enriched, endCredit), config: endCredit };
         } catch (error) {
             this.logger.error({ message: "Failed to get end credit viewer records", error: error as Error, data: { userId } });
             throw error;
         }
+    }
+
+    /** Drops records whose whole category has been switched off, so a disabled section never rolls. */
+    private filterRecordsBySectionToggle<T extends { type: string }>(records: T[], config: EndCreditWidget): T[] {
+        const isSectionEnabled: Record<string, boolean> = {
+            follow: config.is_show_followers,
+            sub: config.is_show_subs,
+            raid: config.is_show_raids,
+            bit: config.is_show_bits,
+        };
+        return records.filter(record => isSectionEnabled[record.type] !== false);
     }
 
     private async enrichRecordsWithTwitchProfile(records: EndCreditViewerRecord[]): Promise<EnrichedEndCreditViewerRecord[]> {
@@ -253,16 +264,33 @@ export default class EndCreditService {
                 end_credit_id: endCredit.id,
                 platform_created_at: now,
                 display_name: mockNames[index % mockNames.length],
-                avatar_url: null,
+                avatar_url: "https://static-cdn.jtvnw.net/jtv_user_pictures/e0bdb40f-d002-4ca0-ac86-937867b93851-profile_image-300x300.png",
             });
 
             const records: EnrichedEndCreditViewerRecord[] = [
                 mockRecord(0, "follow", ""),
                 mockRecord(1, "follow", ""),
-                mockRecord(2, "sub", "3"),
-                mockRecord(3, "sub", "1"),
-                mockRecord(4, "raid", "42"),
-                mockRecord(5, "bit", "500"),
+
+                // sub (เดือน) threshold [2, 6, 12, 24]
+                mockRecord(2, "sub", "1"), // kind: new -> badge "สมาชิกใหม่"
+                mockRecord(3, "sub", "3"), // tier 1
+                mockRecord(4, "sub", "8"), // tier 2
+                mockRecord(5, "sub", "14"), // tier 3
+                mockRecord(6, "sub", "37"), // tier 4, สูงสุดในหมวด -> มงกุฎ
+
+                // raid (คน) threshold [10, 50, 200, 500]
+                mockRecord(8, "raid", "4"), // tier 0
+                mockRecord(9, "raid", "22"), // tier 1
+                mockRecord(10, "raid", "84"), // tier 2
+                mockRecord(11, "raid", "260"), // tier 3
+                mockRecord(12, "raid", "700"), // tier 4, สูงสุดในหมวด -> มงกุฎ
+
+                // bit (Bits) threshold [100, 1000, 5000, 10000]
+                mockRecord(13, "bit", "50"), // tier 0
+                mockRecord(14, "bit", "420"), // tier 1
+                mockRecord(15, "bit", "1500"), // tier 2
+                mockRecord(16, "bit", "6200"), // tier 3
+                mockRecord(17, "bit", "24500"), // tier 4, สูงสุดในหมวด -> มงกุฎ
             ];
 
             await this.publishRoll(userId, endCredit, records);
@@ -301,7 +329,7 @@ export default class EndCreditService {
     private async publishRoll(userId: string, config: EndCreditWidget, records: EnrichedEndCreditViewerRecord[]): Promise<void> {
         await publisher.publish(END_CREDIT_ROLL_CHANNEL, JSON.stringify({
             userId,
-            records,
+            records: this.filterRecordsBySectionToggle(records, config),
             is_show_viewer_avatars: config.is_show_viewer_avatars,
             followers_header: config.followers_header,
             subscribes_header: config.subscribes_header,
