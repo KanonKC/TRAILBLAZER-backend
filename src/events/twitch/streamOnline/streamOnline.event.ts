@@ -1,14 +1,17 @@
 import { FastifyReply, FastifyRequest } from "fastify"
 import { TwitchStreamOnlineEventRequest } from "./request"
 import FirstWordService from "@/services/widget/firstWord/firstWord.service"
+import EndCreditService from "@/services/widget/endCredit/endCredit.service"
 import TLogger, { Layer } from "@/logging/logger"
 
 export default class TwitchStreamOnlineEvent {
     private readonly firstWordService: FirstWordService;
+    private readonly endCreditService: EndCreditService;
     private readonly logger: TLogger;
 
-    constructor(firstWordService: FirstWordService) {
+    constructor(firstWordService: FirstWordService, endCreditService: EndCreditService) {
         this.firstWordService = firstWordService;
+        this.endCreditService = endCreditService;
         this.logger = new TLogger(Layer.EVENT);
     }
 
@@ -27,6 +30,7 @@ export default class TwitchStreamOnlineEvent {
         if (body.subscription.status === "enabled") {
             this.logger.info({ message: "Handling stream online event", data: event })
             this.firstWordService.resetChattersOnStartStream(event)
+            this.endCreditService.handleTwitchStreamOnlineEvent(event)
             res.status(204).send()
             return
         }

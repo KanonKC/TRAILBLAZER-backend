@@ -155,4 +155,10 @@ export default class EndCreditRepository {
             orderBy: { platform_created_at: "asc" },
         });
     }
+
+    async deleteViewerRecordsByEndCreditId(endCreditId: string): Promise<void> {
+        await prisma.endCreditViewerRecord.deleteMany({
+            where: { end_credit_id: endCreditId },
+        });
+    }
 }

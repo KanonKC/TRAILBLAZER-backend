@@ -17,6 +17,7 @@ import { EndCreditViewerRecord } from "generated/prisma/client";
 import { EnrichedEndCreditViewerRecord } from "./response";
 import { publisher } from "@/libs/redis";
 import { TwitchChannelRaidEventRequest } from "@/events/twitch/channelRaid/request";
+import { TwitchStreamOnlineEventRequest } from "@/events/twitch/streamOnline/request";
 
 export const END_CREDIT_ROLL_CHANNEL = "end-credit:roll";
 
@@ -37,6 +38,11 @@ const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
     //     route: "/webhook/v1/twitch/event-sub/channel-subscribe",
     //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelSubscriptionEvents(twitchId, transport),
     // },
+    {
+        eventType: "stream.online",
+        route: "/webhook/v1/twitch/event-sub/stream-online",
+        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToStreamOnlineEvents(twitchId, transport),
+    },
     {
         // Outgoing raid — the streamer raids someone else, which is what triggers the credit roll.
         eventType: "channel.raid",
@@ -362,6 +368,25 @@ export default class EndCreditService {
             this.logger.info({ message: "Recorded end credit viewer action", data: { twitchId, viewerId } });
         } catch (error) {
             this.logger.error({ message: "Failed to record viewer action", error: error as Error, data: { twitchId, viewerId } });
+        }
+    }
+
+    /**
+     * Triggered when the stream goes online — clears out last stream's viewer records so the credit roll starts fresh.
+     */
+    async handleTwitchStreamOnlineEvent(event: TwitchStreamOnlineEventRequest): Promise<void> {
+        this.logger.setContext("service.endCredit.handleTwitchStreamOnlineEvent");
+        try {
+            const endCredit = await this.endCreditRepository.getByTwitchId(event.broadcaster_user_id);
+            if (!endCredit) {
+                this.logger.info({ message: "No end credit config for broadcaster, skipping", data: { twitchId: event.broadcaster_user_id } });
+                return;
+            }
+
+            await this.endCreditRepository.deleteViewerRecordsByEndCreditId(endCredit.id);
+            this.logger.info({ message: "Cleared end credit viewer records on stream online", data: { endCreditId: endCredit.id } });
+        } catch (error) {
+            this.logger.error({ message: "Failed to clear end credit viewer records on stream online", error: error as Error, data: { event } });
         }
     }
 

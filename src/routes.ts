@@ -155,7 +155,7 @@ const spotifySongRequestController = new SpotifySongRequestController(spotifySon
 
 // Event Layer
 const twitchChannelChatMessageEvent = new TwitchChannelChatMessageEvent(firstWordService, dropImageService, spotifySongRequestService)
-const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService);
+const twitchStreamOnlineEvent = new TwitchStreamOnlineEvent(firstWordService, endCreditService);
 const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService);
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(clipShoutoutService);
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(randomDbdPerkService, dropImageService, randomDBDKillerService);
