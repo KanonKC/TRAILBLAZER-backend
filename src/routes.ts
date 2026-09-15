@@ -73,6 +73,7 @@ import AuthController from "./controllers/auth/auth.controller";
 import LinkedAccountController from "./controllers/linkedAccount/linkedAccount.controller";
 import LinkedAccountRepository from "./repositories/linkedAccount/linkedAccount.repository";
 import LinkedAccountService from "./services/linkedAccount/linkedAccount.service";
+import { AuthMiddleware } from "./controllers/middleware";
 import { Google, Discord, Spotify } from "arctic";
 import TbCron from "./cron";
 
@@ -126,10 +127,13 @@ const spotifyProvider = new SpotifyProvider(config, linkedAccountRepository);
 const spotifySongRequestRepository = new SpotifySongRequestRepository();
 const spotifySongRequestService = new SpotifySongRequestService(spotifySongRequestRepository, userRepository, spotifyProvider, widgetService, authService);
 
+// Middleware Layer
+const authMiddleware = new AuthMiddleware(userService);
+
 // Controller Layer
 const systemController = new SystemController(systemService);
-const authController = new AuthController(authService);
-const userController = new UserController(config, userService, referralService);
+const authController = new AuthController(authService, authMiddleware);
+const userController = new UserController(config, userService, referralService, authMiddleware);
 const adminController = new AdminController(userService);
 const firstWordEventController = new FirstWordEventController(firstWordService);
 const firstWordController = new FirstWordController(firstWordService, firstWordEventController);
@@ -148,7 +152,7 @@ const widgetTypeController = new WidgetTypeController(widgetTypeRepository);
 const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
-const linkedAccountController = new LinkedAccountController(linkedAccountService);
+const linkedAccountController = new LinkedAccountController(linkedAccountService, authMiddleware);
 const twitchGqlController = new TwitchGqlController(twitchGql);
 const exportVideoController = new ExportVideoController(exportVideoService);
 const spotifySongRequestController = new SpotifySongRequestController(spotifySongRequestService);

@@ -108,7 +108,7 @@ export default class AuthService {
         return createTwitchUserAPI(token)
     }
 
-    async logout(userId: string): Promise<void> {
+    async logout(userId: string, refreshToken?: string): Promise<void> {
         logger.setContext("service.auth.logout");
         const user = await this.userRepository.get(userId);
         if (!user) {
@@ -116,6 +116,10 @@ export default class AuthService {
         }
         const cacheKey = CacheKey.generateTwitchAccessTokenKey(user.twitch_id);
         await redis.del(cacheKey);
+
+        if (refreshToken) {
+            await redis.del(`refresh_token:${refreshToken}`);
+        }
     }
 
     async updateTwitchGqlToken(userId: string, token: string): Promise<void> {

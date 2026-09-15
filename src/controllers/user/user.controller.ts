@@ -1,14 +1,14 @@
 import UserService from "@/services/user/user.service";
 import ReferralService from "@/services/referral/referral.service";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { getUserFromRequest } from "../middleware";
+import { AuthMiddleware } from "../middleware";
 import { GetTierQuery, LoginQuery } from "./request";
 import { loginSchema } from "./schemas";
 import { z } from "zod";
 
 import Configurations from "@/config/index";
 import TLogger, { Layer } from "@/logging/logger";
-import { verifyToken } from "@/libs/jwt";
+import { setAuthCookies, clearAuthCookies } from "@/libs/cookies";
 import { TError } from "@/errors";
 
 export default class UserController {
@@ -16,12 +16,14 @@ export default class UserController {
     private readonly cfg: Configurations;
     private readonly userService: UserService;
     private readonly referralService: ReferralService;
+    private readonly authMiddleware: AuthMiddleware;
     private readonly logger: TLogger;
 
-    constructor(cfg: Configurations, userService: UserService, referralService: ReferralService) {
+    constructor(cfg: Configurations, userService: UserService, referralService: ReferralService, authMiddleware: AuthMiddleware) {
         this.cfg = cfg;
         this.userService = userService;
         this.referralService = referralService;
+        this.authMiddleware = authMiddleware;
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
@@ -47,23 +49,7 @@ export default class UserController {
 
             const { accessToken, refreshToken, user } = await this.userService.login(request);
 
-            res.setCookie('accessToken', accessToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: this.cfg.rootDomain,
-                maxAge: 60 * 15 // 15 minutes
-            });
-
-            res.setCookie('refreshToken', refreshToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: this.cfg.rootDomain,
-                maxAge: 60 * 60 * 24 * 30 // 30 days
-            });
+            setAuthCookies(res, { accessToken, refreshToken });
             res.redirect(this.cfg.frontendOrigin);
             this.logger.info({ message: "Login successful", data: user });
         } catch (err) {
@@ -83,36 +69,33 @@ export default class UserController {
     async me(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.user.me");
         this.logger.info({ message: "Getting current user info" });
-        const token = req.cookies.accessToken;
-        if (!token) {
-            this.logger.warn({ message: "No access token provided" });
-            return res.status(401).send({ message: "Unauthorized" });
-        }
+        const decoded = await this.authMiddleware.authenticate(req, res);
+        if (!decoded) return; // 401 already sent
+
         try {
-            // TODO: Define interface for decoded token to avoid using any
-            const decoded = verifyToken(token) as any;
+            const info: Record<string, unknown> = { ...decoded };
             const user = await this.userService.get(decoded.id);
-            decoded.tier = await this.userService.getTier(user.id);
-            decoded.extraWidgetQuota = user.extra_widget_quota;
-            decoded.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
-            this.logger.info({ message: "Successfully retrieved user info", data: decoded });
-            res.send(decoded);
+            info.tier = await this.userService.getTier(user.id);
+            info.extraWidgetQuota = user.extra_widget_quota;
+            info.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
+            this.logger.info({ message: "Successfully retrieved user info", data: info });
+            res.send(info);
         } catch (err) {
-            this.logger.warn({ message: "Invalid token", error: err as string | Error });
-            return res.status(401).send({ message: "Invalid token" });
+            this.logger.error({ message: "Failed to get current user info", error: err as string | Error });
+            if (err instanceof TError) {
+                return res.status(err.status).send(err.toJSON());
+            }
+            res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async getTier(req: FastifyRequest<{ Querystring: GetTierQuery }>, res: FastifyReply) {
         this.logger.setContext("controller.user.getTier");
         this.logger.info({ message: "Getting user tier" });
-        const token = req.cookies.accessToken;
-        if (!token) {
-            this.logger.warn({ message: "No access token provided" });
-            return res.status(401).send({ message: "Unauthorized" });
-        }
+        const decoded = await this.authMiddleware.authenticate(req, res);
+        if (!decoded) return; // 401 already sent
+
         try {
-            const decoded = verifyToken(token);
             const force = req.query.force === "true";
             const tier = await this.userService.getTier(decoded.id, { forceTwitch: force });
             this.logger.info({ message: "Successfully retrieved user tier", data: { userId: decoded.id, tier, force } });
@@ -138,36 +121,18 @@ export default class UserController {
         try {
             const tokens = await this.userService.refreshToken(refreshToken);
 
-            res.setCookie('accessToken', tokens.accessToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: this.cfg.rootDomain,
-                maxAge: 60 * 15 // 15 minutes
-            });
-
-            res.setCookie('refreshToken', tokens.refreshToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: this.cfg.rootDomain,
-                maxAge: 60 * 60 * 24 * 30 // 30 days
-            });
+            setAuthCookies(res, tokens);
 
             this.logger.info({ message: "Token refreshed successfully" });
             res.send({ message: "Token refreshed" });
         } catch (err) {
             if (err instanceof TError) {
                 this.logger.error({ message: err.message, error: err });
-                res.clearCookie('accessToken', { path: '/' });
-                res.clearCookie('refreshToken', { path: '/' });
+                clearAuthCookies(res);
                 return res.status(err.status).send(err.toJSON());
             }
             this.logger.error({ message: "Token refresh failed", error: err as string | Error });
-            res.clearCookie('accessToken', { path: '/' });
-            res.clearCookie('refreshToken', { path: '/' });
+            clearAuthCookies(res);
             res.status(401).send({ message: "Invalid refresh token" });
         }
     }
@@ -190,11 +155,10 @@ export default class UserController {
 
     async getReferralStatus(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.user.getReferralStatus");
-        const token = req.cookies.accessToken;
-        if (!token) return res.status(401).send({ message: "Unauthorized" });
+        const decoded = await this.authMiddleware.authenticate(req, res);
+        if (!decoded) return; // 401 already sent
 
         try {
-            const decoded = verifyToken(token);
             const user = await this.userService.get(decoded.id);
             const code = await this.referralService.getOrCreateCode(user.id, user.twitch_id);
             const status = await this.referralService.getReferralStatus(user.id);
@@ -202,6 +166,9 @@ export default class UserController {
             res.send({ ...status, code });
         } catch (err) {
             this.logger.error({ message: "Failed to get referral status", error: err as string | Error });
+            if (err instanceof TError) {
+                return res.status(err.status).send(err.toJSON());
+            }
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

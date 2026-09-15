@@ -1,16 +1,13 @@
 import crypto from "crypto";
-import { prisma } from "@/libs/prisma";
-import redis from "@/libs/redis";
 import { FastifyReply, FastifyRequest } from "fastify";
 import TLogger, { Layer } from "@/logging/logger";
-import { AccessToken, generateRefreshToken, signAccessToken, verifyToken } from "@/libs/jwt";
+import { AccessToken, verifyToken } from "@/libs/jwt";
+import { setAuthCookies } from "@/libs/cookies";
+import { UnauthorizedError } from "@/errors";
+import UserService from "@/services/user/user.service";
 import config from "@/config";
 
 const logger = new TLogger(Layer.MIDDLEWARE);
-
-const REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 30; // 30 days (seconds)
-const COOKIE_MAX_AGE_ACCESS = 60 * 15; // 15 minutes (seconds)
-const COOKIE_MAX_AGE_REFRESH = 60 * 60 * 24 * 30; // 30 days (seconds)
 
 function extractToken(req: FastifyRequest): string | undefined {
     if (req.cookies.accessToken) {
@@ -58,98 +55,56 @@ export function authenticateAdmin(req: FastifyRequest): boolean {
     return crypto.timingSafeEqual(tokenBuffer, secretBuffer);
 }
 
-async function refresh(refreshToken: string) {
-    logger.setContext("middleware.auth.refresh");
-    if (!refreshToken) {
-        throw new Error("No refresh token");
+/**
+ * Canonical auth check: verifies the access token (cookie or Authorization
+ * header) and, if it is missing/expired, transparently refreshes it using
+ * the refresh-token cookie before failing. This is what makes endpoints
+ * like GET /api/v1/user/me resilient to the access token's 15-minute expiry
+ * instead of one-shot 401ing on it.
+ */
+export class AuthMiddleware {
+    private readonly userService: UserService;
+
+    constructor(userService: UserService) {
+        this.userService = userService;
     }
 
-    try {
-        const userId = await redis.get(`refresh_token:${refreshToken}`);
-
-        if (!userId) {
-            throw new Error("Invalid refresh token");
-        }
-
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-
-        const newAccessToken = signAccessToken({
-            id: user.id,
-            username: user.username,
-            displayName: user.display_name,
-            avatarUrl: user.avatar_url,
-            twitchId: user.twitch_id,
-            tier: user.tier,
-            extraWidgetQuota: user.extra_widget_quota
-        });
-        const newRefreshToken = generateRefreshToken();
-
-        await redis.del(`refresh_token:${refreshToken}`);
-        await redis.set(`refresh_token:${newRefreshToken}`, user.id, { EX: REFRESH_TOKEN_EXPIRY });
-
-        return { accessToken: newAccessToken, refreshToken: newRefreshToken };
-    } catch (err) {
-        logger.error({ message: "Token refresh failed", error: err as string | Error });
-        throw new Error("Invalid refresh token");
-    }
-}
-
-export async function authenticationRequired(req: FastifyRequest, res: FastifyReply) {
-    logger.setContext("middleware.auth.authenticationRequired");
-    let token = extractToken(req);
-
-    if (!token) {
-        const refreshToken = req.cookies.refreshToken;
-        if (!refreshToken) {
-            logger.warn({ message: "No access or refresh token" });
-            res.status(401).send({ error: "Unauthorized" });
-            return;
-        }
-
+    private verifyAccessToken(token: string): AccessToken | null {
         try {
-            const newTokens = await refresh(refreshToken);
-
-            res.setCookie('accessToken', newTokens.accessToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: config.rootDomain,
-                maxAge: COOKIE_MAX_AGE_ACCESS
-            });
-
-            res.setCookie('refreshToken', newTokens.refreshToken, {
-                path: '/',
-                httpOnly: true,
-                secure: true,
-                sameSite: 'lax',
-                domain: config.rootDomain,
-                maxAge: COOKIE_MAX_AGE_REFRESH
-            });
-
-            token = newTokens.accessToken;
+            const decoded = verifyToken(token);
+            if (typeof decoded === 'string') {
+                logger.warn({ message: "decoded token is string", data: { decoded } });
+                return null;
+            }
+            return decoded;
         } catch (e) {
-            logger.error({ message: "Refresh failed", error: e as string | Error });
-            res.status(401).send({ error: "Unauthorized" });
-            return;
+            return null;
         }
     }
 
-    try {
-        const decoded = verifyToken(token!); // Token is guaranteed to be string here because of logic above
-        if (typeof decoded === 'string') {
-            logger.warn({ message: "decoded token is string", data: { decoded } });
-            res.status(401).send({ error: "Unauthorized" });
-            return;
+    async authenticate(req: FastifyRequest, res: FastifyReply, opts?: { required?: boolean }): Promise<AccessToken | null> {
+        logger.setContext("middleware.auth.authenticate");
+        const required = opts?.required ?? true;
+
+        const token = extractToken(req);
+        const decoded = token ? this.verifyAccessToken(token) : null;
+        if (decoded) return decoded;
+
+        const refreshToken = req.cookies.refreshToken;
+        if (refreshToken) {
+            try {
+                const tokens = await this.userService.refreshToken(refreshToken);
+                setAuthCookies(res, tokens);
+                const refreshed = this.verifyAccessToken(tokens.accessToken);
+                if (refreshed) return refreshed;
+            } catch (e) {
+                logger.warn({ message: "Transparent token refresh failed", error: e as string | Error });
+            }
         }
-        return decoded as { id: string, twitchId: string };
-    } catch (e) {
-        logger.error({ message: "Token verification failed", error: e as string | Error });
-        res.status(401).send({ error: "Unauthorized" });
-        return;
+
+        if (required) {
+            res.status(401).send(new UnauthorizedError().toJSON());
+        }
+        return null;
     }
 }

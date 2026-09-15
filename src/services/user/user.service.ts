@@ -201,7 +201,7 @@ export default class UserService {
         const newRefreshToken = generateRefreshToken();
 
         await redis.del(`refresh_token:${refreshToken}`);
-        await redis.set(`refresh_token:${newRefreshToken}`, user.id, { EX: 60 * 60 * 24 * 7 });
+        await redis.set(`refresh_token:${newRefreshToken}`, user.id, TTL.ONE_WEEK);
 
         return { accessToken: newAccessToken, refreshToken: newRefreshToken };
     }
