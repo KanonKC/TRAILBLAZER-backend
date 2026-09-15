@@ -8,6 +8,8 @@ const config: Configurations = {
     env: makeEnvironment(process.env.ENV || ""),
     origin: process.env.ORIGIN || "",
     rootDomain: process.env.ROOT_DOMAIN || "",
+    cdnOrigin: process.env.CDN_ORIGIN || "",
+    cdnBucketName: process.env.CDN_S3_BUCKET_NAME || "",
     jwtSecret: process.env.JWT_SECRET || "",
     cookieSecret: process.env.COOKIE_SECRET || "",
     frontendOrigin: process.env.FRONTEND_ORIGIN || "",
@@ -31,7 +33,17 @@ const config: Configurations = {
         apiSecret: process.env.SIGHTENGINE_API_SECRET || ""
     },
     admin: {
-        apiKey: process.env.ADMIN_API_KEY || ""
+        jwtSecret: process.env.ADMIN_JWT_SECRET || "",
+        frontendOrigin: process.env.ADMIN_FRONTEND_ORIGIN || "",
+        cookieDomain: process.env.ADMIN_COOKIE_DOMAIN || "",
+        bootstrapEmail: process.env.BOOTSTRAP_ADMIN_EMAIL || "",
+        bootstrapName: process.env.BOOTSTRAP_ADMIN_NAME || "",
+        bootstrapRole: process.env.BOOTSTRAP_ADMIN_ROLE || "ADMIN"
+    },
+    googleAdmin: {
+        clientId: process.env.GOOGLE_ADMIN_CLIENT_ID || "",
+        clientSecret: process.env.GOOGLE_ADMIN_CLIENT_SECRET || "",
+        redirectUrl: process.env.GOOGLE_ADMIN_REDIRECT_URL || ""
     },
     youtube: {
         clientId: process.env.YOUTUBE_CLIENT_ID || "",

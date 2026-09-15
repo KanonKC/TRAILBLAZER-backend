@@ -11,10 +11,10 @@ const s3Client = new S3Client({
     forcePathStyle: true
 });
 
-async function uploadFile(buffer: Buffer, key: string, contentType: string): Promise<string> {
+async function uploadFile(buffer: Buffer, key: string, contentType: string, bucket?: string): Promise<string> {
     await s3Client.send(
         new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME!,
+            Bucket: bucket || process.env.S3_BUCKET_NAME!,
             Key: key,
             Body: buffer,
             ContentType: contentType
@@ -53,10 +53,10 @@ async function getFile(key: string): Promise<{ buffer: Buffer; contentType?: str
     }
 }
 
-async function deleteFile(key: string): Promise<void> {
+async function deleteFile(key: string, bucket?: string): Promise<void> {
     await s3Client.send(
         new DeleteObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME!,
+            Bucket: bucket || process.env.S3_BUCKET_NAME!,
             Key: key
         })
     );

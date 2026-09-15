@@ -1,27 +1,25 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import AuthService from "../../services/auth/auth.service";
 import TLogger, { Layer } from "@/logging/logger";
-import { getUserFromRequest } from "../middleware";
-import { TError } from "@/errors";
+import { AuthMiddleware } from "../middleware";
+import { clearAuthCookies } from "@/libs/cookies";
+import { BadRequestError, InternalServerError, TError } from "@/errors";
 
 export default class AuthController {
     private readonly logger: TLogger;
-    constructor(private authService: AuthService) {
+    constructor(private authService: AuthService, private authMiddleware: AuthMiddleware) {
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
     async logout(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.auth.logout");
         this.logger.info({ message: "User logging out" });
-        const user = getUserFromRequest(req);
-        if (!user) {
-            this.logger.warn({ message: "No access token provided" });
-            return res.status(401).send({ message: "Unauthorized" });
-        }
+        const user = await this.authMiddleware.authenticate(req, res);
+        if (!user) return; // 401 already sent
+
         try {
-            await this.authService.logout(user.id);
-            res.clearCookie('accessToken', { path: '/' });
-            res.clearCookie('refreshToken', { path: '/' });
+            await this.authService.logout(user.id, req.cookies.refreshToken);
+            clearAuthCookies(res);
             this.logger.info({ message: "Successfully logged out" });
             res.status(200).send({ message: "Logged out" });
         } catch (err) {
@@ -30,20 +28,20 @@ export default class AuthController {
                 return res.status(err.status).send(err.toJSON());
             }
             this.logger.error({ message: "Logout failed", error: err as string | Error });
-            return res.status(500).send({ message: "Logout failed" });
+            const error = new InternalServerError("Logout failed");
+            return res.status(error.status).send(error.toJSON());
         }
     }
 
     async syncTwitchGqlToken(req: FastifyRequest<{ Body: { token: string } }>, res: FastifyReply) {
         this.logger.setContext("controller.auth.syncTwitchGqlToken");
-        const user = getUserFromRequest(req);
-        if (!user) {
-            return res.status(401).send({ message: "Unauthorized" });
-        }
+        const user = await this.authMiddleware.authenticate(req, res);
+        if (!user) return; // 401 already sent
 
         const { token } = req.body;
         if (!token) {
-            return res.status(400).send({ message: "Token is required" });
+            const error = new BadRequestError("Token is required");
+            return res.status(error.status).send(error.toJSON());
         }
 
         try {
@@ -55,7 +53,8 @@ export default class AuthController {
                 return res.status(err.status).send(err.toJSON());
             }
             this.logger.error({ message: "Token sync failed", error: err as string | Error });
-            return res.status(500).send({ message: "Internal server error" });
+            const error = new InternalServerError();
+            return res.status(error.status).send(error.toJSON());
         }
     }
 }

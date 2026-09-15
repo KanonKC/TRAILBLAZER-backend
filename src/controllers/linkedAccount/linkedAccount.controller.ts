@@ -1,21 +1,23 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import LinkedAccountService from "@/services/linkedAccount/linkedAccount.service";
-import { authenticationRequired } from "../middleware";
+import { AuthMiddleware } from "../middleware";
 import TLogger, { Layer } from "@/logging/logger";
 import { TError } from "@/errors";
 
 export default class LinkedAccountController {
     private readonly linkedAccountService: LinkedAccountService;
+    private readonly authMiddleware: AuthMiddleware;
     private readonly logger: TLogger;
 
-    constructor(linkedAccountService: LinkedAccountService) {
+    constructor(linkedAccountService: LinkedAccountService, authMiddleware: AuthMiddleware) {
         this.linkedAccountService = linkedAccountService;
+        this.authMiddleware = authMiddleware;
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
     async list(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.linkedAccount.list");
-        const user = await authenticationRequired(req, res);
+        const user = await this.authMiddleware.authenticate(req, res);
         if (!user) return;
 
         try {
@@ -34,7 +36,7 @@ export default class LinkedAccountController {
 
     async bind(req: FastifyRequest<{ Params: { platform: string }; Body: { code: string; code_verifier?: string } }>, res: FastifyReply) {
         this.logger.setContext("controller.linkedAccount.bind");
-        const user = await authenticationRequired(req, res);
+        const user = await this.authMiddleware.authenticate(req, res);
         if (!user) return;
 
         try {
@@ -60,7 +62,7 @@ export default class LinkedAccountController {
 
     async unbind(req: FastifyRequest<{ Params: { platform: string } }>, res: FastifyReply) {
         this.logger.setContext("controller.linkedAccount.unbind");
-        const user = await authenticationRequired(req, res);
+        const user = await this.authMiddleware.authenticate(req, res);
         if (!user) return;
 
         try {

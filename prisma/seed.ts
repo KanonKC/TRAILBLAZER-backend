@@ -141,7 +141,27 @@ const widgetTypes = [
   },
 ];
 
+async function seedBootstrapAdmin() {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
+  const name = process.env.BOOTSTRAP_ADMIN_NAME;
+  const role = process.env.BOOTSTRAP_ADMIN_ROLE || "ADMIN";
+
+  if (!email || !name) {
+    console.log("Skipping bootstrap admin seed: BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_NAME not set");
+    return;
+  }
+
+  await prisma.adminUser.upsert({
+    where: { email },
+    update: { name, role: role as "SUPER_ADMIN" | "ADMIN" },
+    create: { email, name, role: role as "SUPER_ADMIN" | "ADMIN" },
+  });
+  console.log(`Bootstrap admin ensured: ${email}`);
+}
+
 async function main() {
+  await seedBootstrapAdmin();
+
   for (const killer of killers) {
     await prisma.dBDKillerMaster.upsert({
       where: { slug: killer.slug },

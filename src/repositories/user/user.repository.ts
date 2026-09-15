@@ -1,6 +1,7 @@
 import { prisma } from "@/libs/prisma";
 import { Pagination } from "@/services/response";
 import { User } from "../../../generated/prisma/client";
+import { UserWhereInput } from "generated/prisma/models";
 import { CreateUserRequest } from "./request";
 
 export default class UserRepository {
@@ -30,16 +31,35 @@ export default class UserRepository {
         return prisma.user.findUnique({ where: { twitch_id: twitchId }, include: { auth: true } })
     }
 
-    async count(): Promise<number> {
-        return prisma.user.count();
+    async count(search?: string, tier?: number): Promise<number> {
+        return prisma.user.count({ where: this.buildFilterWhere(search, tier) });
     }
 
-    async findMany(skip: number, take: number): Promise<User[]> {
+    async findMany(skip: number, take: number, search?: string, tier?: number): Promise<User[]> {
         return prisma.user.findMany({
+            where: this.buildFilterWhere(search, tier),
             skip,
             take,
-            orderBy: { id: 'asc' }
+            orderBy: { created_at: 'desc' }
         });
+    }
+
+    private buildFilterWhere(search?: string, tier?: number): UserWhereInput | undefined {
+        const where: UserWhereInput = {};
+
+        if (search) {
+            where.OR = [
+                { username: { contains: search, mode: "insensitive" } },
+                { display_name: { contains: search, mode: "insensitive" } },
+                { id: { contains: search, mode: "insensitive" } },
+            ];
+        }
+
+        if (tier !== undefined) {
+            where.tier = tier;
+        }
+
+        return Object.keys(where).length > 0 ? where : undefined;
     }
 
     async update(id: string, request: Partial<User>, tx?: any): Promise<User> {
