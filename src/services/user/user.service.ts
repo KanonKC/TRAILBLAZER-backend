@@ -20,6 +20,11 @@ import { convertPrismaError } from "@/utils/error";
 import { ListUserShowcaseResponse } from "./response";
 import { CacheKey } from "../cacheKey";
 
+// Bump this (and the matching CONSENT_VERSION in TRAILBLAZER-frontend's
+// lib/twitch-login.ts) whenever the consent terms change — it invalidates
+// every existing acceptance cookie/record so users are asked to accept again.
+const CONSENT_VERSION = "2026-09-14";
+
 export default class UserService {
     private readonly cfg: Configurations
     private readonly userRepository: UserRepository
@@ -116,6 +121,12 @@ export default class UserService {
         
         const user = await this.userRepository.upsert(cr)
         this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
+
+        if (user.consent_version !== CONSENT_VERSION) {
+            await this.userRepository.update(user.id, { consent_accepted_at: new Date(), consent_version: CONSENT_VERSION });
+            user.consent_accepted_at = new Date();
+            user.consent_version = CONSENT_VERSION;
+        }
 
         if (isNewUser && request.ref && this.referralService) {
             await this.referralService.handleReferralRegistration(request.ref, user.id);

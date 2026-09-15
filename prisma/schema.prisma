@@ -11,29 +11,31 @@ datasource db {
 }
 
 model User {
-  id                 String          @id @default(cuid())
-  twitch_id          String          @unique
-  username           String
-  display_name       String
-  avatar_url         String?
-  tier               Int             @default(0)
-  tier_expire_at     DateTime?
-  max_storage_mb     Int             @default(5)
-  extra_widget_quota Int             @default(0)
-  is_showcase        Boolean         @default(false)
-  canvas_overlay_key String?         @unique
-  created_at         DateTime        @default(now())
-  updated_at         DateTime        @updatedAt
-  auth               Auth?
-  workflows          Workflow[]
-  triggers           Trigger[]
-  widgets            Widget[]
-  uploaded_files     UploadedFile[]
-  linked_accounts    LinkedAccount[]
-  referrals          Referral[]      @relation("Referrer")
-  referred_by        Referral?       @relation("Referee")
-  referral_code      ReferralCode?
-  canvases           Canvas[]
+  id                  String          @id @default(cuid())
+  twitch_id           String          @unique
+  username            String
+  display_name        String
+  avatar_url          String?
+  tier                Int             @default(0)
+  tier_expire_at      DateTime?
+  max_storage_mb      Int             @default(5)
+  extra_widget_quota  Int             @default(0)
+  is_showcase         Boolean         @default(false)
+  canvas_overlay_key  String?         @unique
+  consent_accepted_at DateTime?
+  consent_version     String?
+  created_at          DateTime        @default(now())
+  updated_at          DateTime        @updatedAt
+  auth                Auth?
+  workflows           Workflow[]
+  triggers            Trigger[]
+  widgets             Widget[]
+  uploaded_files      UploadedFile[]
+  linked_accounts     LinkedAccount[]
+  referrals           Referral[]      @relation("Referrer")
+  referred_by         Referral?       @relation("Referee")
+  referral_code       ReferralCode?
+  canvases            Canvas[]
 }
 
 model Auth {
