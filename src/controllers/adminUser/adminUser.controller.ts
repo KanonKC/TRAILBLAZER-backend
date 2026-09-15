@@ -1,8 +1,10 @@
 import { FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import AdminUserService from "@/services/adminUser/adminUser.service";
 import { AdminAuthMiddleware } from "../middleware";
 import TLogger, { Layer } from "@/logging/logger";
 import { TError } from "@/errors";
+import { listAdminUserSchema, getUserWidgetsSchema } from "./schemas";
 
 export default class AdminUserController {
     private readonly adminUserService: AdminUserService;
@@ -15,18 +17,19 @@ export default class AdminUserController {
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
-    async list(req: FastifyRequest<{ Querystring: { page?: string, limit?: string, search?: string, tier?: string } }>, res: FastifyReply) {
+    async list(req: FastifyRequest, res: FastifyReply) {
         this.logger.setContext("controller.adminUser.list");
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
         try {
-            const page = parseInt(req.query.page || "1");
-            const limit = parseInt(req.query.limit || "20");
-            const tier = req.query.tier !== undefined && req.query.tier !== "" ? parseInt(req.query.tier) : undefined;
-            const result = await this.adminUserService.list({ page, limit }, req.query.search, tier);
+            const query = listAdminUserSchema.parse(req.query);
+            const result = await this.adminUserService.list({ page: query.page, limit: query.limit }, query.search, query.tier);
             res.send(result);
         } catch (error) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).send({ message: "Validation Error", errors: error.issues });
+            }
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -52,17 +55,19 @@ export default class AdminUserController {
         }
     }
 
-    async getWidgets(req: FastifyRequest<{ Params: { id: string }, Querystring: { page?: string, limit?: string } }>, res: FastifyReply) {
+    async getWidgets(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
         this.logger.setContext("controller.adminUser.getWidgets");
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
         try {
-            const page = parseInt(req.query.page || "1");
-            const limit = parseInt(req.query.limit || "50");
-            const result = await this.adminUserService.getWidgets(req.params.id, { page, limit });
+            const query = getUserWidgetsSchema.parse(req.query);
+            const result = await this.adminUserService.getWidgets(req.params.id, { page: query.page, limit: query.limit });
             res.send(result);
         } catch (error) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).send({ message: "Validation Error", errors: error.issues });
+            }
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
