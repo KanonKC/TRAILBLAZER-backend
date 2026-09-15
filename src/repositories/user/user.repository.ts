@@ -31,20 +31,23 @@ export default class UserRepository {
         return prisma.user.findUnique({ where: { twitch_id: twitchId }, include: { auth: true } })
     }
 
-    async count(search?: string, tier?: number): Promise<number> {
-        return prisma.user.count({ where: this.buildFilterWhere(search, tier) });
+    async count(search?: string, tier?: number, isShowcase?: boolean): Promise<number> {
+        return prisma.user.count({ where: this.buildFilterWhere(search, tier, isShowcase) });
     }
 
-    async findMany(skip: number, take: number, search?: string, tier?: number): Promise<User[]> {
+    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean) {
         return prisma.user.findMany({
-            where: this.buildFilterWhere(search, tier),
+            where: this.buildFilterWhere(search, tier, isShowcase),
             skip,
             take,
-            orderBy: { created_at: 'desc' }
+            orderBy: { created_at: 'desc' },
+            include: {
+                _count: { select: { widgets: true } }
+            }
         });
     }
 
-    private buildFilterWhere(search?: string, tier?: number): UserWhereInput | undefined {
+    private buildFilterWhere(search?: string, tier?: number, isShowcase?: boolean): UserWhereInput | undefined {
         const where: UserWhereInput = {};
 
         if (search) {
@@ -57,6 +60,10 @@ export default class UserRepository {
 
         if (tier !== undefined) {
             where.tier = tier;
+        }
+
+        if (isShowcase !== undefined) {
+            where.is_showcase = isShowcase;
         }
 
         return Object.keys(where).length > 0 ? where : undefined;

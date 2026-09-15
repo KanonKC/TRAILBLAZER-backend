@@ -27,7 +27,8 @@ export default class AdminUserController {
       const result = await this.adminUserService.list(
         { page: query.page, limit: query.limit },
         query.search,
-        query.tier
+        query.tier,
+        query.is_showcase
       );
       res.send(result);
     } catch (error) {
