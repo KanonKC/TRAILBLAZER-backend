@@ -73,14 +73,21 @@ import AuthController from "./controllers/auth/auth.controller";
 import LinkedAccountController from "./controllers/linkedAccount/linkedAccount.controller";
 import LinkedAccountRepository from "./repositories/linkedAccount/linkedAccount.repository";
 import LinkedAccountService from "./services/linkedAccount/linkedAccount.service";
-import { AuthMiddleware } from "./controllers/middleware";
+import { AuthMiddleware, AdminAuthMiddleware } from "./controllers/middleware";
 import { Google, Discord, Spotify } from "arctic";
 import TbCron from "./cron";
+import AdminAuthRepository from "./repositories/adminAuth/adminAuth.repository";
+import AdminAuthService from "./services/adminAuth/adminAuth.service";
+import AdminAuthController from "./controllers/adminAuth/adminAuth.controller";
+import AdminUserService from "./services/adminUser/adminUser.service";
+import AdminUserController from "./controllers/adminUser/adminUser.controller";
+import WidgetTypeService from "./services/widgetType/widgetType.service";
 
 // Providers
 const twitchGql = new TwitchGql(config);
 const sightengine = new Sightengine(config);
 const googleOAuth = new Google(config.youtube.clientId, config.youtube.clientSecret, config.youtube.redirectUrl);
+const googleAdminOAuth = new Google(config.googleAdmin.clientId, config.googleAdmin.clientSecret, config.googleAdmin.redirectUrl);
 const discordOAuth = new Discord(config.discord.clientId, config.discord.clientSecret, config.discord.redirectUrl);
 const spotifyOAuth = new Spotify(config.spotify.clientId, config.spotify.clientSecret, config.spotify.redirectUrl);
 
@@ -102,6 +109,7 @@ const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
 const referralRepository = new ReferralRepository();
+const adminAuthRepository = new AdminAuthRepository();
 
 // Service Layer
 const systemService = new SystemService();
@@ -126,15 +134,21 @@ const exportVideoService = new ExportVideoService(exportVideoRepository, userSer
 const spotifyProvider = new SpotifyProvider(config, linkedAccountRepository);
 const spotifySongRequestRepository = new SpotifySongRequestRepository();
 const spotifySongRequestService = new SpotifySongRequestService(spotifySongRequestRepository, userRepository, spotifyProvider, widgetService, authService);
+const adminAuthService = new AdminAuthService(config, adminAuthRepository, googleAdminOAuth);
+const adminUserService = new AdminUserService(userRepository, widgetService, twitchService);
+const widgetTypeService = new WidgetTypeService(config, widgetTypeRepository);
 
 // Middleware Layer
 const authMiddleware = new AuthMiddleware(userService);
+const adminAuthMiddleware = new AdminAuthMiddleware(adminAuthService);
 
 // Controller Layer
 const systemController = new SystemController(systemService);
 const authController = new AuthController(authService, authMiddleware);
 const userController = new UserController(config, userService, referralService, authMiddleware);
-const adminController = new AdminController(userService);
+const adminController = new AdminController(userService, adminAuthMiddleware);
+const adminAuthController = new AdminAuthController(config, adminAuthService, adminAuthMiddleware);
+const adminUserController = new AdminUserController(adminUserService, adminAuthMiddleware);
 const firstWordEventController = new FirstWordEventController(firstWordService);
 const firstWordController = new FirstWordController(firstWordService, firstWordEventController);
 const clipShoutoutEventController = new ClipShoutoutEventController(clipShoutoutService);
@@ -148,7 +162,7 @@ const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
-const widgetTypeController = new WidgetTypeController(widgetTypeRepository);
+const widgetTypeController = new WidgetTypeController(widgetTypeRepository, widgetTypeService, adminAuthMiddleware);
 const widgetController = new WidgetController(widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
@@ -192,6 +206,22 @@ server.get("/health", systemController.health.bind(systemController))
 
 server.put("/api/v1/admin/users/:id", adminController.updateUser.bind(adminController))
 server.post("/api/v1/admin/bulk-adjust-tier", adminController.bulkAdjustTierAndWidgets.bind(adminController))
+
+server.get("/api/v1/admin/auth/google", adminAuthController.google.bind(adminAuthController))
+server.get("/api/v1/admin/auth/google/callback", adminAuthController.googleCallback.bind(adminAuthController))
+server.post("/api/v1/admin/auth/refresh", adminAuthController.refresh.bind(adminAuthController))
+server.post("/api/v1/admin/auth/logout", adminAuthController.logout.bind(adminAuthController))
+server.get("/api/v1/admin/auth/me", adminAuthController.me.bind(adminAuthController))
+
+server.get("/api/v1/admin/users", adminUserController.list.bind(adminUserController))
+server.get("/api/v1/admin/users/:id", adminUserController.get.bind(adminUserController))
+server.get("/api/v1/admin/users/:id/widgets", adminUserController.getWidgets.bind(adminUserController))
+server.get("/api/v1/admin/users/:id/event-subs", adminUserController.getEventSubs.bind(adminUserController))
+
+server.post("/api/v1/admin/widget-types", widgetTypeController.create.bind(widgetTypeController))
+server.put("/api/v1/admin/widget-types/:id", widgetTypeController.update.bind(widgetTypeController))
+server.delete("/api/v1/admin/widget-types/:id", widgetTypeController.delete.bind(widgetTypeController))
+server.post("/api/v1/admin/widget-types/upload-icon", widgetTypeController.uploadIcon.bind(widgetTypeController))
 
 server.get("/api/v1/login", userController.login.bind(userController))
 server.get("/api/v1/user/me", userController.me.bind(userController))

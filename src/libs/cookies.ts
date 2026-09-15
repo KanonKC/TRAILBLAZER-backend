@@ -37,3 +37,28 @@ export function clearAuthCookies(res: FastifyReply): void {
     res.clearCookie("accessToken", { path: "/" });
     res.clearCookie("refreshToken", { path: "/" });
 }
+
+const baseAdminCookieOptions = {
+    path: "/",
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax" as const,
+    domain: config.admin.cookieDomain
+};
+
+export function setAdminAuthCookies(res: FastifyReply, tokens: AuthTokens): void {
+    res.setCookie("adminAccessToken", tokens.accessToken, {
+        ...baseAdminCookieOptions,
+        maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS
+    });
+
+    res.setCookie("adminRefreshToken", tokens.refreshToken, {
+        ...baseAdminCookieOptions,
+        maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_SECONDS
+    });
+}
+
+export function clearAdminAuthCookies(res: FastifyReply): void {
+    res.clearCookie("adminAccessToken", { path: "/" });
+    res.clearCookie("adminRefreshToken", { path: "/" });
+}

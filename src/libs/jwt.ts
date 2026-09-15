@@ -25,3 +25,19 @@ export function generateRefreshToken(): string {
 export function verifyToken(token: string): AccessToken {
     return jwt.verify(token, config.jwtSecret) as AccessToken;
 }
+
+export interface AdminAccessToken {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl: string | null;
+    role: string;
+}
+
+export function signAdminAccessToken(payload: AdminAccessToken): string {
+    return jwt.sign(payload, config.admin.jwtSecret, { expiresIn: ACCESS_TOKEN_EXPIRY });
+}
+
+export function verifyAdminToken(token: string): AdminAccessToken {
+    return jwt.verify(token, config.admin.jwtSecret) as AdminAccessToken;
+}

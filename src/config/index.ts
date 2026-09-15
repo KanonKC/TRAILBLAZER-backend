@@ -4,6 +4,8 @@ export default interface Configurations {
     env: Environment;
     origin: string;
     rootDomain: string;
+    cdnOrigin: string;
+    cdnBucketName: string;
     jwtSecret: string;
     cookieSecret: string;
     frontendOrigin: string;
@@ -27,7 +29,17 @@ export default interface Configurations {
         apiSecret: string;
     }
     admin: {
-        apiKey: string;
+        jwtSecret: string;
+        frontendOrigin: string;
+        cookieDomain: string;
+        bootstrapEmail: string;
+        bootstrapName: string;
+        bootstrapRole: string;
+    }
+    googleAdmin: {
+        clientId: string;
+        clientSecret: string;
+        redirectUrl: string;
     }
     youtube: {
         clientId: string;
