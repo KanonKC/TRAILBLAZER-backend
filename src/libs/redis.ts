@@ -1,4 +1,7 @@
 import { createClient, SetOptions } from "redis";
+import TLogger, { Layer } from "@/logging/logger";
+
+const logger = new TLogger(Layer.OTHER, "libs.redis");
 
 // const TTL: { [time: string]: SetOptions } = {
 //     TWO_HOURS: { expiration: { type: "EX", value: 60 * 60 * 2 } },
@@ -36,7 +39,7 @@ const clients = [redis, publisher, subscriber]
 
 // node-redis rethrows "error" events when nothing is listening, which kills the process.
 for (const client of clients) {
-    client.on("error", (err) => console.error("[redis] client error:", err))
+    client.on("error", (err) => logger.error({ message: "redis client error", error: err }))
 }
 
 let connecting: Promise<unknown> | null = null
@@ -51,7 +54,7 @@ export function connectRedis() {
 // Defer connecting until the synchronous import of the app has finished, so the connect
 // timeout is not being counted down while the event loop is blocked by ts-node.
 setImmediate(() => {
-    connectRedis().catch((err) => console.error("[redis] failed to connect:", err))
+    connectRedis().catch((err) => logger.error({ message: "redis failed to connect", error: err }))
 })
 
 export { publisher, subscriber }

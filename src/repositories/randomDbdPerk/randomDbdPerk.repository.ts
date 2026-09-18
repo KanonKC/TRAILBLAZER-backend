@@ -1,8 +1,11 @@
+import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateRandomDbdPerk, RandomDbdPerkClassType, UpdateRandomDbdPerk } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { RandomDbdPerkWidget } from "./response";
 import { RandomDbdPerkClass } from "generated/prisma/client";
+
+const logger = new TLogger(Layer.REPOSITORY);
 
 export default class RandomDbdPerkRepository {
 
@@ -10,6 +13,7 @@ export default class RandomDbdPerkRepository {
     }
 
     async create(request: CreateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+        try {
         const classType = [RandomDbdPerkClassType.SURVIVOR, RandomDbdPerkClassType.KILLER]
         return prisma.randomDbdPerk.create({
             data: {
@@ -42,9 +46,14 @@ export default class RandomDbdPerkRepository {
                 }
             }
         });
+    } catch (error) {
+            logger.setContext("repository.randomDbdPerk.create").error({ message: "create failed", error: error as Error });
+            throw error;
+        }
     }
 
     async update(id: string, request: UpdateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+        try {
         return prisma.randomDbdPerk.update({
             where: { id },
             data: {
@@ -77,15 +86,25 @@ export default class RandomDbdPerkRepository {
                 }
             }
         });
+    } catch (error) {
+            logger.setContext("repository.randomDbdPerk.update").error({ message: "update failed", error: error as Error });
+            throw error;
+        }
     }
 
     async delete(id: string): Promise<void> {
+        try {
         await prisma.randomDbdPerk.delete({
             where: { id },
         });
+    } catch (error) {
+            logger.setContext("repository.randomDbdPerk.delete").error({ message: "delete failed", error: error as Error });
+            throw error;
+        }
     }
 
     async findById(id: string): Promise<RandomDbdPerkWidget | null> {
+        try {
         return prisma.randomDbdPerk.findUnique({
             where: { id },
             include: {
@@ -101,6 +120,10 @@ export default class RandomDbdPerkRepository {
                 }
             }
         });
+    } catch (error) {
+            logger.setContext("repository.randomDbdPerk.findById").error({ message: "findById failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByOwnerId(ownerId: string): Promise<RandomDbdPerkWidget | null> {
@@ -170,10 +193,15 @@ export default class RandomDbdPerkRepository {
     }
 
     async getClassByRewardId(rewardId: string): Promise<RandomDbdPerkClass | null> {
+        try {
         return prisma.randomDbdPerkClass.findUnique({
             where: {
                 twitch_reward_id: rewardId
             }
         })
+    } catch (error) {
+            logger.setContext("repository.randomDbdPerk.getClassByRewardId").error({ message: "getClassByRewardId failed", error: error as Error });
+            throw error;
+        }
     }
 }

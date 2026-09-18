@@ -1,12 +1,16 @@
+import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { CreateSpotifySongRequest, UpdateSpotifySongRequest } from "./request";
 import { SpotifySongRequestWidget } from "./response";
 
+const logger = new TLogger(Layer.REPOSITORY);
+
 export default class SpotifySongRequestRepository {
     constructor() {}
 
     async create(request: CreateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+        try {
         return prisma.spotifySongRequest.create({
             data: {
                 twitch_reward_id: request.twitchRewardId,
@@ -31,9 +35,14 @@ export default class SpotifySongRequestRepository {
                 },
             },
         });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.create").error({ message: "create failed", error: error as Error });
+            throw error;
+        }
     }
 
     async update(id: string, request: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+        try {
         return prisma.spotifySongRequest.update({
             where: { id },
             data: request,
@@ -45,9 +54,14 @@ export default class SpotifySongRequestRepository {
                 },
             },
         });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.update").error({ message: "update failed", error: error as Error });
+            throw error;
+        }
     }
 
     async get(id: string): Promise<SpotifySongRequestWidget | null> {
+        try {
         return prisma.spotifySongRequest.findUnique({
             where: { id },
             include: {
@@ -58,9 +72,14 @@ export default class SpotifySongRequestRepository {
                 },
             },
         });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.get").error({ message: "get failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByOwnerId(ownerId: string): Promise<SpotifySongRequestWidget | null> {
+        try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
                 owner_id_widget_type_slug: {
@@ -79,9 +98,14 @@ export default class SpotifySongRequestRepository {
                 },
             },
         });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByTwitchId(twitchId: string): Promise<SpotifySongRequestWidget | null> {
+        try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
                 twitch_id_widget_type_slug: {
@@ -100,9 +124,18 @@ export default class SpotifySongRequestRepository {
                 },
             },
         });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async delete(id: string): Promise<void> {
+        try {
         await prisma.spotifySongRequest.delete({ where: { id } });
+    } catch (error) {
+            logger.setContext("repository.spotifySongRequest.delete").error({ message: "delete failed", error: error as Error });
+            throw error;
+        }
     }
 }
