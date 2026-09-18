@@ -27,6 +27,8 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
+    "@logtail/node": "^0.5.9",
+    "@logtail/winston": "^0.5.9",
     "@newrelic/winston-enricher": "^4.0.1",
     "@prisma/adapter-pg": "7.2.0",
     "@prisma/client": "7.2.0",
