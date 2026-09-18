@@ -61,7 +61,7 @@ describe("UploadedFileService", () => {
             const mockFile = { id: "1", key: "test-key" } as any;
             (s3.getSignedURL as jest.Mock).mockResolvedValue("https://signed-url.com");
 
-            const result = await service.extend(transactionId, mockFile);
+            const result = await service.extend(mockFile, transactionId);
 
             expect(result.url).toBe("https://signed-url.com");
             expect(s3.getSignedURL).toHaveBeenCalledWith("test-key", { expiresIn: 3600 });
@@ -81,14 +81,14 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
             mockUploadedFileRepo.listByPattern.mockResolvedValue([]);
 
-            await service.create(transactionId, userId, file);
+            await service.create(userId, file, transactionId);
 
             expect(s3.uploadFile).toHaveBeenCalledWith(file.buffer, expect.stringContaining(`users/${userId}/`), file.mimetype);
-            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(transactionId, expect.objectContaining({
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 name: file.filename,
                 type: file.mimetype,
                 owner_id: userId,
-            }));
+            }), transactionId);
         });
 
         it("should rename file if filename already exists", async () => {
@@ -103,11 +103,11 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
             mockUploadedFileRepo.listByPattern.mockResolvedValue([{ name: "apple.mp3" }] as any);
 
-            await service.create(transactionId, userId, file);
+            await service.create(userId, file, transactionId);
 
-            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(transactionId, expect.objectContaining({
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 name: "apple (1).mp3",
-            }));
+            }), transactionId);
         });
 
         it("should increment rename suffix until finding available name", async () => {
@@ -126,11 +126,11 @@ describe("UploadedFileService", () => {
                 { name: "apple (1).mp3" }
             ] as any);
 
-            await service.create(transactionId, userId, file);
+            await service.create(userId, file, transactionId);
 
-            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(transactionId, expect.objectContaining({
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 name: "apple (2).mp3",
-            }));
+            }), transactionId);
         });
 
         it("should not rename if different extension exists", async () => {
@@ -145,12 +145,12 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
             mockUploadedFileRepo.listByPattern.mockResolvedValue([]);
 
-            await service.create(transactionId, userId, file);
+            await service.create(userId, file, transactionId);
 
-            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(transactionId, expect.objectContaining({
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 name: "apple.ogg",
-            }));
-            expect(mockUploadedFileRepo.listByPattern).toHaveBeenCalledWith(transactionId, userId, "apple", ".ogg");
+            }), transactionId);
+            expect(mockUploadedFileRepo.listByPattern).toHaveBeenCalledWith(userId, "apple", ".ogg", transactionId);
         });
     });
 
@@ -162,7 +162,7 @@ describe("UploadedFileService", () => {
             const cachedFile = { id: "1", name: "cached.png" };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(cachedFile));
 
-            const result = await service.get(transactionId, id, userId);
+            const result = await service.get(id, userId, transactionId);
 
             expect(result).toEqual(cachedFile);
             expect(mockUploadedFileRepo.get).not.toHaveBeenCalled();
@@ -174,7 +174,7 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.get.mockResolvedValue(mockFile as any);
             (s3.getSignedURL as jest.Mock).mockResolvedValue("http://url");
 
-            const result = await service.get(transactionId, id, userId);
+            const result = await service.get(id, userId, transactionId);
 
             expect(result.name).toBe("db.png");
             expect(result.url).toBe("http://url");
@@ -185,14 +185,14 @@ describe("UploadedFileService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockUploadedFileRepo.get.mockResolvedValue(null);
 
-            await expect(service.get(transactionId, id, userId)).rejects.toThrow(NotFoundError);
+            await expect(service.get(id, userId, transactionId)).rejects.toThrow(NotFoundError);
         });
 
         it("should throw ForbiddenError if user is not the owner", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: "other_user" } as any);
 
-            await expect(service.get(transactionId, id, userId)).rejects.toThrow(ForbiddenError);
+            await expect(service.get(id, userId, transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
 
@@ -206,31 +206,25 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.list.mockResolvedValue([mockFiles, 2] as any);
             (s3.getSignedURL as jest.Mock).mockResolvedValue("http://url");
 
-            const result = await service.list(transactionId, userId, filters as any, pagination);
+            const result = await service.list(userId, filters as any, pagination, transactionId);
 
             expect(result.data.length).toBe(2);
             expect(result.pagination.total).toBe(2);
-            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(transactionId, 
-                expect.objectContaining({ types: ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"] }),
-                pagination
-            );
+            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(expect.objectContaining({ types: ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"] }), pagination, transactionId);
         });
 
         it("should list uploaded files without specific type filter", async () => {
             const filters = { search: "test" };
             mockUploadedFileRepo.list.mockResolvedValue([[], 0] as any);
 
-            await service.list(transactionId, userId, filters as any, pagination);
+            await service.list(userId, filters as any, pagination, transactionId);
 
-            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(transactionId, 
-                expect.objectContaining({ types: undefined, search: "test" }),
-                pagination
-            );
+            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(expect.objectContaining({ types: undefined, search: "test" }), pagination, transactionId);
         });
 
         it("should throw error if repository fails", async () => {
             mockUploadedFileRepo.list.mockRejectedValue(new Error("DB Error"));
-            await expect(service.list(transactionId, userId, {}, pagination as any)).rejects.toThrow("DB Error");
+            await expect(service.list(userId, {}, pagination as any, transactionId)).rejects.toThrow("DB Error");
         });
     });
 
@@ -243,19 +237,19 @@ describe("UploadedFileService", () => {
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: userId } as any);
             mockUploadedFileRepo.update.mockResolvedValue({ id: "1" } as any);
 
-            await service.update(transactionId, id, userId, request);
+            await service.update(id, userId, request, transactionId);
 
-            expect(mockUploadedFileRepo.update).toHaveBeenCalledWith(transactionId, id, request);
+            expect(mockUploadedFileRepo.update).toHaveBeenCalledWith(id, request, transactionId);
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockUploadedFileRepo.get.mockResolvedValue(null);
-            await expect(service.update(transactionId, id, userId, request)).rejects.toThrow(NotFoundError);
+            await expect(service.update(id, userId, request, transactionId)).rejects.toThrow(NotFoundError);
         });
 
         it("should throw ForbiddenError if not owner", async () => {
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: "other" } as any);
-            await expect(service.update(transactionId, id, userId, request)).rejects.toThrow(ForbiddenError);
+            await expect(service.update(id, userId, request, transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
 
@@ -265,18 +259,18 @@ describe("UploadedFileService", () => {
 
         it("should delete successfully", async () => {
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: userId } as any);
-            await service.delete(transactionId, id, userId);
-            expect(mockUploadedFileRepo.delete).toHaveBeenCalledWith(transactionId, id);
+            await service.delete(id, userId, transactionId);
+            expect(mockUploadedFileRepo.delete).toHaveBeenCalledWith(id, transactionId);
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockUploadedFileRepo.get.mockResolvedValue(null);
-            await expect(service.delete(transactionId, id, userId)).rejects.toThrow(NotFoundError);
+            await expect(service.delete(id, userId, transactionId)).rejects.toThrow(NotFoundError);
         });
 
         it("should throw ForbiddenError if not owner", async () => {
             mockUploadedFileRepo.get.mockResolvedValue({ id: "1", owner_id: "other" } as any);
-            await expect(service.delete(transactionId, id, userId)).rejects.toThrow(ForbiddenError);
+            await expect(service.delete(id, userId, transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
     describe("getTotalFileSize", () => {
@@ -287,7 +281,7 @@ describe("UploadedFileService", () => {
             mockUserService.getMaxStorageMB.mockResolvedValue(100);
             (redis.get as jest.Mock).mockResolvedValue(null);
 
-            const result = await service.getTotalFileSize(transactionId, ownerId);
+            const result = await service.getTotalFileSize(ownerId, transactionId);
 
             expect(result.total_size_kb).toBe(500);
             expect(result.max_storage_kb).toBe(100 * 1024);

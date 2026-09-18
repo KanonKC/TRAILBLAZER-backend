@@ -11,7 +11,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class FirstWordRepository {
     constructor() { }
 
-    async create(transactionId: string, request: CreateFirstWord): Promise<FirstWordWidget> {
+    async create(request: CreateFirstWord, transactionId?: string): Promise<FirstWordWidget> {
         try {
         return prisma.firstWord.create({
             data: {
@@ -41,7 +41,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async get(transactionId: string, id: string) {
+    async get(id: string, transactionId?: string) {
         try {
         return prisma.firstWord.findUnique({ 
             where: { id }, 
@@ -60,7 +60,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<FirstWordWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<FirstWordWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -87,7 +87,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<FirstWordWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<FirstWordWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -114,7 +114,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateFirstWord): Promise<FirstWordWidget> {
+    async update(id: string, request: UpdateFirstWord, transactionId?: string): Promise<FirstWordWidget> {
         try {
         return prisma.firstWord.update({
             where: { id },
@@ -134,7 +134,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWord.delete({ where: { id } });
     } catch (error) {
@@ -143,7 +143,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async addChatter(transactionId: string, request: AddChatter): Promise<FirstWordChatter> {
+    async addChatter(request: AddChatter, transactionId?: string): Promise<FirstWordChatter> {
         try {
         return prisma.firstWordChatter.create({
             data: request
@@ -154,7 +154,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getChatter(transactionId: string, id: string, chatterId: string): Promise<FirstWordChatter | null> {
+    async getChatter(id: string, chatterId: string, transactionId?: string): Promise<FirstWordChatter | null> {
         try {
         return prisma.firstWordChatter.findUnique({
             where: {
@@ -170,7 +170,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async listChatters(transactionId: string, id: string): Promise<[FirstWordChatter[], number]> {
+    async listChatters(id: string, transactionId?: string): Promise<[FirstWordChatter[], number]> {
         try {
         const res = await prisma.firstWordChatter.findMany({
             where: {
@@ -186,7 +186,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async listChatterIdByChannelId(transactionId: string, channelId: string): Promise<string[]> {
+    async listChatterIdByChannelId(channelId: string, transactionId?: string): Promise<string[]> {
         try {
         const res = await prisma.firstWordChatter.findMany({
             where: {
@@ -203,7 +203,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getChattersByChannelId(transactionId: string, channelId: string): Promise<FirstWordChatter[]> {
+    async getChattersByChannelId(channelId: string, transactionId?: string): Promise<FirstWordChatter[]> {
         try {
         return prisma.firstWordChatter.findMany({
             where: {
@@ -216,7 +216,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async clearChatters(transactionId: string, id: string): Promise<void> {
+    async clearChatters(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordChatter.deleteMany({
             where: {
@@ -229,7 +229,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getCustomReplyByTwitchId(transactionId: string, firstWordId: string, twitchId: string): Promise<FirstWordCustomReply | null> {
+    async getCustomReplyByTwitchId(firstWordId: string, twitchId: string, transactionId?: string): Promise<FirstWordCustomReply | null> {
         try {
         return prisma.firstWordCustomReply.findUnique({
             where: {
@@ -245,7 +245,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async createCustomReply(transactionId: string, request: CreateCustomReply): Promise<void> {
+    async createCustomReply(request: CreateCustomReply, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.create({
             data: request
@@ -256,7 +256,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async updateCustomReply(transactionId: string, id: number, request: UpdateCustomReply): Promise<void> {
+    async updateCustomReply(id: number, request: UpdateCustomReply, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.update({
             where: { id },
@@ -268,7 +268,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async deleteCustomReply(transactionId: string, id: number): Promise<void> {
+    async deleteCustomReply(id: number, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.delete({ where: { id } });
     } catch (error) {
@@ -277,7 +277,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async listCustomReplies(transactionId: string, request: ListCustomerReplyRequest, pagination: Pagination): Promise<[FirstWordCustomReply[], number]> {
+    async listCustomReplies(request: ListCustomerReplyRequest, pagination: Pagination, transactionId?: string): Promise<[FirstWordCustomReply[], number]> {
         try {
         const where: any = {
             first_word_id: request.first_word_id
@@ -311,7 +311,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async createOrIncrementGreetCount(transactionId: string, firstWordId: string, chatterId: string, channelId: string): Promise<void> {
+    async createOrIncrementGreetCount(firstWordId: string, chatterId: string, channelId: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordGreetCount.upsert({
             where: {
@@ -336,7 +336,7 @@ export default class FirstWordRepository {
         }
     }
 
-    async getGreetCount(transactionId: string, chatterId: string, channelId: string): Promise<FirstWordGreetCount | null> {
+    async getGreetCount(chatterId: string, channelId: string, transactionId?: string): Promise<FirstWordGreetCount | null> {
         try {
         return prisma.firstWordGreetCount.findUnique({
             where: {

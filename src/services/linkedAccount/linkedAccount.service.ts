@@ -36,12 +36,12 @@ export default class LinkedAccountService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async listByUserId(transactionId: string, userId: string) {
+    async listByUserId(userId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.listByUserId", transactionId);
         logger.info({ message: "Listing linked accounts", data: { userId } });
 
-        const accounts = await this.linkedAccountRepository.listByUserId(transactionId, userId);
+        const accounts = await this.linkedAccountRepository.listByUserId(userId, transactionId);
 
         return accounts.map((account) => ({
             id: account.id,
@@ -53,29 +53,29 @@ export default class LinkedAccountService {
         }));
     }
 
-    async bindAccount(transactionId: string, userId: string, platform: string, code: string, codeVerifier?: string) {
+    async bindAccount(userId: string, platform: string, code: string, codeVerifier?: string, transactionId?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.bindAccount", transactionId);
         logger.info({ message: "Binding account", data: { userId, platform } });
 
         this.validatePlatform(platform);
 
-        const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(transactionId, userId, platform);
+        const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, platform, transactionId);
         if (existing) {
             logger.warn({ message: "Account already bound", data: { userId, platform } });
             throw new BadRequestError(`Account already bound to ${platform}`);
         }
 
-        const { accessToken, refreshToken, expiresAt } = await this.exchangeCode(transactionId, platform as Platform, code, codeVerifier);
+        const { accessToken, refreshToken, expiresAt } = await this.exchangeCode(platform as Platform, code, codeVerifier, transactionId);
         logger.info({ message: "OAuth code exchanged successfully" });
 
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
-        const profile = await this.fetchPlatformProfile(transactionId, platform as Platform, accessToken);
+        const profile = await this.fetchPlatformProfile(platform as Platform, accessToken, transactionId);
         logger.info({ message: "Fetched platform profile", data: { platformUserId: profile.platform_user_id, platformUsername: profile.platform_username } });
 
-        const linkedAccount = await this.linkedAccountRepository.create(transactionId, {
+        const linkedAccount = await this.linkedAccountRepository.create({
             user_id: userId,
             platform,
             platform_user_id: profile.platform_user_id,
@@ -83,7 +83,7 @@ export default class LinkedAccountService {
             platform_avatar_url: profile.platform_avatar_url,
             refresh_token: refreshToken,
             token_expires_at: expiresAt,
-        });
+        }, transactionId);
 
         logger.info({ message: "Account bound successfully", data: { userId, platform, platformUserId: profile.platform_user_id } });
 
@@ -97,7 +97,7 @@ export default class LinkedAccountService {
         };
     }
 
-    async unbindAccount(transactionId: string, userId: string, platform: string) {
+    async unbindAccount(userId: string, platform: string, transactionId?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.unbindAccount", transactionId);
         logger.info({ message: "Unbinding account", data: { userId, platform } });
@@ -108,12 +108,12 @@ export default class LinkedAccountService {
             throw new ForbiddenError("Cannot unbind Twitch account");
         }
 
-        const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(transactionId, userId, platform);
+        const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, platform, transactionId);
         if (!existing) {
             throw new NotFoundError(`No linked account found for ${platform}`);
         }
 
-        await this.linkedAccountRepository.delete(transactionId, userId, platform);
+        await this.linkedAccountRepository.delete(userId, platform, transactionId);
 
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         await redis.del(redisKey);
@@ -121,7 +121,7 @@ export default class LinkedAccountService {
         logger.info({ message: "Account unbound successfully", data: { userId, platform } });
     }
 
-    async getAccessToken(transactionId: string, userId: string, platform: string): Promise<string> {
+    async getAccessToken(userId: string, platform: string, transactionId?: string): Promise<string> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.getAccessToken", transactionId);
 
@@ -131,34 +131,34 @@ export default class LinkedAccountService {
             return cachedToken;
         }
 
-        const account = await this.linkedAccountRepository.getByUserIdAndPlatform(transactionId, userId, platform);
+        const account = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, platform, transactionId);
         if (!account || !account.refresh_token) {
             throw new NotFoundError(`No linked account found for ${platform}`);
         }
 
-        const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(transactionId, platform as Platform, account.refresh_token);
+        const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(platform as Platform, account.refresh_token, transactionId);
 
         await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
         // Update tokens in DB if changed
         if (expiresAt || refreshToken) {
             logger.info({ message: "Refreshed access token", data: { userId, platform } });
-            await this.linkedAccountRepository.update(transactionId, account.id, {
+            await this.linkedAccountRepository.update(account.id, {
                 token_expires_at: expiresAt,
                 refresh_token: refreshToken || account.refresh_token
-            });
+            }, transactionId);
         }
 
         return accessToken;
     }
 
-    async refreshExpiringTokens(transactionId: string) {
+    async refreshExpiringTokens(transactionId?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.refreshExpiringTokens", transactionId);
         logger.info({ message: "Starting bulk refresh of expiring tokens" });
 
         const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        const accounts = await this.linkedAccountRepository.listExpiring(transactionId, tomorrow);
+        const accounts = await this.linkedAccountRepository.listExpiring(tomorrow, transactionId);
 
         logger.info({ message: `Found ${accounts.length} accounts with expiring tokens` });
 
@@ -166,12 +166,12 @@ export default class LinkedAccountService {
             try {
                 logger.info({ message: "Refreshing token for account", data: { id: account.id, platform: account.platform } });
 
-                const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(transactionId, account.platform as Platform, account.refresh_token!);
+                const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(account.platform as Platform, account.refresh_token!, transactionId);
 
-                await this.linkedAccountRepository.update(transactionId, account.id, {
+                await this.linkedAccountRepository.update(account.id, {
                     token_expires_at: expiresAt,
                     refresh_token: refreshToken || account.refresh_token
-                });
+                }, transactionId);
 
                 // Update Redis cache
                 const redisKey = `linked_account:access_token:${account.platform}:${account.user_id}`;
@@ -196,7 +196,7 @@ export default class LinkedAccountService {
         }
     }
 
-    private async exchangeCode(transactionId: string, platform: Platform, code: string, codeVerifier?: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
+    private async exchangeCode(platform: Platform, code: string, codeVerifier?: string, transactionId?: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.exchangeCode", transactionId);
 
@@ -244,7 +244,7 @@ export default class LinkedAccountService {
         }
     }
 
-    private async refreshAccessToken(transactionId: string, platform: Platform, refreshToken: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
+    private async refreshAccessToken(platform: Platform, refreshToken: string, transactionId?: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.refreshAccessToken", transactionId);
 
@@ -284,7 +284,7 @@ export default class LinkedAccountService {
         }
     }
 
-    private async fetchPlatformProfile(transactionId: string, platform: Platform, accessToken: string): Promise<PlatformUserProfile> {
+    private async fetchPlatformProfile(platform: Platform, accessToken: string, transactionId?: string): Promise<PlatformUserProfile> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.linkedAccount.fetchPlatformProfile", transactionId);
 

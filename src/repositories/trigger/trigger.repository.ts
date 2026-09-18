@@ -8,7 +8,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class TriggerRepository {
     constructor() { }
 
-    async create(transactionId: string, request: CreateTriggerRequest): Promise<Trigger> {
+    async create(request: CreateTriggerRequest, transactionId?: string): Promise<Trigger> {
         try {
         return prisma.trigger.create({
             data: request
@@ -19,7 +19,7 @@ export default class TriggerRepository {
         }
     }
 
-    async get(transactionId: string, id: string): Promise<Trigger | null> {
+    async get(id: string, transactionId?: string): Promise<Trigger | null> {
         try {
         return prisma.trigger.findUnique({ where: { id } })
     } catch (error) {

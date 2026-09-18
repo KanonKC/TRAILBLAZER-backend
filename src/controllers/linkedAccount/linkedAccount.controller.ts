@@ -22,7 +22,7 @@ export default class LinkedAccountController {
         if (!user) return;
 
         try {
-            const accounts = await this.linkedAccountService.listByUserId(req.id, user.id);
+            const accounts = await this.linkedAccountService.listByUserId(user.id, req.id);
             logger.info({ message: "Listed linked accounts", data: { userId: user.id, count: accounts.length } });
             res.send(accounts);
         } catch (err) {
@@ -49,7 +49,7 @@ export default class LinkedAccountController {
                 return res.status(400).send({ message: "OAuth code is required" });
             }
 
-            const linkedAccount = await this.linkedAccountService.bindAccount(req.id, user.id, platform, code, code_verifier);
+            const linkedAccount = await this.linkedAccountService.bindAccount(user.id, platform, code, code_verifier, req.id);
             logger.info({ message: "Account bound", data: { userId: user.id, platform } });
             res.send(linkedAccount);
         } catch (err) { 
@@ -70,7 +70,7 @@ export default class LinkedAccountController {
 
         try {
             const { platform } = req.params;
-            await this.linkedAccountService.unbindAccount(req.id, user.id, platform);
+            await this.linkedAccountService.unbindAccount(user.id, platform, req.id);
             logger.info({ message: "Account unbound", data: { userId: user.id, platform } });
             res.status(204).send();
         } catch (err) {

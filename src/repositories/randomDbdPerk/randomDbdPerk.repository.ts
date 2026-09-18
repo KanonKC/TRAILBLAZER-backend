@@ -12,7 +12,7 @@ export default class RandomDbdPerkRepository {
     constructor() {
     }
 
-    async create(transactionId: string, request: CreateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+    async create(request: CreateRandomDbdPerk, transactionId?: string): Promise<RandomDbdPerkWidget> {
         try {
         const classType = [RandomDbdPerkClassType.SURVIVOR, RandomDbdPerkClassType.KILLER]
         return prisma.randomDbdPerk.create({
@@ -52,7 +52,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+    async update(id: string, request: UpdateRandomDbdPerk, transactionId?: string): Promise<RandomDbdPerkWidget> {
         try {
         return prisma.randomDbdPerk.update({
             where: { id },
@@ -92,7 +92,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.randomDbdPerk.delete({
             where: { id },
@@ -103,7 +103,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async findById(transactionId: string, id: string): Promise<RandomDbdPerkWidget | null> {
+    async findById(id: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
         return prisma.randomDbdPerk.findUnique({
             where: { id },
@@ -126,7 +126,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<RandomDbdPerkWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
@@ -160,7 +160,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<RandomDbdPerkWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
@@ -194,7 +194,7 @@ export default class RandomDbdPerkRepository {
         }
     }
 
-    async getClassByRewardId(transactionId: string, rewardId: string): Promise<RandomDbdPerkClass | null> {
+    async getClassByRewardId(rewardId: string, transactionId?: string): Promise<RandomDbdPerkClass | null> {
         try {
         return prisma.randomDbdPerkClass.findUnique({
             where: {

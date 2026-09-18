@@ -26,7 +26,7 @@ export default class EndCreditEventController {
         logger.info({ message: "SSE connection attempt", data: { userId } });
 
         try {
-            const isValid = await this.widgetService.validateOverlayAccess(req.id, userId, key);
+            const isValid = await this.widgetService.validateOverlayAccess(userId, key, req.id);
             if (!isValid) {
                 logger.warn({ message: "Invalid key for SSE connection", data: { userId } });
                 return res.status(401).send({ message: "Invalid overlay key" });

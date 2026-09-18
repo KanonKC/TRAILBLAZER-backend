@@ -29,7 +29,7 @@ export default class AdminAuthService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async buildGoogleAuthUrl(transactionId: string): Promise<string> {
+    async buildGoogleAuthUrl(transactionId?: string): Promise<string> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.adminAuth.buildGoogleAuthUrl", transactionId);
         const state = generateState();
@@ -42,7 +42,7 @@ export default class AdminAuthService {
         return url.toString();
     }
 
-    async handleGoogleCallback(transactionId: string, code: string, state: string): Promise<{ admin: AdminUser, accessToken: string, refreshToken: string }> {
+    async handleGoogleCallback(code: string, state: string, transactionId?: string): Promise<{ admin: AdminUser, accessToken: string, refreshToken: string }> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.adminAuth.handleGoogleCallback", transactionId);
 
@@ -70,16 +70,16 @@ export default class AdminAuthService {
             throw new UnauthorizedError("Failed to complete Google login");
         }
 
-        let admin = await this.adminAuthRepository.findByGoogleId(transactionId, claims.sub);
+        let admin = await this.adminAuthRepository.findByGoogleId(claims.sub, transactionId);
         if (!admin) {
-            admin = await this.adminAuthRepository.findByEmail(transactionId, claims.email);
+            admin = await this.adminAuthRepository.findByEmail(claims.email, transactionId);
             if (!admin) {
                 logger.warn({ message: "Admin account not found", data: { email: claims.email } });
                 throw new ForbiddenError("Admin account not found — contact an administrator");
             }
-            admin = await this.adminAuthRepository.updateGoogleIdAndLastLogin(transactionId, admin.id, claims.sub);
+            admin = await this.adminAuthRepository.updateGoogleIdAndLastLogin(admin.id, claims.sub, transactionId);
         } else {
-            admin = await this.adminAuthRepository.updateLastLogin(transactionId, admin.id);
+            admin = await this.adminAuthRepository.updateLastLogin(admin.id, transactionId);
         }
 
         if (!admin.is_active) {
@@ -91,7 +91,7 @@ export default class AdminAuthService {
         return { admin, accessToken, refreshToken };
     }
 
-    async refreshToken(transactionId: string, refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+    async refreshToken(refreshToken: string, transactionId?: string): Promise<{ accessToken: string, refreshToken: string }> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.adminAuth.refreshToken", transactionId);
         const adminId = await redis.get(`admin_refresh_token:${refreshToken}`);
@@ -99,7 +99,7 @@ export default class AdminAuthService {
             throw new UnauthorizedError("Invalid refresh token");
         }
 
-        const admin = await this.adminAuthRepository.get(transactionId, adminId);
+        const admin = await this.adminAuthRepository.get(adminId, transactionId);
         if (!admin || !admin.is_active) {
             throw new UnauthorizedError("Admin account not found or disabled");
         }
@@ -108,7 +108,7 @@ export default class AdminAuthService {
         return this.mintTokens(admin);
     }
 
-    async logout(transactionId: string, refreshToken?: string): Promise<void> {
+    async logout(refreshToken?: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.adminAuth.logout", transactionId);
         if (refreshToken) {

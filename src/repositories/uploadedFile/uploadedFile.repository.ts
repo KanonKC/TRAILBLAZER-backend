@@ -10,7 +10,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export class UploadedFileRepository {
     constructor() { }
 
-    async create(transactionId: string, request: CreateUploadedFileRequest) {
+    async create(request: CreateUploadedFileRequest, transactionId?: string) {
         try {
         return prisma.uploadedFile.create({
             data: request
@@ -21,7 +21,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async get(transactionId: string, id: string) {
+    async get(id: string, transactionId?: string) {
         try {
         return prisma.uploadedFile.findUnique({
             where: {
@@ -34,7 +34,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async getByName(transactionId: string, ownerId: string, name: string) {
+    async getByName(ownerId: string, name: string, transactionId?: string) {
         try {
         return prisma.uploadedFile.findFirst({
             where: {
@@ -48,7 +48,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async listByPattern(transactionId: string, ownerId: string, base: string, ext: string) {
+    async listByPattern(ownerId: string, base: string, ext: string, transactionId?: string) {
         try {
         return prisma.uploadedFile.findMany({
             where: {
@@ -68,7 +68,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async list(transactionId: string, request: ListUploadedFileRequest, pagination: Pagination): Promise<[UploadedFile[], number]> {
+    async list(request: ListUploadedFileRequest, pagination: Pagination, transactionId?: string): Promise<[UploadedFile[], number]> {
         try {
         const where: any = {
             owner_id: request.ownerId
@@ -106,7 +106,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async getTotalFileSize(transactionId: string, ownerId: string): Promise<number> {
+    async getTotalFileSize(ownerId: string, transactionId?: string): Promise<number> {
         try {
         const res = await prisma.uploadedFile.aggregate({
             where: {
@@ -124,7 +124,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateUploadedFileRequest) {
+    async update(id: string, request: UpdateUploadedFileRequest, transactionId?: string) {
         try {
         return prisma.uploadedFile.update({
             where: {
@@ -138,7 +138,7 @@ export class UploadedFileRepository {
         }
     }
 
-    async delete(transactionId: string, id: string) {
+    async delete(id: string, transactionId?: string) {
         try {
         return prisma.uploadedFile.delete({
             where: {

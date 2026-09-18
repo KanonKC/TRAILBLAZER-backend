@@ -26,7 +26,7 @@ export default class ExportVideoController {
         }
 
         try {
-            const config = await this.service.getByUserId(req.id, user.id);
+            const config = await this.service.getByUserId(user.id, req.id);
             logger.info({ message: "Successfully retrieved export video", data: { userId: user.id } });
             res.send(config);
         } catch (error) {
@@ -55,7 +55,7 @@ export default class ExportVideoController {
 
         try {
             const body = createExportVideoSchema.parse(req.body);
-            const config = await this.service.create(req.id, user.id, body);
+            const config = await this.service.create(user.id, body, req.id);
             logger.info({ message: "Successfully created export video", data: { userId: user.id } });
             res.status(201).send(config);
         } catch (error) {
@@ -84,7 +84,7 @@ export default class ExportVideoController {
 
         try {
             const body = updateExportVideoSchema.parse(req.body);
-            const updated = await this.service.update(req.id, user.id, body);
+            const updated = await this.service.update(user.id, body, req.id);
             logger.info({ message: "Successfully updated export video", data: { userId: user.id } });
             res.status(200).send(updated);
         } catch (error) {
@@ -112,7 +112,7 @@ export default class ExportVideoController {
         }
 
         try {
-            await this.service.delete(req.id, user.id);
+            await this.service.delete(user.id, req.id);
             logger.info({ message: "Successfully deleted export video", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -135,7 +135,7 @@ export default class ExportVideoController {
 
         try {
             const body = createExportVideoHistorySchema.parse(req.body);
-            await this.service.createHistory(req.id, user.id, body);
+            await this.service.createHistory(user.id, body, req.id);
             logger.info({ message: "Successfully created export video history", data: { userId: user.id } });
             res.status(201).send({ message: "Success" });
         } catch (error) {
@@ -165,7 +165,7 @@ export default class ExportVideoController {
             const page = parseInt(query.page || "1");
             const limit = parseInt(query.limit || "10");
 
-            const history = await this.service.listHistory(req.id, user.id, { page, limit });
+            const history = await this.service.listHistory(user.id, { page, limit }, req.id);
             logger.info({ message: "Successfully listed export video history", data: { userId: user.id, page, limit } });
             res.send(history);
         } catch (error) {
@@ -188,7 +188,7 @@ export default class ExportVideoController {
 
         const { historyId } = req.params as { historyId: string };
         try {
-            const entry = await this.service.getHistory(req.id, user.id, parseInt(historyId));
+            const entry = await this.service.getHistory(user.id, parseInt(historyId), req.id);
             logger.info({ message: "Successfully retrieved export video history", data: { userId: user.id, historyId } });
             res.send(entry);
         } catch (error) {
@@ -211,7 +211,7 @@ export default class ExportVideoController {
 
         const { historyId } = req.params as { historyId: string };
         try {
-            await this.service.deleteHistory(req.id, user.id, parseInt(historyId));
+            await this.service.deleteHistory(user.id, parseInt(historyId), req.id);
             logger.info({ message: "Successfully deleted export video history", data: { userId: user.id, historyId } });
             res.status(204).send();
         } catch (error) {
@@ -233,7 +233,7 @@ export default class ExportVideoController {
         }
 
         try {
-            await this.service.testExport(req.id, user.id);
+            await this.service.testExport(user.id, req.id);
             logger.info({ message: "Successfully triggered manual test export", data: { userId: user.id } });
             res.status(200).send({ message: "Success" });
         } catch (error) {

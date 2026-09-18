@@ -27,7 +27,7 @@ export default class TwitchStreamOfflineEvent {
 
         if (body.subscription.status === "enabled") {
             logger.info({ message: "Handling stream offline event", data: event })
-            await this.exportVideoService.onTwitchStreamOffline(req.id, event)
+            await this.exportVideoService.onTwitchStreamOffline(event, req.id)
             res.status(204).send()
             return
         }

@@ -25,7 +25,7 @@ export default class RandomDBDKillerController {
         }
 
         try {
-            const result = await this.service.getByUserId(req.id, user.id);
+            const result = await this.service.getByUserId(user.id, req.id);
             logger.info({ message: "Successfully retrieved random dbd killer config", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
@@ -49,11 +49,11 @@ export default class RandomDBDKillerController {
 
         try {
             const request = createRandomDBDKillerSchema.parse(req.body ?? {});
-            const result = await this.service.create(req.id, {
+            const result = await this.service.create({
                 owner_id: user.id,
                 twitch_id: user.twitchId,
                 twitch_reward_id: request.twitch_reward_id
-            });
+            }, req.id);
             logger.info({ message: "Successfully created random dbd killer config", data: { userId: user.id } });
             res.status(201).send(result);
         } catch (error) {
@@ -81,9 +81,9 @@ export default class RandomDBDKillerController {
 
         try {
             const request = updateRandomDBDKillerSchema.parse(req.body);
-            const existing = await this.service.getByUserId(req.id, user.id);
+            const existing = await this.service.getByUserId(user.id, req.id);
 
-            const result = await this.service.update(req.id, existing.id, user.id, request);
+            const result = await this.service.update(existing.id, user.id, request, req.id);
             logger.info({ message: "Successfully updated random dbd killer config", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
@@ -110,7 +110,7 @@ export default class RandomDBDKillerController {
         }
 
         try {
-            await this.service.delete(req.id, user.id);
+            await this.service.delete(user.id, req.id);
             logger.info({ message: "Successfully deleted random dbd killer config", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -133,7 +133,7 @@ export default class RandomDBDKillerController {
         }
 
         try {
-            const result = await this.service.refreshKey(req.id, user.id);
+            const result = await this.service.refreshKey(user.id, req.id);
             logger.info({ message: "Successfully refreshed random dbd killer overlay key", data: { userId: user.id } });
             res.send(result);
         } catch (error) {

@@ -8,7 +8,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class LinkedAccountRepository {
     constructor() { }
 
-    async listByUserId(transactionId: string, userId: string): Promise<LinkedAccount[]> {
+    async listByUserId(userId: string, transactionId?: string): Promise<LinkedAccount[]> {
         try {
         return prisma.linkedAccount.findMany({
             where: { user_id: userId }
@@ -19,7 +19,7 @@ export default class LinkedAccountRepository {
         }
     }
 
-    async getByUserIdAndPlatform(transactionId: string, userId: string, platform: string): Promise<LinkedAccount | null> {
+    async getByUserIdAndPlatform(userId: string, platform: string, transactionId?: string): Promise<LinkedAccount | null> {
         try {
         return prisma.linkedAccount.findUnique({
             where: {
@@ -35,7 +35,7 @@ export default class LinkedAccountRepository {
         }
     }
 
-    async create(transactionId: string, request: CreateLinkedAccountRequest): Promise<LinkedAccount> {
+    async create(request: CreateLinkedAccountRequest, transactionId?: string): Promise<LinkedAccount> {
         try {
         return prisma.linkedAccount.create({
             data: request
@@ -46,7 +46,7 @@ export default class LinkedAccountRepository {
         }
     }
 
-    async delete(transactionId: string, userId: string, platform: string): Promise<LinkedAccount> {
+    async delete(userId: string, platform: string, transactionId?: string): Promise<LinkedAccount> {
         try {
         return prisma.linkedAccount.delete({
             where: {
@@ -62,7 +62,7 @@ export default class LinkedAccountRepository {
         }
     }
 
-    async update(transactionId: string, id: string, data: Partial<LinkedAccount>): Promise<LinkedAccount> {
+    async update(id: string, data: Partial<LinkedAccount>, transactionId?: string): Promise<LinkedAccount> {
         try {
         return prisma.linkedAccount.update({
             where: { id },
@@ -74,7 +74,7 @@ export default class LinkedAccountRepository {
         }
     }
 
-    async listExpiring(transactionId: string, before: Date): Promise<LinkedAccount[]> {
+    async listExpiring(before: Date, transactionId?: string): Promise<LinkedAccount[]> {
         try {
         return prisma.linkedAccount.findMany({
             where: {

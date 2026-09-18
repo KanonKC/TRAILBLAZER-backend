@@ -8,7 +8,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class AuthRepository {
     constructor() { }
 
-    async create(transactionId: string, userId: string): Promise<Auth> {
+    async create(userId: string, transactionId?: string): Promise<Auth> {
         try {
         return prisma.auth.create({
             data: {
@@ -21,7 +21,7 @@ export default class AuthRepository {
         }
     }
 
-    async updateTwitchToken(transactionId: string, userId: string, request: UpdateTwitchTokenRequest): Promise<Auth> {
+    async updateTwitchToken(userId: string, request: UpdateTwitchTokenRequest, transactionId?: string): Promise<Auth> {
         try {
         return prisma.auth.upsert({
             where: {
@@ -39,7 +39,7 @@ export default class AuthRepository {
         }
     }
 
-    async getByUserId(transactionId: string, userId: string): Promise<Auth | null> {
+    async getByUserId(userId: string, transactionId?: string): Promise<Auth | null> {
         try {
         return prisma.auth.findUnique({
             where: {
@@ -52,7 +52,7 @@ export default class AuthRepository {
         }
     }
 
-    async getByTwitchRefreshToken(transactionId: string, twitchRefreshToken: string) {
+    async getByTwitchRefreshToken(twitchRefreshToken: string, transactionId?: string) {
         try {
         return prisma.auth.findUnique({
             where: {

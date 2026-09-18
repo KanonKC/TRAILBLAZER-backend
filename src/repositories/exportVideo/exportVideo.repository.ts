@@ -12,7 +12,7 @@ export default class ExportVideoRepository {
     constructor() {
     }
 
-    async create(transactionId: string, request: CreateExportVideo): Promise<ExportVideoWithWidget> {
+    async create(request: CreateExportVideo, transactionId?: string): Promise<ExportVideoWithWidget> {
         try {
         return prisma.exportVideo.create({
             data: {
@@ -42,7 +42,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
+    async update(id: string, request: UpdateExportVideo, transactionId?: string): Promise<ExportVideoWithWidget> {
         try {
         const { privacy_status, tags, description, ...exportVideoData } = request;
         const updateData: any = { ...exportVideoData };
@@ -68,7 +68,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.exportVideo.delete({
             where: { id },
@@ -79,7 +79,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async get(transactionId: string, id: string): Promise<ExportVideoWithWidget | null> {
+    async get(id: string, transactionId?: string): Promise<ExportVideoWithWidget | null> {
         try {
         return prisma.exportVideo.findUnique({
             where: { id },
@@ -97,7 +97,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async getByWidgetId(transactionId: string, widgetId: string): Promise<ExportVideoWithWidget | null> {
+    async getByWidgetId(widgetId: string, transactionId?: string): Promise<ExportVideoWithWidget | null> {
         try {
         return prisma.exportVideo.findUnique({
             where: { widget_id: widgetId },
@@ -115,7 +115,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<ExportVideoWithWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<ExportVideoWithWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -141,7 +141,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<ExportVideoWithWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<ExportVideoWithWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -169,7 +169,7 @@ export default class ExportVideoRepository {
 
 
     // ExportVideoHistory CRUD
-    async createHistory(transactionId: string, request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
+    async createHistory(request: CreateExportVideoHistory, transactionId?: string): Promise<ExportVideoHistoryResponse> {
         try {
         return prisma.exportVideoHistory.create({
             data: {
@@ -186,7 +186,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async listHistoryByExportVideoId(transactionId: string, exportVideoId: string, pagination: Pagination): Promise<[ExportVideoHistoryResponse[], number]> {
+    async listHistoryByExportVideoId(exportVideoId: string, pagination: Pagination, transactionId?: string): Promise<[ExportVideoHistoryResponse[], number]> {
         try {
         const where = { export_video_id: exportVideoId };
         const data = await prisma.exportVideoHistory.findMany({
@@ -205,7 +205,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async getHistory(transactionId: string, id: number): Promise<ExportVideoHistoryResponse | null> {
+    async getHistory(id: number, transactionId?: string): Promise<ExportVideoHistoryResponse | null> {
         try {
         return prisma.exportVideoHistory.findUnique({
             where: { id }
@@ -216,7 +216,7 @@ export default class ExportVideoRepository {
         }
     }
 
-    async deleteHistory(transactionId: string, id: number): Promise<void> {
+    async deleteHistory(id: number, transactionId?: string): Promise<void> {
         try {
         await prisma.exportVideoHistory.delete({
             where: { id }

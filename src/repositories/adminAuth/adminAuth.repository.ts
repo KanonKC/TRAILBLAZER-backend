@@ -8,7 +8,7 @@ export default class AdminAuthRepository {
     constructor() {
     }
 
-    async findByGoogleId(transactionId: string, googleId: string): Promise<AdminUser | null> {
+    async findByGoogleId(googleId: string, transactionId?: string): Promise<AdminUser | null> {
         try {
         return prisma.adminUser.findUnique({ where: { google_id: googleId } });
     } catch (error) {
@@ -17,7 +17,7 @@ export default class AdminAuthRepository {
         }
     }
 
-    async findByEmail(transactionId: string, email: string): Promise<AdminUser | null> {
+    async findByEmail(email: string, transactionId?: string): Promise<AdminUser | null> {
         try {
         return prisma.adminUser.findUnique({ where: { email } });
     } catch (error) {
@@ -26,7 +26,7 @@ export default class AdminAuthRepository {
         }
     }
 
-    async get(transactionId: string, id: string): Promise<AdminUser | null> {
+    async get(id: string, transactionId?: string): Promise<AdminUser | null> {
         try {
         return prisma.adminUser.findUnique({ where: { id } });
     } catch (error) {
@@ -35,7 +35,7 @@ export default class AdminAuthRepository {
         }
     }
 
-    async updateGoogleIdAndLastLogin(transactionId: string, id: string, googleId: string): Promise<AdminUser> {
+    async updateGoogleIdAndLastLogin(id: string, googleId: string, transactionId?: string): Promise<AdminUser> {
         try {
         return prisma.adminUser.update({
             where: { id },
@@ -47,7 +47,7 @@ export default class AdminAuthRepository {
         }
     }
 
-    async updateLastLogin(transactionId: string, id: string): Promise<AdminUser> {
+    async updateLastLogin(id: string, transactionId?: string): Promise<AdminUser> {
         try {
         return prisma.adminUser.update({
             where: { id },

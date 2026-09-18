@@ -84,15 +84,15 @@ describe("DropImageService", () => {
             const mockConfig = { id: "di_1", widget: { id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
 
-            const result = await service.getByUserId(transactionId, "user_1");
+            const result = await service.getByUserId("user_1", transactionId);
 
             expect(result).toEqual(mockConfig);
-            expect(mockWidgetService.authorizeOwnership).toHaveBeenCalledWith(transactionId, "user_1", "widget_1");
+            expect(mockWidgetService.authorizeOwnership).toHaveBeenCalledWith("user_1", "widget_1", transactionId);
         });
 
         it("should throw NotFoundError if config missing", async () => {
             mockDropImageRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.getByUserId(transactionId, "user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId("user_1", transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -107,7 +107,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.create.mockResolvedValue({ id: "di_1", widget_id: "widget_1" } as any);
             mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { id: "widget_1" } } as any);
 
-            const result = await service.create(transactionId, request);
+            const result = await service.create(request, transactionId);
 
             expect(mockDropImageRepo.create).toHaveBeenCalled();
             expect(result).toBeDefined();
@@ -118,12 +118,12 @@ describe("DropImageService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1" } as any);
 
-            await expect(service.create(transactionId, request)).rejects.toThrow(BadRequestError);
+            await expect(service.create(request, transactionId)).rejects.toThrow(BadRequestError);
         });
 
         it("should throw NotFoundError if user missing", async () => {
             mockUserRepo.get.mockResolvedValue(null);
-            await expect(service.create(transactionId, request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(request, transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -136,13 +136,13 @@ describe("DropImageService", () => {
         } as any;
 
         it("should return early if no reward id", async () => {
-            await service.handleDropImage(transactionId, { message: { text: "" } } as any);
+            await service.handleDropImage({ message: { text: "" } } as any, transactionId);
             expect(mockDropImageRepo.getByTwitchRewardId).not.toHaveBeenCalled();
         });
 
         it("should return early if config not found", async () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(null);
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
             expect(mockedAxios.get).not.toHaveBeenCalled();
         });
 
@@ -155,7 +155,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
 
-            await service.handleDropImage(transactionId, invalidEvent);
+            await service.handleDropImage(invalidEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1", "twitch_1", "invalid", expect.anything()
@@ -171,7 +171,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockRejectedValue(new Error("Network error"));
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1", "twitch_1", "invalid", expect.anything()
@@ -190,7 +190,7 @@ describe("DropImageService", () => {
                 data: Buffer.from("html")
             });
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1", "twitch_1", "not-image", expect.anything()
@@ -214,7 +214,7 @@ describe("DropImageService", () => {
                 gore: { prob: 0.6 }
             } as any);
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1", "twitch_1", "mature", expect.anything()
@@ -231,7 +231,7 @@ describe("DropImageService", () => {
                 data: Buffer.from("image")
             });
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(publisher.publish).toHaveBeenCalledWith(
                 "drop-image:image-url", 
@@ -248,7 +248,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const testEvent = { ...event, message_id: "test-message-id-123", message: { text: "not-a-url" } };
 
-            await service.handleDropImage(transactionId, testEvent);
+            await service.handleDropImage(testEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1", "twitch_1", "invalid", 
@@ -264,7 +264,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
 
-            await service.handleDropImage(transactionId, invalidEvent);
+            await service.handleDropImage(invalidEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -277,7 +277,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
 
-            await service.handleDropImage(transactionId, invalidEvent);
+            await service.handleDropImage(invalidEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -293,7 +293,7 @@ describe("DropImageService", () => {
                 data: Buffer.from("image")
             });
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(mockSightengine.detectMatureContent).not.toHaveBeenCalled();
             expect(publisher.publish).toHaveBeenCalled();
@@ -314,7 +314,7 @@ describe("DropImageService", () => {
                 gore: { prob: 0.6 }
             } as any);
 
-            await service.handleDropImage(transactionId, event);
+            await service.handleDropImage(event, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -331,7 +331,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.create.mockResolvedValue({ id: "di_1", widget_id: "widget_1" } as any);
             mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { id: "widget_1" } } as any);
 
-            await service.create(transactionId, { userId: "user_1" } as any);
+            await service.create({ userId: "user_1" } as any, transactionId);
 
             expect(createESTransport).not.toHaveBeenCalled();
         });
@@ -343,7 +343,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.findById.mockResolvedValue(mockExisting as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
 
-            await service.update(transactionId, "di_1", "user_1", {});
+            await service.update("di_1", "user_1", {}, transactionId);
 
             expect(mockDropImageRepo.update).toHaveBeenCalled();
         });
@@ -353,14 +353,14 @@ describe("DropImageService", () => {
             mockDropImageRepo.findById.mockResolvedValue(mockExisting as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockRejectedValue(new Error("API Error"));
 
-            await service.update(transactionId, "di_1", "user_1", {});
+            await service.update("di_1", "user_1", {}, transactionId);
 
             expect(mockDropImageRepo.update).toHaveBeenCalled();
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockDropImageRepo.findById.mockResolvedValue(null);
-            await expect(service.update(transactionId, "di_1", "user_1", {})).rejects.toThrow(NotFoundError);
+            await expect(service.update("di_1", "user_1", {}, transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -369,14 +369,14 @@ describe("DropImageService", () => {
             const mockExisting = { id: "di_1", widget: { id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            await service.delete(transactionId, "user_1");
+            await service.delete("user_1", transactionId);
 
-            expect(mockDropImageRepo.delete).toHaveBeenCalledWith(transactionId, "di_1");
+            expect(mockDropImageRepo.delete).toHaveBeenCalledWith("di_1", transactionId);
         });
 
         it("should return early if missing", async () => {
             mockDropImageRepo.getByOwnerId.mockResolvedValue(null);
-            await service.delete(transactionId, "user_1");
+            await service.delete("user_1", transactionId);
             expect(mockDropImageRepo.delete).not.toHaveBeenCalled();
         });
 
@@ -385,7 +385,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
             mockDropImageRepo.delete.mockRejectedValue(new Error("DB error"));
 
-            await expect(service.delete(transactionId, "user_1")).rejects.toThrow("DB error");
+            await expect(service.delete("user_1", transactionId)).rejects.toThrow("DB error");
         });
     });
 
@@ -394,14 +394,14 @@ describe("DropImageService", () => {
             const mockExisting = { id: "di_1", widget: { id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            await service.refreshOverlayKey(transactionId, "user_1");
+            await service.refreshOverlayKey("user_1", transactionId);
 
-            expect(mockDropImageRepo.update).toHaveBeenCalledWith(transactionId, "di_1", expect.objectContaining({ overlay_key: "mocked_uuid" }));
+            expect(mockDropImageRepo.update).toHaveBeenCalledWith("di_1", expect.objectContaining({ overlay_key: "mocked_uuid" }), transactionId);
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockDropImageRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.refreshOverlayKey(transactionId, "user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.refreshOverlayKey("user_1", transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 });

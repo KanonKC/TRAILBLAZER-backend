@@ -7,7 +7,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class ReferralRepository {
     constructor() { }
 
-    async createReferral(transactionId: string, referrerId: string, refereeId: string, tx?: any): Promise<Referral> {
+    async createReferral(referrerId: string, refereeId: string, tx?: any, transactionId?: string): Promise<Referral> {
         try {
         const client = tx || prisma;
         return client.referral.create({
@@ -22,7 +22,7 @@ export default class ReferralRepository {
         }
     }
 
-    async getReferralByRefereeId(transactionId: string, refereeId: string): Promise<Referral | null> {
+    async getReferralByRefereeId(refereeId: string, transactionId?: string): Promise<Referral | null> {
         try {
         return prisma.referral.findUnique({
             where: { referee_id: refereeId }
@@ -33,7 +33,7 @@ export default class ReferralRepository {
         }
     }
 
-    async countReferralsByReferrerId(transactionId: string, referrerId: string, tx?: any): Promise<number> {
+    async countReferralsByReferrerId(referrerId: string, tx?: any, transactionId?: string): Promise<number> {
         try {
         const client = tx || prisma;
         return client.referral.count({
@@ -45,7 +45,7 @@ export default class ReferralRepository {
         }
     }
 
-    async getOrCreateReferralCode(transactionId: string, userId: string, code: string): Promise<ReferralCode> {
+    async getOrCreateReferralCode(userId: string, code: string, transactionId?: string): Promise<ReferralCode> {
         try {
         return prisma.referralCode.upsert({
             where: { user_id: userId },
@@ -61,7 +61,7 @@ export default class ReferralRepository {
         }
     }
 
-    async getReferralCodeByCode(transactionId: string, code: string): Promise<ReferralCode | null> {
+    async getReferralCodeByCode(code: string, transactionId?: string): Promise<ReferralCode | null> {
         try {
         return prisma.referralCode.findUnique({
             where: { code }
@@ -72,7 +72,7 @@ export default class ReferralRepository {
         }
     }
 
-    async getReferralCodeByUserId(transactionId: string, userId: string): Promise<ReferralCode | null> {
+    async getReferralCodeByUserId(userId: string, transactionId?: string): Promise<ReferralCode | null> {
         try {
         return prisma.referralCode.findUnique({
             where: { user_id: userId }

@@ -29,7 +29,7 @@ export default class ClipShoutoutController {
         }
 
         try {
-            const config = await this.clipShoutoutService.getByUserId(req.id, user.id);
+            const config = await this.clipShoutoutService.getByUserId(user.id, req.id);
             if (!config) {
                 logger.info({ message: "Clip shoutout not enabled", data: { userId: user.id } });
                 return res.status(404).send({ message: "Clip shoutout not enabled" });
@@ -59,12 +59,12 @@ export default class ClipShoutoutController {
         try {
             const request = updateClipShoutoutSchema.parse(req.body);
             // Retrieve existing config to get ID
-            const config = await this.clipShoutoutService.getByUserId(req.id, user.id);
+            const config = await this.clipShoutoutService.getByUserId(user.id, req.id);
             if (!config) {
                 throw new NotFoundError("Clip shoutout not enabled");
             }
 
-            const updated = await this.clipShoutoutService.update(req.id, config.id, user.id, request);
+            const updated = await this.clipShoutoutService.update(config.id, user.id, request, req.id);
             logger.info({ message: "Successfully updated clip shoutout", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -94,7 +94,7 @@ export default class ClipShoutoutController {
 
         try {
             const request = createClipShoutoutSchema.parse(req.body);
-            const created = await this.clipShoutoutService.create(req.id, request);
+            const created = await this.clipShoutoutService.create(request, req.id);
             logger.info({ message: "Successfully created clip shoutout", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
@@ -123,7 +123,7 @@ export default class ClipShoutoutController {
         }
 
         try {
-            await this.clipShoutoutService.delete(req.id, user.id);
+            await this.clipShoutoutService.delete(user.id, req.id);
             this.clipShoutoutEventController.disconnectUser(user.id);
             logger.info({ message: "Successfully deleted clip shoutout", data: { userId: user.id } });
             res.status(204).send();
@@ -148,7 +148,7 @@ export default class ClipShoutoutController {
         }
 
         try {
-            const updated = await this.clipShoutoutService.refreshOverlayKey(req.id, user.id);
+            const updated = await this.clipShoutoutService.refreshOverlayKey(user.id, req.id);
             this.clipShoutoutEventController.disconnectUser(user.id);
             logger.info({ message: "Successfully refreshed overlay key", data: { userId: user.id } });
             res.send(updated);

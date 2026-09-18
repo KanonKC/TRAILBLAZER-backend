@@ -10,7 +10,7 @@ export default class WidgetTypeRepository {
     constructor() {
     }
 
-    async list(transactionId: string): Promise<WidgetType[]> {
+    async list(transactionId?: string): Promise<WidgetType[]> {
         try {
         return prisma.widgetType.findMany({
             orderBy: { id: "asc" }
@@ -21,7 +21,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async get(transactionId: string, id: number): Promise<WidgetType | null> {
+    async get(id: number, transactionId?: string): Promise<WidgetType | null> {
         try {
         return prisma.widgetType.findUnique({ where: { id } });
     } catch (error) {
@@ -30,7 +30,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async getBySlug(transactionId: string, slug: string): Promise<WidgetType | null> {
+    async getBySlug(slug: string, transactionId?: string): Promise<WidgetType | null> {
         try {
         return prisma.widgetType.findUnique({ where: { slug } });
     } catch (error) {
@@ -39,7 +39,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async create(transactionId: string, request: CreateWidgetType): Promise<WidgetType> {
+    async create(request: CreateWidgetType, transactionId?: string): Promise<WidgetType> {
         try {
         return prisma.widgetType.create({ data: request });
     } catch (error) {
@@ -48,7 +48,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async update(transactionId: string, id: number, request: UpdateWidgetType): Promise<WidgetType> {
+    async update(id: number, request: UpdateWidgetType, transactionId?: string): Promise<WidgetType> {
         try {
         return prisma.widgetType.update({ where: { id }, data: request });
     } catch (error) {
@@ -57,7 +57,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async delete(transactionId: string, id: number): Promise<void> {
+    async delete(id: number, transactionId?: string): Promise<void> {
         try {
         await prisma.widgetType.delete({ where: { id } });
     } catch (error) {
@@ -66,7 +66,7 @@ export default class WidgetTypeRepository {
         }
     }
 
-    async countWidgetsUsingSlug(transactionId: string, slug: string): Promise<number> {
+    async countWidgetsUsingSlug(slug: string, transactionId?: string): Promise<number> {
         try {
         return prisma.widget.count({ where: { widget_type_slug: slug } });
     } catch (error) {

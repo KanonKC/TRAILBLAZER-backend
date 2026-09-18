@@ -9,7 +9,7 @@ export default class DBDKillerMasterRepository {
     constructor() {
     }
 
-    async getBySlug(transactionId: string, slug: string): Promise<DBDKillerMaster | null> {
+    async getBySlug(slug: string, transactionId?: string): Promise<DBDKillerMaster | null> {
         try {
         return prisma.dBDKillerMaster.findUnique({
             where: { slug }
@@ -20,7 +20,7 @@ export default class DBDKillerMasterRepository {
         }
     }
 
-    async getBySlugs(transactionId: string, slugs: string[]): Promise<DBDKillerMaster[]> {
+    async getBySlugs(slugs: string[], transactionId?: string): Promise<DBDKillerMaster[]> {
         try {
         return prisma.dBDKillerMaster.findMany({
             where: { slug: { in: slugs } }
@@ -31,7 +31,7 @@ export default class DBDKillerMasterRepository {
         }
     }
 
-    async list(transactionId: string): Promise<DBDKillerMaster[]> {
+    async list(transactionId?: string): Promise<DBDKillerMaster[]> {
         try {
         return prisma.dBDKillerMaster.findMany({
             orderBy: { title: "asc" }

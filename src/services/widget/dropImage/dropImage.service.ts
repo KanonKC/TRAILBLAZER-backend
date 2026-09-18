@@ -26,16 +26,16 @@ export default class DropImageService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async getByUserId(transactionId: string, userId: string): Promise<DropImageWidget> {
+    async getByUserId(userId: string, transactionId?: string): Promise<DropImageWidget> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.getByUserId", transactionId);
         logger.info({ message: "Fetching drop image config for user", data: { userId } });
         try {
-            const res = await this.dropImageRepository.getByOwnerId(transactionId, userId);
+            const res = await this.dropImageRepository.getByOwnerId(userId, transactionId);
             if (!res) {
                 throw new NotFoundError("Drop Image config not found");
             }
-            await this.widgetService.authorizeOwnership(transactionId, userId, res.widget.id);
+            await this.widgetService.authorizeOwnership(userId, res.widget.id, transactionId);
             return res;
         } catch (error) {
             logger.error({ message: "Failed to get drop image widget", error: error as Error, data: { userId } });
@@ -43,26 +43,26 @@ export default class DropImageService {
         }
     }
 
-    async create(transactionId: string, request: CreateDropImageServiceRequest): Promise<DropImageWidget> {
+    async create(request: CreateDropImageServiceRequest, transactionId?: string): Promise<DropImageWidget> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.create", transactionId);
         logger.info({ message: "Creating drop image config", data: request });
         try {
-            const user = await this.userRepository.get(transactionId, request.userId);
+            const user = await this.userRepository.get(request.userId, transactionId);
             if (!user) {
                 logger.warn({ message: "User not found for setup", data: request });
                 throw new NotFoundError("User not found");
             }
 
-            const existing = await this.dropImageRepository.getByOwnerId(transactionId, user.id).catch(() => null);
+            const existing = await this.dropImageRepository.getByOwnerId(user.id, transactionId).catch(() => null);
             if (existing) {
                 logger.warn({ message: "Drop image config already exists", data: request });
                 throw new BadRequestError("Drop image config already exists");
             }
 
-            await this.subscribeToRedemptionEvents(transactionId, user.twitch_id, user.id);
+            await this.subscribeToRedemptionEvents(user.twitch_id, user.id, transactionId);
 
-            const res = await this.dropImageRepository.create(transactionId, {
+            const res = await this.dropImageRepository.create({
                 twitch_id: user.twitch_id,
                 owner_id: user.id,
                 twitch_bot_id: user.twitch_id,
@@ -70,78 +70,78 @@ export default class DropImageService {
                 invalid_message: "ข้อความที่ส่งมาไม่ใช่ URL",
                 not_image_message: "ลิงก์ที่ส่งมาไม่ใช่ลิงก์ของรูปภาพ",
                 contain_mature_message: "ลิงก์ที่ส่งมามีเนื้อหาที่ไม่เหมาะสม"
-            });
-            await this.widgetService.setInitialEnabled(transactionId, res.widget_id, user.id)
-            return this.getByUserId(transactionId, user.id)
+            }, transactionId);
+            await this.widgetService.setInitialEnabled(res.widget_id, user.id, transactionId)
+            return this.getByUserId(user.id, transactionId)
         } catch (error) {
             logger.error({ message: "Failed to create drop image widget", error: error as Error, data: request });
             throw error;
         }
     }
 
-    async update(transactionId: string, id: string, userId: string, request: UpdateDropImageServiceRequest): Promise<DropImageWidget> {
+    async update(id: string, userId: string, request: UpdateDropImageServiceRequest, transactionId?: string): Promise<DropImageWidget> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.update", transactionId);
         logger.info({ message: "Updating drop image config", data: { id, userId, request } });
         try {
-            const dropImage = await this.dropImageRepository.findById(transactionId, id);
+            const dropImage = await this.dropImageRepository.findById(id, transactionId);
             if (!dropImage) {
                 logger.warn({ message: "DropImage widget not found", data: { id, userId } });
                 throw new NotFoundError("Drop Image config not found");
             }
 
-            await this.widgetService.authorizeOwnership(transactionId, userId, dropImage.widget.id);
+            await this.widgetService.authorizeOwnership(userId, dropImage.widget.id, transactionId);
 
-            await this.subscribeToRedemptionEvents(transactionId, dropImage.widget.twitch_id, userId);
+            await this.subscribeToRedemptionEvents(dropImage.widget.twitch_id, userId, transactionId);
 
-            return await this.dropImageRepository.update(transactionId, id, request);
+            return await this.dropImageRepository.update(id, request, transactionId);
         } catch (error) {
             logger.error({ message: "Failed to update drop image widget", error: error as Error, data: request });
             throw error;
         }
     }
 
-    async delete(transactionId: string, userId: string): Promise<void> {
+    async delete(userId: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.delete", transactionId);
         logger.info({ message: "Deleting drop image config", data: { userId } });
         try {
-            const dropImage = await this.dropImageRepository.getByOwnerId(transactionId, userId).catch(() => null);
+            const dropImage = await this.dropImageRepository.getByOwnerId(userId, transactionId).catch(() => null);
             if (!dropImage) {
                 logger.info({ message: "Drop image config not found, skip delete", data: { userId } });
                 return;
             }
 
-            await this.widgetService.authorizeOwnership(transactionId, userId, dropImage.widget.id);
+            await this.widgetService.authorizeOwnership(userId, dropImage.widget.id, transactionId);
 
-            await this.dropImageRepository.delete(transactionId, dropImage.id);
+            await this.dropImageRepository.delete(dropImage.id, transactionId);
         } catch (error) {
             logger.error({ message: "Failed to delete drop image widget", error: error as Error, data: { userId } });
             throw error;
         }
     }
 
-    async refreshOverlayKey(transactionId: string, userId: string): Promise<DropImageWidget> {
+    async refreshOverlayKey(userId: string, transactionId?: string): Promise<DropImageWidget> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.refreshOverlayKey", transactionId);
         logger.info({ message: "Refreshing drop image overlay key", data: { userId } });
         try {
-            const dropImage = await this.dropImageRepository.getByOwnerId(transactionId, userId);
+            const dropImage = await this.dropImageRepository.getByOwnerId(userId, transactionId);
             if (!dropImage) {
                 logger.warn({ message: "DropImage widget not found", data: { userId } });
                 throw new NotFoundError("Drop Image config not found");
             }
 
-            return await this.dropImageRepository.update(transactionId, dropImage.id, {
+            return await this.dropImageRepository.update(dropImage.id, {
                 overlay_key: randomUUID()
-            });
+            }, transactionId);
         } catch (error) {
             logger.error({ message: "Failed to refresh drop image overlay key", error: error as Error, data: { userId } });
             throw error;
         }
     }
 
-    private async subscribeToRedemptionEvents(transactionId: string, twitchId: string, userId: string): Promise<void> {
+    private async subscribeToRedemptionEvents(twitchId: string, userId: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.subscribeToRedemptionEvents", transactionId);
         try {
@@ -159,7 +159,7 @@ export default class DropImageService {
         }
     }
 
-    async handleDropImage(transactionId: string, event: TwitchChannelChatMessageEventRequest) {
+    async handleDropImage(event: TwitchChannelChatMessageEventRequest, transactionId?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.handleDropImage", transactionId);
 
@@ -170,7 +170,7 @@ export default class DropImageService {
         logger.info({ message: "Initializing drop image event", data: { event } });
         const url = event.message.text;
 
-        const config = await this.dropImageRepository.getByTwitchRewardId(transactionId, event.channel_points_custom_reward_id);
+        const config = await this.dropImageRepository.getByTwitchRewardId(event.channel_points_custom_reward_id, transactionId);
         if (!config) {
             logger.warn({ message: "Drop image config not found", data: { event } });
             return;
@@ -255,6 +255,6 @@ export default class DropImageService {
             url: url,
             userId: config.widget.owner_id,
         }));
-        this.widgetService.increaseTriggeredCount(transactionId, config.widget_id)
+        this.widgetService.increaseTriggeredCount(config.widget_id, transactionId)
     }
 }

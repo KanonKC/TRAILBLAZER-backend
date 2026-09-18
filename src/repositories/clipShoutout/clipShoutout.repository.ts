@@ -11,7 +11,7 @@ export default class ClipShoutoutRepository {
     constructor() {
     }
 
-    async create(transactionId: string, request: CreateClipShoutout): Promise<ClipShoutoutWidget> {
+    async create(request: CreateClipShoutout, transactionId?: string): Promise<ClipShoutoutWidget> {
         try {
         return prisma.clipShoutout.create({
             data: {
@@ -42,7 +42,7 @@ export default class ClipShoutoutRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateClipShoutout): Promise<ClipShoutoutWidget> {
+    async update(id: string, request: UpdateClipShoutout, transactionId?: string): Promise<ClipShoutoutWidget> {
         try {
         return prisma.clipShoutout.update({
             where: { id },
@@ -61,7 +61,7 @@ export default class ClipShoutoutRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.clipShoutout.delete({
             where: { id },
@@ -72,7 +72,7 @@ export default class ClipShoutoutRepository {
         }
     }
 
-    async findById(transactionId: string, id: string): Promise<ClipShoutoutWidget | null> {
+    async findById(id: string, transactionId?: string): Promise<ClipShoutoutWidget | null> {
         try {
         return prisma.clipShoutout.findUnique({
             where: { id },
@@ -90,7 +90,7 @@ export default class ClipShoutoutRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<ClipShoutoutWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<ClipShoutoutWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -116,7 +116,7 @@ export default class ClipShoutoutRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<ClipShoutoutWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<ClipShoutoutWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {

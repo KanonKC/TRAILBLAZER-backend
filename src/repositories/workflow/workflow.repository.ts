@@ -7,7 +7,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class WorkflowRepository {
     constructor() { }
 
-    async get(transactionId: string, id: string): Promise<Workflow | null> {
+    async get(id: string, transactionId?: string): Promise<Workflow | null> {
         try {
         return prisma.workflow.findUnique({ where: { id } })
     } catch (error) {
@@ -16,7 +16,7 @@ export default class WorkflowRepository {
         }
     }
 
-    async getOwner(transactionId: string, id: string): Promise<User | null> {
+    async getOwner(id: string, transactionId?: string): Promise<User | null> {
         try {
         const workflow = await prisma.workflow.findUnique({ where: { id }, include: { owner: true } })
         return workflow?.owner ?? null
@@ -26,7 +26,7 @@ export default class WorkflowRepository {
         }
     }
 
-    async getManyByTriggerId(transactionId: string, triggerId: string): Promise<Workflow[]> {
+    async getManyByTriggerId(triggerId: string, transactionId?: string): Promise<Workflow[]> {
         try {
         return prisma.workflow.findMany({ where: { triggers: { some: { id: triggerId } } } })
     } catch (error) {

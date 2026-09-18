@@ -11,7 +11,7 @@ export default class RandomDBDKillerRepository {
     constructor() {
     }
 
-    async create(transactionId: string, request: CreateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async create(request: CreateRandomDBDKiller, transactionId?: string): Promise<RandomDBDKillerWidget> {
         try {
         return prisma.randomDBDKiller.create({
             data: {
@@ -40,7 +40,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async update(id: string, request: UpdateRandomDBDKiller, transactionId?: string): Promise<RandomDBDKillerWidget> {
         try {
         return prisma.randomDBDKiller.update({
             where: { id },
@@ -63,7 +63,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.randomDBDKiller.delete({
             where: { id },
@@ -74,7 +74,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async findById(transactionId: string, id: string): Promise<RandomDBDKillerWidget | null> {
+    async findById(id: string, transactionId?: string): Promise<RandomDBDKillerWidget | null> {
         try {
         return prisma.randomDBDKiller.findUnique({
             where: { id },
@@ -92,7 +92,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<RandomDBDKillerWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -121,7 +121,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<RandomDBDKillerWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -150,7 +150,7 @@ export default class RandomDBDKillerRepository {
         }
     }
 
-    async getByTwitchRewardId(transactionId: string, twitchRewardId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByTwitchRewardId(twitchRewardId: string, transactionId?: string): Promise<RandomDBDKillerWidget | null> {
         try {
         return prisma.randomDBDKiller.findUnique({
             where: { twitch_reward_id: twitchRewardId },

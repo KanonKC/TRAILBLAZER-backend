@@ -10,7 +10,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class UserRepository {
     constructor() { }
 
-    async create(transactionId: string, request: CreateUserRequest): Promise<User> {
+    async create(request: CreateUserRequest, transactionId?: string): Promise<User> {
         try {
         return prisma.user.create({
             data: request
@@ -21,7 +21,7 @@ export default class UserRepository {
         }
     }
 
-    async upsert(transactionId: string, request: CreateUserRequest): Promise<User> {
+    async upsert(request: CreateUserRequest, transactionId?: string): Promise<User> {
         try {
         return prisma.user.upsert({
             where: {
@@ -36,7 +36,7 @@ export default class UserRepository {
         }
     }
 
-    async get(transactionId: string, id: string): Promise<User | null> {
+    async get(id: string, transactionId?: string): Promise<User | null> {
         try {
         return prisma.user.findUnique({ where: { id } })
     } catch (error) {
@@ -45,7 +45,7 @@ export default class UserRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string) {
+    async getByTwitchId(twitchId: string, transactionId?: string) {
         try {
         return prisma.user.findUnique({ where: { twitch_id: twitchId }, include: { auth: true } })
     } catch (error) {
@@ -54,7 +54,7 @@ export default class UserRepository {
         }
     }
 
-    async count(transactionId: string, search?: string, tier?: number, isShowcase?: boolean): Promise<number> {
+    async count(search?: string, tier?: number, isShowcase?: boolean, transactionId?: string): Promise<number> {
         try {
         return prisma.user.count({ where: this.buildFilterWhere(search, tier, isShowcase) });
     } catch (error) {
@@ -63,7 +63,7 @@ export default class UserRepository {
         }
     }
 
-    async findMany(transactionId: string, skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean) {
+    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string) {
         try {
         return prisma.user.findMany({
             where: this.buildFilterWhere(search, tier, isShowcase),
@@ -102,7 +102,7 @@ export default class UserRepository {
         return Object.keys(where).length > 0 ? where : undefined;
     }
 
-    async update(transactionId: string, id: string, request: Partial<User>, tx?: any): Promise<User> {
+    async update(id: string, request: Partial<User>, tx?: any, transactionId?: string): Promise<User> {
         try {
         const client = tx || prisma;
         return client.user.update({
@@ -115,7 +115,7 @@ export default class UserRepository {
         }
     }
 
-    async listExpired(transactionId: string, pagination: Pagination, excludeIds: string[] = []): Promise<User[]> {
+    async listExpired(pagination: Pagination, excludeIds: string[] = [], transactionId?: string): Promise<User[]> {
         try {
         const now = new Date()
         return prisma.user.findMany({
@@ -136,7 +136,7 @@ export default class UserRepository {
         }
     }
 
-    async listByIds(transactionId: string, ids: string[], pagination: Pagination): Promise<User[]> {
+    async listByIds(ids: string[], pagination: Pagination, transactionId?: string): Promise<User[]> {
         try {
         return prisma.user.findMany({
             where: {
@@ -153,7 +153,7 @@ export default class UserRepository {
         }
     }
 
-    async listShowcase(transactionId: string): Promise<Partial<User>[]> {
+    async listShowcase(transactionId?: string): Promise<Partial<User>[]> {
         try {
         return prisma.user.findMany({
             where: {

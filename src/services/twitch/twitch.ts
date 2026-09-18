@@ -24,11 +24,11 @@ export default class TwitchService {
         })
     }
 
-    async listChannelRewards(transactionId: string, channelId: string, options?: ListChannelRewardsOptions): Promise<{
+    async listChannelRewards(channelId: string, options?: ListChannelRewardsOptions, transactionId?: string): Promise<{
         data: HelixCustomRewardData[];
     }> {
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(transactionId, channelId)
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(channelId, transactionId)
             let res = await twitchUserAPI.channelPoints.getCustomRewards(channelId)
             if (options?.userInputRequired) {
                 res = res.filter(r => r.userInputRequired)
@@ -40,11 +40,11 @@ export default class TwitchService {
         }
     }
 
-    async listUsers(transactionId: string, userIds: string[]): Promise<{
+    async listUsers(userIds: string[], transactionId?: string): Promise<{
         data: HelixUserData[];
     }> {
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(transactionId, userIds[0])
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(userIds[0], transactionId)
             let res = await twitchUserAPI.users.getUsersByIds(userIds)
             return { data: res.map(r => r[rawDataSymbol]) }
         } catch (error) {
@@ -52,9 +52,9 @@ export default class TwitchService {
         }
     }
 
-    async getUser(transactionId: string, userId: string): Promise<HelixUserData> {
+    async getUser(userId: string, transactionId?: string): Promise<HelixUserData> {
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(transactionId, userId)
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(userId, transactionId)
             let res = await twitchUserAPI.users.getUserById(userId)
             if (!res) {
                 throw new NotFoundError("Twitch user not found")
@@ -65,9 +65,9 @@ export default class TwitchService {
         }
     }
 
-    async getUserByName(transactionId: string, channelId: string, userName: string): Promise<HelixUserData> {
+    async getUserByName(channelId: string, userName: string, transactionId?: string): Promise<HelixUserData> {
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(transactionId, channelId)
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(channelId, transactionId)
             let res = await twitchUserAPI.users.getUserByName(userName)
             if (!res) {
                 throw new NotFoundError("Twitch user not found")

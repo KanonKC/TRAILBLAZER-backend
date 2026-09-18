@@ -26,7 +26,7 @@ export default class DropImageController {
         }
 
         try {
-            const config = await this.dropImageService.getByUserId(req.id, user.id);
+            const config = await this.dropImageService.getByUserId(user.id, req.id);
             if (!config) {
                 logger.info({ message: "Drop image not enabled", data: { userId: user.id } });
                 return res.status(404).send({ message: "Drop image not enabled" });
@@ -55,12 +55,12 @@ export default class DropImageController {
 
         try {
             const request = updateDropImageSchema.parse(req.body);
-            const config = await this.dropImageService.getByUserId(req.id, user.id);
+            const config = await this.dropImageService.getByUserId(user.id, req.id);
             if (!config) {
                 throw new NotFoundError("Drop image not enabled");
             }
 
-            const updated = await this.dropImageService.update(req.id, config.id, user.id, request);
+            const updated = await this.dropImageService.update(config.id, user.id, request, req.id);
             logger.info({ message: "Successfully updated drop image", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -89,7 +89,7 @@ export default class DropImageController {
 
         try {
             const request = createDropImageSchema.parse(req.body);
-            const created = await this.dropImageService.create(req.id, { userId: user.id });
+            const created = await this.dropImageService.create({ userId: user.id }, req.id);
             logger.info({ message: "Successfully created drop image", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
@@ -117,7 +117,7 @@ export default class DropImageController {
         }
 
         try {
-            await this.dropImageService.delete(req.id, user.id);
+            await this.dropImageService.delete(user.id, req.id);
             logger.info({ message: "Successfully deleted drop image", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -141,7 +141,7 @@ export default class DropImageController {
         }
 
         try {
-            const updated = await this.dropImageService.refreshOverlayKey(req.id, user.id);
+            const updated = await this.dropImageService.refreshOverlayKey(user.id, req.id);
             logger.info({ message: "Successfully refreshed overlay key", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {

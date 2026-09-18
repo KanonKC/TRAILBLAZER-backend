@@ -21,25 +21,25 @@ export default class WidgetTypeService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async list(transactionId: string): Promise<WidgetType[]> {
+    async list(transactionId?: string): Promise<WidgetType[]> {
         return this.widgetTypeRepository.list(transactionId);
     }
 
-    async get(transactionId: string, id: number): Promise<WidgetType> {
+    async get(id: number, transactionId?: string): Promise<WidgetType> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.get", transactionId);
-        const widgetType = await this.widgetTypeRepository.get(transactionId, id);
+        const widgetType = await this.widgetTypeRepository.get(id, transactionId);
         if (!widgetType) {
             throw new NotFoundError("Widget type not found");
         }
         return widgetType;
     }
 
-    async create(transactionId: string, request: CreateWidgetType): Promise<WidgetType> {
+    async create(request: CreateWidgetType, transactionId?: string): Promise<WidgetType> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.create", transactionId);
         try {
-            return await this.widgetTypeRepository.create(transactionId, request);
+            return await this.widgetTypeRepository.create(request, transactionId);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);
@@ -48,12 +48,12 @@ export default class WidgetTypeService {
         }
     }
 
-    async update(transactionId: string, id: number, request: UpdateWidgetType): Promise<WidgetType> {
+    async update(id: number, request: UpdateWidgetType, transactionId?: string): Promise<WidgetType> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.update", transactionId);
-        await this.get(transactionId, id);
+        await this.get(id, transactionId);
         try {
-            return await this.widgetTypeRepository.update(transactionId, id, request);
+            return await this.widgetTypeRepository.update(id, request, transactionId);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);
@@ -62,21 +62,21 @@ export default class WidgetTypeService {
         }
     }
 
-    async delete(transactionId: string, id: number): Promise<void> {
+    async delete(id: number, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.delete", transactionId);
-        const widgetType = await this.get(transactionId, id);
+        const widgetType = await this.get(id, transactionId);
 
-        const widgetsUsingType = await this.widgetTypeRepository.countWidgetsUsingSlug(transactionId, widgetType.slug);
+        const widgetsUsingType = await this.widgetTypeRepository.countWidgetsUsingSlug(widgetType.slug, transactionId);
         if (widgetsUsingType > 0) {
             logger.warn({ message: "Cannot delete widget type still in use", data: { id, widgetsUsingType } });
             throw new BadRequestError(`${widgetsUsingType} widget(s) still use this type — disable it instead of deleting`);
         }
 
-        await this.widgetTypeRepository.delete(transactionId, id);
+        await this.widgetTypeRepository.delete(id, transactionId);
     }
 
-    async uploadIcon(transactionId: string, filename: string, file: { buffer: Buffer, mimetype: string }): Promise<string> {
+    async uploadIcon(filename: string, file: { buffer: Buffer, mimetype: string }, transactionId?: string): Promise<string> {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.uploadIcon", transactionId);
         if (!/^[a-zA-Z0-9._-]+\.[a-zA-Z0-9]+$/.test(filename)) {

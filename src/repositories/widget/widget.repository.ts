@@ -12,7 +12,7 @@ export default class WidgetRepository {
     constructor() {
     }
 
-    async get(transactionId: string, id: string): Promise<ExtendedWidget | null> {
+    async get(id: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findUnique({
             where: { id },
@@ -26,7 +26,7 @@ export default class WidgetRepository {
         }
     }
 
-    async getByOverlayKey(transactionId: string, overlayKey: string): Promise<ExtendedWidget | null> {
+    async getByOverlayKey(overlayKey: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findUnique({
             where: { overlay_key: overlayKey },
@@ -40,7 +40,7 @@ export default class WidgetRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateWidget): Promise<void> {
+    async update(id: string, request: UpdateWidget, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },
@@ -52,7 +52,7 @@ export default class WidgetRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.delete({
             where: { id },
@@ -63,7 +63,7 @@ export default class WidgetRepository {
         }
     }
 
-    async listByOwnerId(transactionId: string, ownerId: string, pagination: Pagination, filters?: ListWidgetFilters): Promise<[ExtendedWidget[], number]> {
+    async listByOwnerId(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters, transactionId?: string): Promise<[ExtendedWidget[], number]> {
         try {
         const where: WidgetWhereInput = {
             owner_id: ownerId,
@@ -97,7 +97,7 @@ export default class WidgetRepository {
         }
     }
 
-    async disableAll(transactionId: string, ownerId: string): Promise<void> {
+    async disableAll(ownerId: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.updateMany({
             where: { owner_id: ownerId },
@@ -109,7 +109,7 @@ export default class WidgetRepository {
         }
     }
 
-    async getEnabledQuotaUsed(transactionId: string, ownerId: string, excludeIds?: string[]): Promise<number> {
+    async getEnabledQuotaUsed(ownerId: string, excludeIds?: string[], transactionId?: string): Promise<number> {
         try {
         const enabledWidgets = await prisma.widget.findMany({
             where: {
@@ -126,7 +126,7 @@ export default class WidgetRepository {
         }
     }
 
-    async getFirstEnabled(transactionId: string, ownerId: string): Promise<ExtendedWidget | null> {
+    async getFirstEnabled(ownerId: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findFirst({
             where: {
@@ -143,7 +143,7 @@ export default class WidgetRepository {
         }
     }
 
-    async updateOverlayKey(transactionId: string, id: string, overlayKey: string): Promise<void> {
+    async updateOverlayKey(id: string, overlayKey: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },
@@ -155,7 +155,7 @@ export default class WidgetRepository {
         }
     }
 
-    async increaseTriggeredCount(transactionId: string, id: string): Promise<void> {
+    async increaseTriggeredCount(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },

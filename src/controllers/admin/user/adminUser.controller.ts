@@ -25,13 +25,7 @@ export default class AdminUserController {
 
     try {
       const query = listAdminUserSchema.parse(req.query);
-      const result = await this.adminUserService.list(
-        req.id,
-        { page: query.page, limit: query.limit },
-        query.search,
-        query.tier,
-        query.is_showcase
-      );
+      const result = await this.adminUserService.list({ page: query.page, limit: query.limit }, query.search, query.tier, query.is_showcase, req.id);
       res.send(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -52,7 +46,7 @@ export default class AdminUserController {
     if (!admin) return; // 401 already sent
 
     try {
-      const user = await this.adminUserService.get(req.id, req.params.id);
+      const user = await this.adminUserService.get(req.params.id, req.id);
       res.send(user);
     } catch (error) {
       if (error instanceof TError) {
@@ -71,10 +65,10 @@ export default class AdminUserController {
 
     try {
       const query = getUserWidgetsSchema.parse(req.query);
-      const result = await this.adminUserService.getWidgets(req.id, req.params.id, {
+      const result = await this.adminUserService.getWidgets(req.params.id, {
         page: query.page,
         limit: query.limit,
-      });
+      }, req.id);
       res.send(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -95,7 +89,7 @@ export default class AdminUserController {
     if (!admin) return; // 401 already sent
 
     try {
-      const result = await this.adminUserService.getEventSubs(req.id, req.params.id);
+      const result = await this.adminUserService.getEventSubs(req.params.id, req.id);
       res.send(result);
     } catch (error) {
       if (error instanceof TError) {

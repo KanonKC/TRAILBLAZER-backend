@@ -49,10 +49,7 @@ export default class AdminAuthController {
     }
 
     try {
-      const { accessToken, refreshToken, admin } = await this.adminAuthService.handleGoogleCallback(req.id, 
-        code,
-        state
-      );
+      const { accessToken, refreshToken, admin } = await this.adminAuthService.handleGoogleCallback(code, state, req.id);
       setAdminAuthCookies(res, { accessToken, refreshToken });
       logger.info({
         message: 'Admin login successful',
@@ -80,7 +77,7 @@ export default class AdminAuthController {
     }
 
     try {
-      const tokens = await this.adminAuthService.refreshToken(req.id, adminRefreshToken);
+      const tokens = await this.adminAuthService.refreshToken(adminRefreshToken, req.id);
       setAdminAuthCookies(res, tokens);
       res.send({ message: 'Token refreshed' });
     } catch (err) {
@@ -99,7 +96,7 @@ export default class AdminAuthController {
         let logger: TLogger = this.logger;
     logger = this.logger.setContext('controller.adminAuth.logout', req.id);
     try {
-      await this.adminAuthService.logout(req.id, req.cookies.adminRefreshToken);
+      await this.adminAuthService.logout(req.cookies.adminRefreshToken, req.id);
       clearAdminAuthCookies(res);
       res.send({ message: 'Logged out' });
     } catch (err) {

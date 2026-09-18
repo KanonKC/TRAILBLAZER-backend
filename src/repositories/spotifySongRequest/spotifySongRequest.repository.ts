@@ -9,7 +9,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class SpotifySongRequestRepository {
     constructor() {}
 
-    async create(transactionId: string, request: CreateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+    async create(request: CreateSpotifySongRequest, transactionId?: string): Promise<SpotifySongRequestWidget> {
         try {
         return prisma.spotifySongRequest.create({
             data: {
@@ -41,7 +41,7 @@ export default class SpotifySongRequestRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+    async update(id: string, request: UpdateSpotifySongRequest, transactionId?: string): Promise<SpotifySongRequestWidget> {
         try {
         return prisma.spotifySongRequest.update({
             where: { id },
@@ -60,7 +60,7 @@ export default class SpotifySongRequestRepository {
         }
     }
 
-    async get(transactionId: string, id: string): Promise<SpotifySongRequestWidget | null> {
+    async get(id: string, transactionId?: string): Promise<SpotifySongRequestWidget | null> {
         try {
         return prisma.spotifySongRequest.findUnique({
             where: { id },
@@ -78,7 +78,7 @@ export default class SpotifySongRequestRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<SpotifySongRequestWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<SpotifySongRequestWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -104,7 +104,7 @@ export default class SpotifySongRequestRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<SpotifySongRequestWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<SpotifySongRequestWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -130,7 +130,7 @@ export default class SpotifySongRequestRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.spotifySongRequest.delete({ where: { id } });
     } catch (error) {

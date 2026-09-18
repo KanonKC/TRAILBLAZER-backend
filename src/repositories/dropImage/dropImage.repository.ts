@@ -11,7 +11,7 @@ export default class DropImageRepository {
     constructor() {
     }
 
-    async create(transactionId: string, request: CreateDropImage): Promise<DropImageWidget> {
+    async create(request: CreateDropImage, transactionId?: string): Promise<DropImageWidget> {
         try {
         return prisma.dropImage.create({
             data: {
@@ -45,7 +45,7 @@ export default class DropImageRepository {
         }
     }
 
-    async update(transactionId: string, id: string, request: UpdateDropImage): Promise<DropImageWidget> {
+    async update(id: string, request: UpdateDropImage, transactionId?: string): Promise<DropImageWidget> {
         try {
         const { overlay_key, ...dropImageData } = request;
 
@@ -75,7 +75,7 @@ export default class DropImageRepository {
         }
     }
 
-    async delete(transactionId: string, id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.dropImage.delete({
             where: { id },
@@ -86,7 +86,7 @@ export default class DropImageRepository {
         }
     }
 
-    async findById(transactionId: string, id: string): Promise<DropImageWidget | null> {
+    async findById(id: string, transactionId?: string): Promise<DropImageWidget | null> {
         try {
         return prisma.dropImage.findUnique({
             where: { id },
@@ -104,7 +104,7 @@ export default class DropImageRepository {
         }
     }
 
-    async getByOwnerId(transactionId: string, ownerId: string): Promise<DropImageWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<DropImageWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -130,7 +130,7 @@ export default class DropImageRepository {
         }
     }
 
-    async getByTwitchId(transactionId: string, twitchId: string): Promise<DropImageWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<DropImageWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -156,7 +156,7 @@ export default class DropImageRepository {
         }
     }
 
-    async getByTwitchRewardId(transactionId: string, twitchRewardId: string): Promise<DropImageWidget | null> {
+    async getByTwitchRewardId(twitchRewardId: string, transactionId?: string): Promise<DropImageWidget | null> {
         try {
         return prisma.dropImage.findFirst({
             where: { twitch_reward_id: twitchRewardId },

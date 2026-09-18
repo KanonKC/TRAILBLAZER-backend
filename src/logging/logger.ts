@@ -34,7 +34,7 @@ interface LogMeta {
  * instead of continuing to use the original field.
  *
  * Example:
- *   async myMethod(transactionId: string) {
+ *   async myMethod(transactionId?: string) {
  *     const logger = this.logger.setContext("service.widget.myMethod", transactionId);
  *     logger.info({ message: "..." });
  *   }
