@@ -27,7 +27,7 @@ export default class SpotifySongRequestController {
 
         try {
             const request = createSpotifySongRequestSchema.parse(req.body);
-            const created = await this.spotifySongRequestService.create({
+            const created = await this.spotifySongRequestService.create(req.id, {
                 twitch_id: request.twitch_id,
                 owner_id: request.owner_id,
                 twitchRewardId: request.twitch_reward_id ?? undefined,
@@ -60,7 +60,7 @@ export default class SpotifySongRequestController {
         }
 
         try {
-            const config = await this.spotifySongRequestService.getByUserId(user.id);
+            const config = await this.spotifySongRequestService.getByUserId(req.id, user.id);
             logger.info({ message: "Successfully retrieved spotify song request", data: { userId: user.id } });
             res.send(config);
         } catch (error) {
@@ -84,7 +84,7 @@ export default class SpotifySongRequestController {
 
         try {
             const request = updateSpotifySongRequestSchema.parse(req.body);
-            const updated = await this.spotifySongRequestService.update(user.id, request);
+            const updated = await this.spotifySongRequestService.update(req.id, user.id, request);
             logger.info({ message: "Successfully updated spotify song request", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -110,7 +110,7 @@ export default class SpotifySongRequestController {
         }
 
         try {
-            await this.spotifySongRequestService.test(user.id);
+            await this.spotifySongRequestService.test(req.id, user.id);
             logger.info({ message: "Test completed", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -133,7 +133,7 @@ export default class SpotifySongRequestController {
         }
 
         try {
-            await this.spotifySongRequestService.delete(user.id);
+            await this.spotifySongRequestService.delete(req.id, user.id);
             logger.info({ message: "Successfully deleted spotify song request", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {

@@ -19,12 +19,12 @@ export default class Spotify {
         this.logger = new TLogger(Layer.SERVICE)
     }
 
-    async createUserAPI(userId: string): Promise<SpotifyApi> {
+    async createUserAPI(transactionId: string, userId: string): Promise<SpotifyApi> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("provider.spotify.createUserAPI")
+        logger = this.logger.setContext("provider.spotify.createUserAPI", transactionId)
         logger.info({ message: "Creating user Spotify API", data: { userId } })
 
-        const linkedAccount = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, "spotify")
+        const linkedAccount = await this.linkedAccountRepository.getByUserIdAndPlatform(transactionId, userId, "spotify")
         const refreshToken = linkedAccount?.refresh_token
         if (!refreshToken) {
             logger.error({ message: "No refresh token found", data: { userId } })

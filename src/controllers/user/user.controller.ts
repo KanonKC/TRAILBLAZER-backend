@@ -48,7 +48,7 @@ export default class UserController {
                 ref: ref
             };
 
-            const { accessToken, refreshToken, user } = await this.userService.login(request);
+            const { accessToken, refreshToken, user } = await this.userService.login(req.id, request);
 
             setAuthCookies(res, { accessToken, refreshToken });
             res.redirect(this.cfg.frontendOrigin);
@@ -76,10 +76,10 @@ export default class UserController {
 
         try {
             const info: Record<string, unknown> = { ...decoded };
-            const user = await this.userService.get(decoded.id);
-            info.tier = await this.userService.getTier(user.id);
+            const user = await this.userService.get(req.id, decoded.id);
+            info.tier = await this.userService.getTier(req.id, user.id);
             info.extraWidgetQuota = user.extra_widget_quota;
-            info.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
+            info.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(req.id, user.id);
             logger.info({ message: "Successfully retrieved user info", data: info });
             res.send(info);
         } catch (err) {
@@ -100,7 +100,7 @@ export default class UserController {
 
         try {
             const force = req.query.force === "true";
-            const tier = await this.userService.getTier(decoded.id, { forceTwitch: force });
+            const tier = await this.userService.getTier(req.id, decoded.id, { forceTwitch: force });
             logger.info({ message: "Successfully retrieved user tier", data: { userId: decoded.id, tier, force } });
             res.send({ tier });
         } catch (err) {
@@ -123,7 +123,7 @@ export default class UserController {
         }
 
         try {
-            const tokens = await this.userService.refreshToken(refreshToken);
+            const tokens = await this.userService.refreshToken(req.id, refreshToken);
 
             setAuthCookies(res, tokens);
 
@@ -146,7 +146,7 @@ export default class UserController {
         logger = this.logger.setContext("controller.user.listShowcase", req.id);
         logger.info({ message: "Listing user showcase" });
         try {
-            const showcase = await this.userService.listShowcase();
+            const showcase = await this.userService.listShowcase(req.id);
             logger.info({ message: "Successfully retrieved user showcase" });
             res.send(showcase);
         } catch (err) {
@@ -165,9 +165,9 @@ export default class UserController {
         if (!decoded) return; // 401 already sent
 
         try {
-            const user = await this.userService.get(decoded.id);
-            const code = await this.referralService.getOrCreateCode(user.id, user.twitch_id);
-            const status = await this.referralService.getReferralStatus(user.id);
+            const user = await this.userService.get(req.id, decoded.id);
+            const code = await this.referralService.getOrCreateCode(req.id, user.id, user.twitch_id);
+            const status = await this.referralService.getReferralStatus(req.id, user.id);
 
             res.send({ ...status, code });
         } catch (err) {

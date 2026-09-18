@@ -105,7 +105,7 @@ export class AdminAuthMiddleware {
     const refreshToken = req.cookies.adminRefreshToken;
     if (refreshToken) {
       try {
-        const tokens = await this.adminAuthService.refreshToken(refreshToken);
+        const tokens = await this.adminAuthService.refreshToken(req.id, refreshToken);
         setAdminAuthCookies(res, tokens);
         const refreshed = this.verifyAccessToken(tokens.accessToken);
         if (refreshed) return refreshed;
@@ -166,7 +166,7 @@ export class AuthMiddleware {
     const refreshToken = req.cookies.refreshToken;
     if (refreshToken) {
       try {
-        const tokens = await this.userService.refreshToken(refreshToken);
+        const tokens = await this.userService.refreshToken(req.id, refreshToken);
         setAuthCookies(res, tokens);
         const refreshed = this.verifyAccessToken(tokens.accessToken);
         if (refreshed) return refreshed;

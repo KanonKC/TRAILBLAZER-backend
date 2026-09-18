@@ -27,24 +27,24 @@ export default class RandomDBDKillerService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async create(request: CreateRandomDBDKillerInput): Promise<RandomDBDKillerWidget> {
+    async create(transactionId: string, request: CreateRandomDBDKillerInput): Promise<RandomDBDKillerWidget> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.create");
-        const user = await this.userRepository.get(request.owner_id);
+        logger = this.logger.setContext("service.randomDBDKiller.create", transactionId);
+        const user = await this.userRepository.get(transactionId, request.owner_id);
         if (!user) {
             throw new NotFoundError("User not found");
         }
 
-        const existing = await this.randomDBDKillerRepository.getByOwnerId(request.owner_id);
+        const existing = await this.randomDBDKillerRepository.getByOwnerId(transactionId, request.owner_id);
         if (existing) {
             throw new BadRequestError("Random DBD Killer widget already exists for this user");
         }
 
-        await this.subscribeToRedemptionEvents(user.twitch_id, user.id);
+        await this.subscribeToRedemptionEvents(transactionId, user.twitch_id, user.id);
 
         let res;
         try {
-            res = await this.randomDBDKillerRepository.create({
+            res = await this.randomDBDKillerRepository.create(transactionId, {
                 ...request,
                 overlay_key: crypto.randomBytes(16).toString("hex")
             });
@@ -54,23 +54,23 @@ export default class RandomDBDKillerService {
             }
             throw error;
         }
-        await this.widgetService.setInitialEnabled(res.widget_id, user.id);
-        return this.getByUserId(user.id);
+        await this.widgetService.setInitialEnabled(transactionId, res.widget_id, user.id);
+        return this.getByUserId(transactionId, user.id);
     }
 
-    async update(id: string, userId: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async update(transactionId: string, id: string, userId: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.update");
+        logger = this.logger.setContext("service.randomDBDKiller.update", transactionId);
 
-        const existing = await this.randomDBDKillerRepository.findById(id);
+        const existing = await this.randomDBDKillerRepository.findById(transactionId, id);
         if (!existing) {
             throw new NotFoundError("Widget not found");
         }
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
+        await this.widgetService.authorizeOwnership(transactionId, userId, existing.widget.id);
 
         if (request.killer_pool) {
             request.killer_pool = [...new Set(request.killer_pool)];
-            const masters = await this.dbdKillerMasterRepository.getBySlugs(request.killer_pool);
+            const masters = await this.dbdKillerMasterRepository.getBySlugs(transactionId, request.killer_pool);
             const foundSlugs = new Set(masters.map(m => m.slug));
             const unknownSlugs = request.killer_pool.filter(slug => !foundSlugs.has(slug));
             if (unknownSlugs.length > 0) {
@@ -78,45 +78,45 @@ export default class RandomDBDKillerService {
             }
         }
 
-        const updated = await this.randomDBDKillerRepository.update(id, request);
+        const updated = await this.randomDBDKillerRepository.update(transactionId, id, request);
         await redis.del(`random_dbd_killer:owner_id:${updated.widget.owner_id}`);
         await redis.del(`random_dbd_killer:twitch_id:${updated.widget.twitch_id}`);
         return updated;
     }
 
-    async delete(userId: string): Promise<void> {
+    async delete(transactionId: string, userId: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.delete");
-        const existing = await this.randomDBDKillerRepository.getByOwnerId(userId);
+        logger = this.logger.setContext("service.randomDBDKiller.delete", transactionId);
+        const existing = await this.randomDBDKillerRepository.getByOwnerId(transactionId, userId);
         if (!existing) {
             return;
         }
 
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
+        await this.widgetService.authorizeOwnership(transactionId, userId, existing.widget.id);
 
-        await this.randomDBDKillerRepository.delete(existing.id);
+        await this.randomDBDKillerRepository.delete(transactionId, existing.id);
 
         await redis.del(`random_dbd_killer:owner_id:${userId}`);
         await redis.del(`random_dbd_killer:twitch_id:${existing.widget.twitch_id}`);
     }
 
-    async getByUserId(userId: string): Promise<RandomDBDKillerWidget> {
+    async getByUserId(transactionId: string, userId: string): Promise<RandomDBDKillerWidget> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.getByUserId");
-        const randomDBDKiller = await this.randomDBDKillerRepository.getByOwnerId(userId);
+        logger = this.logger.setContext("service.randomDBDKiller.getByUserId", transactionId);
+        const randomDBDKiller = await this.randomDBDKillerRepository.getByOwnerId(transactionId, userId);
         if (!randomDBDKiller) {
             throw new NotFoundError("Random DBD Killer widget not found");
         }
-        await this.widgetService.authorizeOwnership(userId, randomDBDKiller.widget.id);
+        await this.widgetService.authorizeOwnership(transactionId, userId, randomDBDKiller.widget.id);
         return randomDBDKiller;
     }
 
-    async randomizeKiller(event: TwitchChannelRedemptionAddEventRequest): Promise<void> {
+    async randomizeKiller(transactionId: string, event: TwitchChannelRedemptionAddEventRequest): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.randomizeKiller");
+        logger = this.logger.setContext("service.randomDBDKiller.randomizeKiller", transactionId);
         const rewardId = event.reward.id;
 
-        const config = await this.randomDBDKillerRepository.getByTwitchRewardId(rewardId);
+        const config = await this.randomDBDKillerRepository.getByTwitchRewardId(transactionId, rewardId);
         if (!config) {
             logger.warn({ message: "Random DBD Killer config not found", data: { rewardId } });
             return;
@@ -137,13 +137,13 @@ export default class RandomDBDKillerService {
         }
 
         const randomSlug = config.killer_pool[Math.floor(Math.random() * config.killer_pool.length)];
-        const killer = await this.dbdKillerMasterRepository.getBySlug(randomSlug);
+        const killer = await this.dbdKillerMasterRepository.getBySlug(transactionId, randomSlug);
         if (!killer) {
             logger.warn({ message: "Killer master not found for slug", data: { slug: randomSlug } });
             return;
         }
 
-        const poolMasters = await this.dbdKillerMasterRepository.getBySlugs(config.killer_pool);
+        const poolMasters = await this.dbdKillerMasterRepository.getBySlugs(transactionId, config.killer_pool);
 
         await publisher.publish("random-dbd-killer:result", JSON.stringify({
             userId: config.widget.owner_id,
@@ -159,7 +159,7 @@ export default class RandomDBDKillerService {
             })),
             animationStyle: config.animation_style
         }));
-        await this.widgetService.increaseTriggeredCount(config.widget_id);
+        await this.widgetService.increaseTriggeredCount(transactionId, config.widget_id);
 
         const message = `Random Killer: ${killer.title}`;
         const senderId = event.broadcaster_user_id;
@@ -173,9 +173,9 @@ export default class RandomDBDKillerService {
         }, CHAT_MESSAGE_DELAY_MS);
     }
 
-    private async subscribeToRedemptionEvents(twitchId: string, userId: string): Promise<void> {
+    private async subscribeToRedemptionEvents(transactionId: string, twitchId: string, userId: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.subscribeToRedemptionEvents");
+        logger = this.logger.setContext("service.randomDBDKiller.subscribeToRedemptionEvents", transactionId);
         try {
             const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
             const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled');
@@ -191,23 +191,23 @@ export default class RandomDBDKillerService {
         }
     }
 
-    async validateOverlayAccess(userId: string, key: string): Promise<boolean> {
+    async validateOverlayAccess(transactionId: string, userId: string, key: string): Promise<boolean> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.validateOverlayAccess");
-        return this.widgetService.validateOverlayAccess(userId, key);
+        logger = this.logger.setContext("service.randomDBDKiller.validateOverlayAccess", transactionId);
+        return this.widgetService.validateOverlayAccess(transactionId, userId, key);
     }
 
-    async refreshKey(userId: string): Promise<{ overlay_key: string }> {
+    async refreshKey(transactionId: string, userId: string): Promise<{ overlay_key: string }> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.randomDBDKiller.refreshKey");
-        const widget = await this.randomDBDKillerRepository.getByOwnerId(userId);
+        logger = this.logger.setContext("service.randomDBDKiller.refreshKey", transactionId);
+        const widget = await this.randomDBDKillerRepository.getByOwnerId(transactionId, userId);
         if (!widget) {
             throw new NotFoundError("Widget not found");
         }
-        await this.widgetService.authorizeOwnership(userId, widget.widget.id);
+        await this.widgetService.authorizeOwnership(transactionId, userId, widget.widget.id);
 
         const newKey = crypto.randomUUID();
-        await this.widgetService.updateOverlayKey(widget.widget.id, newKey);
+        await this.widgetService.updateOverlayKey(transactionId, widget.widget.id, newKey);
 
         await redis.del(`random_dbd_killer:owner_id:${userId}`);
 

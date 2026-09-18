@@ -10,67 +10,67 @@ export default class WidgetTypeRepository {
     constructor() {
     }
 
-    async list(): Promise<WidgetType[]> {
+    async list(transactionId: string): Promise<WidgetType[]> {
         try {
         return prisma.widgetType.findMany({
             orderBy: { id: "asc" }
         });
     } catch (error) {
-            logger.setContext("repository.widgetType.list").error({ message: "list failed", error: error as Error });
+            logger.setContext("repository.widgetType.list", transactionId).error({ message: "list failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: number): Promise<WidgetType | null> {
+    async get(transactionId: string, id: number): Promise<WidgetType | null> {
         try {
         return prisma.widgetType.findUnique({ where: { id } });
     } catch (error) {
-            logger.setContext("repository.widgetType.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.widgetType.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getBySlug(slug: string): Promise<WidgetType | null> {
+    async getBySlug(transactionId: string, slug: string): Promise<WidgetType | null> {
         try {
         return prisma.widgetType.findUnique({ where: { slug } });
     } catch (error) {
-            logger.setContext("repository.widgetType.getBySlug").error({ message: "getBySlug failed", error: error as Error });
+            logger.setContext("repository.widgetType.getBySlug", transactionId).error({ message: "getBySlug failed", error: error as Error });
             throw error;
         }
     }
 
-    async create(request: CreateWidgetType): Promise<WidgetType> {
+    async create(transactionId: string, request: CreateWidgetType): Promise<WidgetType> {
         try {
         return prisma.widgetType.create({ data: request });
     } catch (error) {
-            logger.setContext("repository.widgetType.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.widgetType.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: number, request: UpdateWidgetType): Promise<WidgetType> {
+    async update(transactionId: string, id: number, request: UpdateWidgetType): Promise<WidgetType> {
         try {
         return prisma.widgetType.update({ where: { id }, data: request });
     } catch (error) {
-            logger.setContext("repository.widgetType.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.widgetType.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: number): Promise<void> {
+    async delete(transactionId: string, id: number): Promise<void> {
         try {
         await prisma.widgetType.delete({ where: { id } });
     } catch (error) {
-            logger.setContext("repository.widgetType.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.widgetType.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async countWidgetsUsingSlug(slug: string): Promise<number> {
+    async countWidgetsUsingSlug(transactionId: string, slug: string): Promise<number> {
         try {
         return prisma.widget.count({ where: { widget_type_slug: slug } });
     } catch (error) {
-            logger.setContext("repository.widgetType.countWidgetsUsingSlug").error({ message: "countWidgetsUsingSlug failed", error: error as Error });
+            logger.setContext("repository.widgetType.countWidgetsUsingSlug", transactionId).error({ message: "countWidgetsUsingSlug failed", error: error as Error });
             throw error;
         }
     }

@@ -27,7 +27,7 @@ export default class AdminAuthController {
         let logger: TLogger = this.logger;
     logger = this.logger.setContext('controller.adminAuth.google', req.id);
     try {
-      const url = await this.adminAuthService.buildGoogleAuthUrl();
+      const url = await this.adminAuthService.buildGoogleAuthUrl(req.id);
       res.redirect(url);
     } catch (err) {
       logger.error({ message: 'Failed to build Google auth URL', error: err as Error });
@@ -49,7 +49,7 @@ export default class AdminAuthController {
     }
 
     try {
-      const { accessToken, refreshToken, admin } = await this.adminAuthService.handleGoogleCallback(
+      const { accessToken, refreshToken, admin } = await this.adminAuthService.handleGoogleCallback(req.id, 
         code,
         state
       );
@@ -80,7 +80,7 @@ export default class AdminAuthController {
     }
 
     try {
-      const tokens = await this.adminAuthService.refreshToken(adminRefreshToken);
+      const tokens = await this.adminAuthService.refreshToken(req.id, adminRefreshToken);
       setAdminAuthCookies(res, tokens);
       res.send({ message: 'Token refreshed' });
     } catch (err) {
@@ -99,7 +99,7 @@ export default class AdminAuthController {
         let logger: TLogger = this.logger;
     logger = this.logger.setContext('controller.adminAuth.logout', req.id);
     try {
-      await this.adminAuthService.logout(req.cookies.adminRefreshToken);
+      await this.adminAuthService.logout(req.id, req.cookies.adminRefreshToken);
       clearAdminAuthCookies(res);
       res.send({ message: 'Logged out' });
     } catch (err) {

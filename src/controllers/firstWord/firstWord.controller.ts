@@ -30,7 +30,7 @@ export default class FirstWordController {
 
         try {
             logger.info({ message: "Retrieving first word config", data: { userId: user.id } });
-            const firstWord = await this.firstWordService.getByUserId(user.id);
+            const firstWord = await this.firstWordService.getByUserId(req.id, user.id);
             logger.info({ message: "Successfully retrieved first word", data: { userId: user.id, firstWord } });
             res.send(firstWord);
         } catch (error) {
@@ -54,7 +54,7 @@ export default class FirstWordController {
 
         try {
             const request = updateFirstWordSchema.parse(req.body);
-            const updated = await this.firstWordService.update(user.id, request);
+            const updated = await this.firstWordService.update(req.id, user.id, request);
             logger.info({ message: "Successfully updated first word", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -81,7 +81,7 @@ export default class FirstWordController {
 
         try {
             const request = createFirstWordSchema.parse(req.body);
-            const created = await this.firstWordService.create(request);
+            const created = await this.firstWordService.create(req.id, request);
             logger.info({ message: "Successfully created first word", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
@@ -107,7 +107,7 @@ export default class FirstWordController {
         }
 
         try {
-            await this.firstWordService.delete(user.id);
+            await this.firstWordService.delete(req.id, user.id);
             logger.info({ message: "Successfully deleted first word", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -127,7 +127,7 @@ export default class FirstWordController {
         }
 
         try {
-            const updated = await this.firstWordService.refreshOverlayKey(user.id);
+            const updated = await this.firstWordService.refreshOverlayKey(req.id, user.id);
             this.firstWordEventController.disconnectUser(user.id);
             logger.info({ message: "Successfully refreshed overlay key", data: { userId: user.id } });
             res.send(updated);
@@ -154,7 +154,7 @@ export default class FirstWordController {
                 return res.status(400).send({ message: "Invalid request body", error: result.error });
             }
 
-            await this.firstWordService.createCustomReply(user.id, result.data);
+            await this.firstWordService.createCustomReply(req.id, user.id, result.data);
             res.status(201).send({ message: "Custom reply created successfully" });
         } catch (error) {
             logger.error({ message: "Failed to create custom reply", data: { userId: user.id }, error: error as Error });
@@ -184,7 +184,7 @@ export default class FirstWordController {
                 return res.status(400).send({ message: "Invalid request body", error: result.error });
             }
 
-            await this.firstWordService.updateCustomReply(user.id, id, result.data);
+            await this.firstWordService.updateCustomReply(req.id, user.id, id, result.data);
             res.status(200).send({ message: "Custom reply updated successfully" });
         } catch (error) {
             logger.error({ message: "Failed to update custom reply", data: { userId: user.id, id }, error: error as Error });
@@ -209,7 +209,7 @@ export default class FirstWordController {
         }
 
         try {
-            await this.firstWordService.deleteCustomReply(user.id, id);
+            await this.firstWordService.deleteCustomReply(req.id, user.id, id);
             res.status(200).send({ message: "Custom reply deleted successfully" });
         } catch (error) {
             logger.error({ message: "Failed to delete custom reply", data: { userId: user.id, id }, error: error as Error });
@@ -235,7 +235,7 @@ export default class FirstWordController {
             const page = req.query.page ? parseInt(req.query.page as any) : 1;
             const limit = req.query.limit ? parseInt(req.query.limit as any) : 10;
 
-            const result = await this.firstWordService.listCustomReplies(user.id, { search }, { limit, page, total: 0 });
+            const result = await this.firstWordService.listCustomReplies(req.id, user.id, { search }, { limit, page, total: 0 });
             res.status(200).send(result);
         } catch (error) {
             logger.error({ message: "Failed to list custom replies", data: { userId: user.id }, error: error as Error });
@@ -257,7 +257,7 @@ export default class FirstWordController {
         }
 
         try {
-            await this.firstWordService.resetChatter(user.twitchId);
+            await this.firstWordService.resetChatter(req.id, user.twitchId);
             logger.info({ message: "Successfully reset chatters", data: { userId: user.id } });
             res.status(200).send({ message: "Chatters reset successfully" });
         } catch (error) {
@@ -280,7 +280,7 @@ export default class FirstWordController {
         }
 
         try {
-            const result = await this.firstWordService.listChatters(user.id);
+            const result = await this.firstWordService.listChatters(req.id, user.id);
             logger.info({ message: "Successfully listed chatters", data: { userId: user.id } });
             res.status(200).send(result);
         } catch (error) {

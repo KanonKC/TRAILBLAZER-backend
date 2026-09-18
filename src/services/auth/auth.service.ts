@@ -23,8 +23,8 @@ export default class AuthService {
         this.userRepository = userRepository;
     }
 
-    async getTwitchAccessToken(twitchId: string): Promise<string> {
-        logger.setContext("service.auth.getTwitchAccessToken");
+    async getTwitchAccessToken(transactionId: string, twitchId: string): Promise<string> {
+        logger.setContext("service.auth.getTwitchAccessToken", transactionId);
         logger.info({ message: "getTwitchAccessToken", data: { twitchId } });
         const cacheKey = CacheKey.generateTwitchAccessTokenKey(twitchId);
         let token = await redis.get(cacheKey);
@@ -54,7 +54,7 @@ export default class AuthService {
         // Generate token from refresh token
         const now = new Date()
         let auth: Auth | null = null
-        const user = await this.userRepository.getByTwitchId(twitchId)
+        const user = await this.userRepository.getByTwitchId(transactionId, twitchId)
         logger.info({ message: "user", data: user });
         if (!user) {
             throw new NotFoundError("User not found");
@@ -62,10 +62,10 @@ export default class AuthService {
         auth = user.auth;
         logger.info({ message: "auth", data: auth });
         if (!auth) {
-            auth = await this.authRepository.create(user.id)
+            auth = await this.authRepository.create(transactionId, user.id)
         }
         if (!auth.twitch_refresh_token) {
-            await this.logout(user.id)
+            await this.logout(transactionId, user.id)
             throw new UnauthorizedError("Refresh token not found");
         }
         const refreshStart = Date.now()
@@ -88,7 +88,7 @@ export default class AuthService {
         logger.info({ message: "newToken", data: { ms: Date.now() - refreshStart } });
         try {
             if (auth.twitch_refresh_token !== newToken.refreshToken) {
-                await this.authRepository.updateTwitchToken(auth.id, {
+                await this.authRepository.updateTwitchToken(transactionId, auth.id, {
                     twitch_refresh_token: newToken.refreshToken,
                     twitch_token_expires_at: newToken.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
                 })
@@ -101,16 +101,16 @@ export default class AuthService {
         return newToken.accessToken
     }
 
-    async createTwitchUserAPI(userId: string): Promise<ApiClient> {
-        logger.setContext("service.auth.createTwitchUserAPI");
+    async createTwitchUserAPI(transactionId: string, userId: string): Promise<ApiClient> {
+        logger.setContext("service.auth.createTwitchUserAPI", transactionId);
         logger.info({ message: "Creating Twitch user API", data: { userId } });
-        const token = await this.getTwitchAccessToken(userId)
+        const token = await this.getTwitchAccessToken(transactionId, userId)
         return createTwitchUserAPI(token)
     }
 
-    async logout(userId: string, refreshToken?: string): Promise<void> {
-        logger.setContext("service.auth.logout");
-        const user = await this.userRepository.get(userId);
+    async logout(transactionId: string, userId: string, refreshToken?: string): Promise<void> {
+        logger.setContext("service.auth.logout", transactionId);
+        const user = await this.userRepository.get(transactionId, userId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
@@ -122,16 +122,16 @@ export default class AuthService {
         }
     }
 
-    async updateTwitchGqlToken(userId: string, token: string): Promise<void> {
-        logger.setContext("service.auth.updateTwitchGqlToken");
-        await this.authRepository.updateTwitchToken(userId, {
+    async updateTwitchGqlToken(transactionId: string, userId: string, token: string): Promise<void> {
+        logger.setContext("service.auth.updateTwitchGqlToken", transactionId);
+        await this.authRepository.updateTwitchToken(transactionId, userId, {
             twitch_gql_token: token
         });
     }
 
-    async getTwitchGqlToken(userId: string): Promise<string | null> {
-        logger.setContext("service.auth.getTwitchGqlToken");
-        const auth = await this.authRepository.getByUserId(userId);
+    async getTwitchGqlToken(transactionId: string, userId: string): Promise<string | null> {
+        logger.setContext("service.auth.getTwitchGqlToken", transactionId);
+        const auth = await this.authRepository.getByUserId(transactionId, userId);
         return auth?.twitch_gql_token || null;
     }
 }

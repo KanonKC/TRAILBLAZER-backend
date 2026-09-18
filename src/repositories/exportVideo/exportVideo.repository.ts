@@ -12,7 +12,7 @@ export default class ExportVideoRepository {
     constructor() {
     }
 
-    async create(request: CreateExportVideo): Promise<ExportVideoWithWidget> {
+    async create(transactionId: string, request: CreateExportVideo): Promise<ExportVideoWithWidget> {
         try {
         return prisma.exportVideo.create({
             data: {
@@ -37,12 +37,12 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.exportVideo.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
+    async update(transactionId: string, id: string, request: UpdateExportVideo): Promise<ExportVideoWithWidget> {
         try {
         const { privacy_status, tags, description, ...exportVideoData } = request;
         const updateData: any = { ...exportVideoData };
@@ -63,23 +63,23 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.exportVideo.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(transactionId: string, id: string): Promise<void> {
         try {
         await prisma.exportVideo.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.exportVideo.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: string): Promise<ExportVideoWithWidget | null> {
+    async get(transactionId: string, id: string): Promise<ExportVideoWithWidget | null> {
         try {
         return prisma.exportVideo.findUnique({
             where: { id },
@@ -92,12 +92,12 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.exportVideo.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByWidgetId(widgetId: string): Promise<ExportVideoWithWidget | null> {
+    async getByWidgetId(transactionId: string, widgetId: string): Promise<ExportVideoWithWidget | null> {
         try {
         return prisma.exportVideo.findUnique({
             where: { widget_id: widgetId },
@@ -110,12 +110,12 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.getByWidgetId").error({ message: "getByWidgetId failed", error: error as Error });
+            logger.setContext("repository.exportVideo.getByWidgetId", transactionId).error({ message: "getByWidgetId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<ExportVideoWithWidget | null> {
+    async getByOwnerId(transactionId: string, ownerId: string): Promise<ExportVideoWithWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -136,12 +136,12 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.exportVideo.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<ExportVideoWithWidget | null> {
+    async getByTwitchId(transactionId: string, twitchId: string): Promise<ExportVideoWithWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -162,14 +162,14 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.exportVideo.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
 
     // ExportVideoHistory CRUD
-    async createHistory(request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
+    async createHistory(transactionId: string, request: CreateExportVideoHistory): Promise<ExportVideoHistoryResponse> {
         try {
         return prisma.exportVideoHistory.create({
             data: {
@@ -181,12 +181,12 @@ export default class ExportVideoRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.createHistory").error({ message: "createHistory failed", error: error as Error });
+            logger.setContext("repository.exportVideo.createHistory", transactionId).error({ message: "createHistory failed", error: error as Error });
             throw error;
         }
     }
 
-    async listHistoryByExportVideoId(exportVideoId: string, pagination: Pagination): Promise<[ExportVideoHistoryResponse[], number]> {
+    async listHistoryByExportVideoId(transactionId: string, exportVideoId: string, pagination: Pagination): Promise<[ExportVideoHistoryResponse[], number]> {
         try {
         const where = { export_video_id: exportVideoId };
         const data = await prisma.exportVideoHistory.findMany({
@@ -200,29 +200,29 @@ export default class ExportVideoRepository {
         });
         return [data, total];
     } catch (error) {
-            logger.setContext("repository.exportVideo.listHistoryByExportVideoId").error({ message: "listHistoryByExportVideoId failed", error: error as Error });
+            logger.setContext("repository.exportVideo.listHistoryByExportVideoId", transactionId).error({ message: "listHistoryByExportVideoId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getHistory(id: number): Promise<ExportVideoHistoryResponse | null> {
+    async getHistory(transactionId: string, id: number): Promise<ExportVideoHistoryResponse | null> {
         try {
         return prisma.exportVideoHistory.findUnique({
             where: { id }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.getHistory").error({ message: "getHistory failed", error: error as Error });
+            logger.setContext("repository.exportVideo.getHistory", transactionId).error({ message: "getHistory failed", error: error as Error });
             throw error;
         }
     }
 
-    async deleteHistory(id: number): Promise<void> {
+    async deleteHistory(transactionId: string, id: number): Promise<void> {
         try {
         await prisma.exportVideoHistory.delete({
             where: { id }
         });
     } catch (error) {
-            logger.setContext("repository.exportVideo.deleteHistory").error({ message: "deleteHistory failed", error: error as Error });
+            logger.setContext("repository.exportVideo.deleteHistory", transactionId).error({ message: "deleteHistory failed", error: error as Error });
             throw error;
         }
     }

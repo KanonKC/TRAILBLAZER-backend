@@ -34,6 +34,7 @@ jest.mock("node:crypto", () => ({
 }));
 
 describe("RandomDbdPerkService", () => {
+    const transactionId = "test-transaction-id";
     let service: RandomDbdPerkService;
     let mockRandomDbdPerkRepo: jest.Mocked<RandomDbdPerkRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
@@ -70,7 +71,7 @@ describe("RandomDbdPerkService", () => {
     describe("extend", () => {
         it("should extend widget with perk counts", async () => {
             const rw = { id: "rw_1" } as any;
-            const result = await service.extend(rw);
+            const result = await service.extend(transactionId, rw);
             expect(result.totalKillerPerks).toBe(145);
             expect(result.totalSurvivorPerks).toBe(180);
         });
@@ -86,7 +87,7 @@ describe("RandomDbdPerkService", () => {
             mockRandomDbdPerkRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
-            const result = await service.create(request);
+            const result = await service.create(transactionId, request);
 
             expect(mockRandomDbdPerkRepo.create).toHaveBeenCalled();
             expect(result).toBeDefined();
@@ -94,7 +95,7 @@ describe("RandomDbdPerkService", () => {
 
         it("should throw NotFoundError if user missing", async () => {
             mockUserRepo.get.mockResolvedValue(null);
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(transactionId, request)).rejects.toThrow(NotFoundError);
         });
 
         it("should skip subscription if already exists", async () => {
@@ -106,7 +107,7 @@ describe("RandomDbdPerkService", () => {
             mockRandomDbdPerkRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
-            await service.create(request);
+            await service.create(transactionId, request);
 
             expect(createESTransport).not.toHaveBeenCalled();
         });
@@ -124,7 +125,7 @@ describe("RandomDbdPerkService", () => {
                     { type: RandomDbdPerkClassType.SURVIVOR, maximum_random_size: 50 }
                 ] 
             };
-            await service.update("rw_1", "user_1", updateReq);
+            await service.update(transactionId, "rw_1", "user_1", updateReq);
 
             expect(updateReq.classes[0].maximum_random_size).toBe(999);
             expect(updateReq.classes[1].maximum_random_size).toBe(50);
@@ -134,7 +135,7 @@ describe("RandomDbdPerkService", () => {
 
         it("should throw NotFoundError if missing", async () => {
             mockRandomDbdPerkRepo.findById.mockResolvedValue(null);
-            await expect(service.update("rw_1", "user_1", {})).rejects.toThrow(NotFoundError);
+            await expect(service.update(transactionId, "rw_1", "user_1", {})).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -143,14 +144,14 @@ describe("RandomDbdPerkService", () => {
             const mockExisting = { id: "rw_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
-            expect(mockRandomDbdPerkRepo.delete).toHaveBeenCalledWith("rw_1");
+            expect(mockRandomDbdPerkRepo.delete).toHaveBeenCalledWith(transactionId, "rw_1");
         });
 
         it("should return early if missing", async () => {
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(null);
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
             expect(mockRandomDbdPerkRepo.delete).not.toHaveBeenCalled();
         });
     });
@@ -158,13 +159,13 @@ describe("RandomDbdPerkService", () => {
     describe("getByUserId", () => {
         it("should return config successfully", async () => {
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId(transactionId, "user_1");
             expect(result).toBeDefined();
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.getByUserId("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -180,13 +181,13 @@ describe("RandomDbdPerkService", () => {
 
         it("should return early if widget not found", async () => {
             mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue(null);
-            await service.randomPerk(event);
+            await service.randomPerk(transactionId, event);
             expect(mockRandomDbdPerkRepo.getClassByRewardId).not.toHaveBeenCalled();
         });
 
         it("should return early if class not found", async () => {
             mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue(null);
-            await service.randomPerk(event);
+            await service.randomPerk(transactionId, event);
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
 
@@ -202,7 +203,7 @@ describe("RandomDbdPerkService", () => {
                 .mockReturnValueOnce(0.3) // Perk 31
                 .mockReturnValueOnce(0.4); // Perk 41
 
-            await service.randomPerk(event);
+            await service.randomPerk(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
             mockRandom.mockRestore();
@@ -212,7 +213,7 @@ describe("RandomDbdPerkService", () => {
             const mockClass = { type: RandomDbdPerkClassType.SURVIVOR, maximum_random_size: 2 };
             mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue(mockClass as any);
 
-            await service.randomPerk(event);
+            await service.randomPerk(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
         });
@@ -222,7 +223,7 @@ describe("RandomDbdPerkService", () => {
             mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue(mockClass as any);
             (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockRejectedValue(new Error("Chat Error"));
 
-            await service.randomPerk(event);
+            await service.randomPerk(transactionId, event);
             // Should not throw
         });
     });
@@ -230,20 +231,20 @@ describe("RandomDbdPerkService", () => {
     describe("validateOverlayAccess", () => {
         it("should return true if keys match (cache)", async () => {
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { overlay_key: "key_1" } }));
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
             expect(result).toBe(true);
         });
 
         it("should return false if keys mismatch", async () => {
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { overlay_key: "key_1" } }));
-            const result = await service.validateOverlayAccess("user_1", "key_2");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_2");
             expect(result).toBe(false);
         });
 
         it("should fetch from repository if not in cache", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ widget: { overlay_key: "key_1" } } as any);
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
             expect(result).toBe(true);
             expect(redis.set).toHaveBeenCalled();
         });
@@ -251,7 +252,7 @@ describe("RandomDbdPerkService", () => {
         it("should return false if config missing", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(null);
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
             expect(result).toBe(false);
         });
     });
@@ -261,23 +262,23 @@ describe("RandomDbdPerkService", () => {
             const mockExisting = { id: "rw_1", widget: { id: "widget_1" } };
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            const result = await service.refreshKey("user_1");
+            const result = await service.refreshKey(transactionId, "user_1");
 
             expect(result.overlay_key).toBe("mocked_uuid");
-            expect(mockWidgetService.updateOverlayKey).toHaveBeenCalledWith("widget_1", "mocked_uuid");
+            expect(mockWidgetService.updateOverlayKey).toHaveBeenCalledWith(transactionId, "widget_1", "mocked_uuid");
             expect(redis.del).toHaveBeenCalled();
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.refreshKey("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.refreshKey(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
     describe("trigger", () => {
         it("should trigger successfully", async () => {
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
-            await service.trigger("user_1");
+            await service.trigger(transactionId, "user_1");
         });
     });
 });

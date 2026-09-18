@@ -26,6 +26,7 @@ export default class AdminUserController {
     try {
       const query = listAdminUserSchema.parse(req.query);
       const result = await this.adminUserService.list(
+        req.id,
         { page: query.page, limit: query.limit },
         query.search,
         query.tier,
@@ -51,7 +52,7 @@ export default class AdminUserController {
     if (!admin) return; // 401 already sent
 
     try {
-      const user = await this.adminUserService.get(req.params.id);
+      const user = await this.adminUserService.get(req.id, req.params.id);
       res.send(user);
     } catch (error) {
       if (error instanceof TError) {
@@ -70,7 +71,7 @@ export default class AdminUserController {
 
     try {
       const query = getUserWidgetsSchema.parse(req.query);
-      const result = await this.adminUserService.getWidgets(req.params.id, {
+      const result = await this.adminUserService.getWidgets(req.id, req.params.id, {
         page: query.page,
         limit: query.limit,
       });
@@ -94,7 +95,7 @@ export default class AdminUserController {
     if (!admin) return; // 401 already sent
 
     try {
-      const result = await this.adminUserService.getEventSubs(req.params.id);
+      const result = await this.adminUserService.getEventSubs(req.id, req.params.id);
       res.send(result);
     } catch (error) {
       if (error instanceof TError) {

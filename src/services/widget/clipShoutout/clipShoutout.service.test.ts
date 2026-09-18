@@ -47,6 +47,7 @@ jest.mock("node:crypto", () => ({
 }));
 
 describe("ClipShoutoutService", () => {
+    const transactionId = "test-transaction-id";
     let service: ClipShoutoutService;
     let mockCfg: Configurations;
     let mockClipShoutoutRepo: jest.Mocked<ClipShoutoutRepository>;
@@ -105,9 +106,9 @@ describe("ClipShoutoutService", () => {
             mockClipShoutoutRepo.create.mockResolvedValue({ id: "cs_1", widget_id: "widget_1" } as any);
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue({ widget: { id: "widget_1" } } as any);
 
-            const result = await service.create(request);
+            const result = await service.create(transactionId, request);
 
-            expect(mockUserRepo.get).toHaveBeenCalledWith(request.owner_id);
+            expect(mockUserRepo.get).toHaveBeenCalledWith(transactionId, request.owner_id);
             expect(createESTransport).toHaveBeenCalled();
             expect(mockClipShoutoutRepo.create).toHaveBeenCalled();
             expect(result).toBeDefined();
@@ -122,7 +123,7 @@ describe("ClipShoutoutService", () => {
             mockClipShoutoutRepo.create.mockResolvedValue({ id: "cs_1", widget_id: "widget_1" } as any);
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue({ widget: { id: "widget_1" } } as any);
 
-            await service.create(request);
+            await service.create(transactionId, request);
 
             expect(createESTransport).not.toHaveBeenCalled();
             expect(mockClipShoutoutRepo.create).toHaveBeenCalled();
@@ -130,7 +131,7 @@ describe("ClipShoutoutService", () => {
 
         it("should throw NotFoundError if user not found", async () => {
             mockUserRepo.get.mockResolvedValue(null);
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(transactionId, request)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -147,13 +148,13 @@ describe("ClipShoutoutService", () => {
         } as any;
 
         it("should return early if not a raid", async () => {
-            await service.shoutoutRaider({ notice_type: "sub" } as any);
+            await service.shoutoutRaider(transactionId, { notice_type: "sub" } as any);
             expect(redis.get).not.toHaveBeenCalled();
         });
 
         it("should return early if cooldown active", async () => {
             (redis.get as jest.Mock).mockResolvedValue("true");
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
             expect(mockClipShoutoutRepo.getByTwitchId).not.toHaveBeenCalled();
         });
 
@@ -172,7 +173,7 @@ describe("ClipShoutoutService", () => {
             (twitchAppAPI.clips.getClipsForBroadcaster as jest.Mock).mockResolvedValue({ data: [{ id: "clip_1", duration: 30 }] });
             mockTwitchGql.getClipProductionUrl.mockResolvedValue("clip_url");
 
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
 
             expect(mockUserAPI.chat.shoutoutUser).toHaveBeenCalledWith("broadcaster_1", "raider_1");
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("bot_1", "broadcaster_1", "Hello RaiderOne");
@@ -189,7 +190,7 @@ describe("ClipShoutoutService", () => {
             mockClipShoutoutRepo.getByTwitchId.mockResolvedValue(mockCsConfig as any);
             mockAuthService.createTwitchUserAPI.mockRejectedValue(new Error("Shoutout Error"));
 
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
         });
@@ -198,18 +199,18 @@ describe("ClipShoutoutService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
             mockClipShoutoutRepo.getByTwitchId.mockResolvedValue(null);
 
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
 
             expect(mockAuthService.createTwitchUserAPI).not.toHaveBeenCalled();
 
             mockClipShoutoutRepo.getByTwitchId.mockResolvedValue({ widget: { enabled: false } } as any);
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
             expect(mockAuthService.createTwitchUserAPI).not.toHaveBeenCalled();
         });
 
         it("should use cache for config", async () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(JSON.stringify({ widget: { enabled: true } }));
-            await service.shoutoutRaider(event);
+            await service.shoutoutRaider(transactionId, event);
             expect(mockClipShoutoutRepo.getByTwitchId).not.toHaveBeenCalled();
         });
     });
@@ -219,15 +220,15 @@ describe("ClipShoutoutService", () => {
             const mockRes = { id: "cs_1", widget: { id: "widget_1" } };
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(mockRes as any);
 
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId(transactionId, "user_1");
 
             expect(result).toEqual(mockRes);
-            expect(mockWidgetService.authorizeOwnership).toHaveBeenCalledWith("user_1", "widget_1");
+            expect(mockWidgetService.authorizeOwnership).toHaveBeenCalledWith(transactionId, "user_1", "widget_1");
         });
 
         it("should throw NotFoundError if config missing", async () => {
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.getByUserId("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -237,7 +238,7 @@ describe("ClipShoutoutService", () => {
             mockClipShoutoutRepo.findById.mockResolvedValue(mockExisting as any);
             mockClipShoutoutRepo.update.mockResolvedValue({ id: "cs_1" } as any);
 
-            await service.update("cs_1", "user_1", { reply_message: "new" });
+            await service.update(transactionId, "cs_1", "user_1", { reply_message: "new" });
 
             expect(mockClipShoutoutRepo.update).toHaveBeenCalled();
             expect(redis.del).toHaveBeenCalled();
@@ -245,7 +246,7 @@ describe("ClipShoutoutService", () => {
 
         it("should throw NotFoundError if config missing", async () => {
             mockClipShoutoutRepo.findById.mockResolvedValue(null);
-            await expect(service.update("cs_1", "user_1", {})).rejects.toThrow(NotFoundError);
+            await expect(service.update(transactionId, "cs_1", "user_1", {})).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -254,15 +255,15 @@ describe("ClipShoutoutService", () => {
             const mockExisting = { id: "cs_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
-            expect(mockClipShoutoutRepo.delete).toHaveBeenCalledWith("cs_1");
+            expect(mockClipShoutoutRepo.delete).toHaveBeenCalledWith(transactionId, "cs_1");
             expect(redis.del).toHaveBeenCalled();
         });
 
         it("should return early if config missing", async () => {
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(null);
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
             expect(mockClipShoutoutRepo.delete).not.toHaveBeenCalled();
         });
     });
@@ -272,14 +273,14 @@ describe("ClipShoutoutService", () => {
             const mockRes = { id: "cs_1" };
             mockClipShoutoutRepo.findById.mockResolvedValue(mockRes as any);
 
-            const result = await service.getOverlay("cs_1");
+            const result = await service.getOverlay(transactionId, "cs_1");
 
             expect(result).toEqual(mockRes);
         });
 
         it("should throw NotFoundError if config missing", async () => {
             mockClipShoutoutRepo.findById.mockResolvedValue(null);
-            await expect(service.getOverlay("cs_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getOverlay(transactionId, "cs_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -289,15 +290,15 @@ describe("ClipShoutoutService", () => {
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
             mockClipShoutoutRepo.update.mockResolvedValue({ id: "cs_1" } as any);
 
-            await service.refreshOverlayKey("user_1");
+            await service.refreshOverlayKey(transactionId, "user_1");
 
-            expect(mockClipShoutoutRepo.update).toHaveBeenCalledWith("cs_1", expect.objectContaining({ overlay_key: "mocked_hex" }));
+            expect(mockClipShoutoutRepo.update).toHaveBeenCalledWith(transactionId, "cs_1", expect.objectContaining({ overlay_key: "mocked_hex" }));
             expect(redis.del).toHaveBeenCalled();
         });
 
         it("should throw NotFoundError if config missing", async () => {
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.refreshOverlayKey("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.refreshOverlayKey(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -306,7 +307,7 @@ describe("ClipShoutoutService", () => {
             const mockConfig = { widget: { overlay_key: "key_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockConfig));
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
             expect(result).toBe(true);
         });
@@ -315,7 +316,7 @@ describe("ClipShoutoutService", () => {
             const mockConfig = { widget: { overlay_key: "key_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockConfig));
 
-            const result = await service.validateOverlayAccess("user_1", "key_2");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_2");
 
             expect(result).toBe(false);
         });
@@ -325,9 +326,9 @@ describe("ClipShoutoutService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
-            expect(mockClipShoutoutRepo.getByOwnerId).toHaveBeenCalledWith("user_1");
+            expect(mockClipShoutoutRepo.getByOwnerId).toHaveBeenCalledWith(transactionId, "user_1");
             expect(redis.set).toHaveBeenCalled();
             expect(result).toBe(true);
         });
@@ -336,7 +337,7 @@ describe("ClipShoutoutService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockClipShoutoutRepo.getByOwnerId.mockResolvedValue(null);
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
             expect(result).toBe(false);
         });

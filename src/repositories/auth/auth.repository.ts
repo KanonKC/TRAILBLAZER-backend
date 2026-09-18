@@ -8,7 +8,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class AuthRepository {
     constructor() { }
 
-    async create(userId: string): Promise<Auth> {
+    async create(transactionId: string, userId: string): Promise<Auth> {
         try {
         return prisma.auth.create({
             data: {
@@ -16,12 +16,12 @@ export default class AuthRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.auth.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.auth.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async updateTwitchToken(userId: string, request: UpdateTwitchTokenRequest): Promise<Auth> {
+    async updateTwitchToken(transactionId: string, userId: string, request: UpdateTwitchTokenRequest): Promise<Auth> {
         try {
         return prisma.auth.upsert({
             where: {
@@ -34,12 +34,12 @@ export default class AuthRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.auth.updateTwitchToken").error({ message: "updateTwitchToken failed", error: error as Error });
+            logger.setContext("repository.auth.updateTwitchToken", transactionId).error({ message: "updateTwitchToken failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByUserId(userId: string): Promise<Auth | null> {
+    async getByUserId(transactionId: string, userId: string): Promise<Auth | null> {
         try {
         return prisma.auth.findUnique({
             where: {
@@ -47,12 +47,12 @@ export default class AuthRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.auth.getByUserId").error({ message: "getByUserId failed", error: error as Error });
+            logger.setContext("repository.auth.getByUserId", transactionId).error({ message: "getByUserId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchRefreshToken(twitchRefreshToken: string) {
+    async getByTwitchRefreshToken(transactionId: string, twitchRefreshToken: string) {
         try {
         return prisma.auth.findUnique({
             where: {
@@ -60,7 +60,7 @@ export default class AuthRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.auth.getByTwitchRefreshToken").error({ message: "getByTwitchRefreshToken failed", error: error as Error });
+            logger.setContext("repository.auth.getByTwitchRefreshToken", transactionId).error({ message: "getByTwitchRefreshToken failed", error: error as Error });
             throw error;
         }
     }

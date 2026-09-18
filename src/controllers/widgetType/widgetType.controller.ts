@@ -24,7 +24,7 @@ export default class WidgetTypeController {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("controller.widgetType.list", req.id);
         try {
-            const data = await this.repository.list();
+            const data = await this.repository.list(req.id);
             res.send({ data });
         } catch (error) {
             logger.error({ message: "Failed to list widget types", error: error as Error });
@@ -40,7 +40,7 @@ export default class WidgetTypeController {
 
         try {
             const request = createWidgetTypeSchema.parse(req.body);
-            const widgetType = await this.widgetTypeService.create(request);
+            const widgetType = await this.widgetTypeService.create(req.id, request);
             logger.info({ message: "Widget type created", data: { id: widgetType.id, adminId: admin.id } });
             res.status(201).send(widgetType);
         } catch (error) {
@@ -65,7 +65,7 @@ export default class WidgetTypeController {
         try {
             const id = parseInt(req.params.id);
             const request = updateWidgetTypeSchema.parse(req.body);
-            const widgetType = await this.widgetTypeService.update(id, request);
+            const widgetType = await this.widgetTypeService.update(req.id, id, request);
             logger.info({ message: "Widget type updated", data: { id, adminId: admin.id } });
             res.send(widgetType);
         } catch (error) {
@@ -104,7 +104,7 @@ export default class WidgetTypeController {
             }
 
             const buffer = await file.toBuffer();
-            const url = await this.widgetTypeService.uploadIcon(filename, { buffer, mimetype: file.mimetype });
+            const url = await this.widgetTypeService.uploadIcon(req.id, filename, { buffer, mimetype: file.mimetype });
             logger.info({ message: "Widget icon uploaded", data: { filename, adminId: admin.id } });
             res.send({ url });
         } catch (error) {
@@ -125,7 +125,7 @@ export default class WidgetTypeController {
 
         try {
             const id = parseInt(req.params.id);
-            await this.widgetTypeService.delete(id);
+            await this.widgetTypeService.delete(req.id, id);
             logger.info({ message: "Widget type deleted", data: { id, adminId: admin.id } });
             res.status(204).send();
         } catch (error) {

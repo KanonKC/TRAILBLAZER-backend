@@ -9,7 +9,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class SpotifySongRequestRepository {
     constructor() {}
 
-    async create(request: CreateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+    async create(transactionId: string, request: CreateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
         try {
         return prisma.spotifySongRequest.create({
             data: {
@@ -36,12 +36,12 @@ export default class SpotifySongRequestRepository {
             },
         });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
+    async update(transactionId: string, id: string, request: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
         try {
         return prisma.spotifySongRequest.update({
             where: { id },
@@ -55,12 +55,12 @@ export default class SpotifySongRequestRepository {
             },
         });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: string): Promise<SpotifySongRequestWidget | null> {
+    async get(transactionId: string, id: string): Promise<SpotifySongRequestWidget | null> {
         try {
         return prisma.spotifySongRequest.findUnique({
             where: { id },
@@ -73,12 +73,12 @@ export default class SpotifySongRequestRepository {
             },
         });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<SpotifySongRequestWidget | null> {
+    async getByOwnerId(transactionId: string, ownerId: string): Promise<SpotifySongRequestWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -99,12 +99,12 @@ export default class SpotifySongRequestRepository {
             },
         });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<SpotifySongRequestWidget | null> {
+    async getByTwitchId(transactionId: string, twitchId: string): Promise<SpotifySongRequestWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -125,16 +125,16 @@ export default class SpotifySongRequestRepository {
             },
         });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(transactionId: string, id: string): Promise<void> {
         try {
         await prisma.spotifySongRequest.delete({ where: { id } });
     } catch (error) {
-            logger.setContext("repository.spotifySongRequest.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.spotifySongRequest.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }

@@ -25,7 +25,7 @@ export default class TwitchController {
         const { user_input_required } = req.query;
 
         try {
-            const response = await this.twitchService.listChannelRewards(user.twitchId, {
+            const response = await this.twitchService.listChannelRewards(req.id, user.twitchId, {
                 userInputRequired: user_input_required === "true"
             });
             return res.status(200).send(response);
@@ -75,9 +75,9 @@ export default class TwitchController {
         try {
             let response;
             if (username) {
-                response = await this.twitchService.getUserByName(user.twitchId, username);
+                response = await this.twitchService.getUserByName(req.id, user.twitchId, username);
             } else {
-                response = await this.twitchService.getUser(user.twitchId);
+                response = await this.twitchService.getUser(req.id, user.twitchId);
             }
             return res.status(200).send(response);
         } catch (error) {

@@ -35,9 +35,9 @@ export default class TwitchChannelChatMessageEvent {
         if (body.subscription.status === "enabled") {
             try {
                 await Promise.allSettled([
-                    this.firstWordService.greetNewChatter(event),
-                    this.dropImageService.handleDropImage(event),
-                    this.spotifySongRequestService.handleTwitchEvent(event),
+                    this.firstWordService.greetNewChatter(req.id, event),
+                    this.dropImageService.handleDropImage(req.id, event),
+                    this.spotifySongRequestService.handleTwitchEvent(req.id, event),
                 ])
             } catch (err: any) {
                 logger.error({ message: "Handle event failed", error: err })

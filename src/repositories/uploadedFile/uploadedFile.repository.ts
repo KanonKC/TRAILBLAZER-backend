@@ -10,18 +10,18 @@ const logger = new TLogger(Layer.REPOSITORY);
 export class UploadedFileRepository {
     constructor() { }
 
-    async create(request: CreateUploadedFileRequest) {
+    async create(transactionId: string, request: CreateUploadedFileRequest) {
         try {
         return prisma.uploadedFile.create({
             data: request
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: string) {
+    async get(transactionId: string, id: string) {
         try {
         return prisma.uploadedFile.findUnique({
             where: {
@@ -29,12 +29,12 @@ export class UploadedFileRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByName(ownerId: string, name: string) {
+    async getByName(transactionId: string, ownerId: string, name: string) {
         try {
         return prisma.uploadedFile.findFirst({
             where: {
@@ -43,12 +43,12 @@ export class UploadedFileRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.getByName").error({ message: "getByName failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.getByName", transactionId).error({ message: "getByName failed", error: error as Error });
             throw error;
         }
     }
 
-    async listByPattern(ownerId: string, base: string, ext: string) {
+    async listByPattern(transactionId: string, ownerId: string, base: string, ext: string) {
         try {
         return prisma.uploadedFile.findMany({
             where: {
@@ -63,12 +63,12 @@ export class UploadedFileRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.listByPattern").error({ message: "listByPattern failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.listByPattern", transactionId).error({ message: "listByPattern failed", error: error as Error });
             throw error;
         }
     }
 
-    async list(request: ListUploadedFileRequest, pagination: Pagination): Promise<[UploadedFile[], number]> {
+    async list(transactionId: string, request: ListUploadedFileRequest, pagination: Pagination): Promise<[UploadedFile[], number]> {
         try {
         const where: any = {
             owner_id: request.ownerId
@@ -101,12 +101,12 @@ export class UploadedFileRepository {
 
         return [data, count]
     } catch (error) {
-            logger.setContext("repository.uploadedFile.list").error({ message: "list failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.list", transactionId).error({ message: "list failed", error: error as Error });
             throw error;
         }
     }
 
-    async getTotalFileSize(ownerId: string): Promise<number> {
+    async getTotalFileSize(transactionId: string, ownerId: string): Promise<number> {
         try {
         const res = await prisma.uploadedFile.aggregate({
             where: {
@@ -119,12 +119,12 @@ export class UploadedFileRepository {
 
         return res._sum.size_kb || 0
     } catch (error) {
-            logger.setContext("repository.uploadedFile.getTotalFileSize").error({ message: "getTotalFileSize failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.getTotalFileSize", transactionId).error({ message: "getTotalFileSize failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateUploadedFileRequest) {
+    async update(transactionId: string, id: string, request: UpdateUploadedFileRequest) {
         try {
         return prisma.uploadedFile.update({
             where: {
@@ -133,12 +133,12 @@ export class UploadedFileRepository {
             data: request
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string) {
+    async delete(transactionId: string, id: string) {
         try {
         return prisma.uploadedFile.delete({
             where: {
@@ -146,7 +146,7 @@ export class UploadedFileRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.uploadedFile.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.uploadedFile.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }

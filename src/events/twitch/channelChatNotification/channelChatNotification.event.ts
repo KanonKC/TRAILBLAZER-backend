@@ -28,7 +28,7 @@ export default class TwitchChannelChatNotificationEvent {
         if (body.subscription.status === "enabled") {
             logger.info({ message: "Handling chat notification event", data: event })
             try {
-                await this.clipShoutoutService.shoutoutRaider(event)
+                await this.clipShoutoutService.shoutoutRaider(req.id, event)
             } catch (err: any) {
                 logger.error({ message: "Handle event failed", error: err })
             }

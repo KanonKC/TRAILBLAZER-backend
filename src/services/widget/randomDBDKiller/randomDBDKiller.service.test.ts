@@ -41,6 +41,7 @@ jest.mock("crypto", () => ({
 }));
 
 describe("RandomDBDKillerService", () => {
+    const transactionId = "test-transaction-id";
     let service: RandomDBDKillerService;
     let mockRepo: jest.Mocked<RandomDBDKillerRepository>;
     let mockMasterRepo: jest.Mocked<DBDKillerMasterRepository>;
@@ -93,9 +94,9 @@ describe("RandomDBDKillerService", () => {
                 .mockResolvedValueOnce(null)
                 .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
-            const result = await service.create(request);
+            const result = await service.create(transactionId, request);
 
-            expect(mockRepo.create).toHaveBeenCalledWith({ ...request, overlay_key: "mocked_overlay_key" });
+            expect(mockRepo.create).toHaveBeenCalledWith(transactionId, { ...request, overlay_key: "mocked_overlay_key" });
             expect(result).toBeDefined();
         });
 
@@ -104,7 +105,7 @@ describe("RandomDBDKillerService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
-            await expect(service.create(request)).rejects.toThrow("Random DBD Killer widget already exists for this user");
+            await expect(service.create(transactionId, request)).rejects.toThrow("Random DBD Killer widget already exists for this user");
             expect(mockRepo.create).not.toHaveBeenCalled();
         });
 
@@ -118,12 +119,12 @@ describe("RandomDBDKillerService", () => {
             const p2002 = new PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "0.0.0" });
             mockRepo.create.mockRejectedValue(p2002);
 
-            await expect(service.create(request)).rejects.toMatchObject({ status: 400 });
+            await expect(service.create(transactionId, request)).rejects.toMatchObject({ status: 400 });
         });
 
         it("should throw NotFoundError if user missing", async () => {
             mockUserRepo.get.mockResolvedValue(null);
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(transactionId, request)).rejects.toThrow(NotFoundError);
         });
 
         it("should skip subscription if already exists", async () => {
@@ -137,7 +138,7 @@ describe("RandomDBDKillerService", () => {
                 .mockResolvedValueOnce(null)
                 .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
 
-            await service.create(request);
+            await service.create(transactionId, request);
 
             expect(createESTransport).not.toHaveBeenCalled();
         });
@@ -150,7 +151,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.update.mockResolvedValue(mockExisting as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper" }, { slug: "wraith" }] as any);
 
-            await service.update("rw_1", "user_1", { killer_pool: ["trapper", "wraith"] });
+            await service.update(transactionId, "rw_1", "user_1", { killer_pool: ["trapper", "wraith"] });
 
             expect(mockRepo.update).toHaveBeenCalled();
             expect(redis.del).toHaveBeenCalled();
@@ -158,7 +159,7 @@ describe("RandomDBDKillerService", () => {
 
         it("should throw NotFoundError if missing", async () => {
             mockRepo.findById.mockResolvedValue(null);
-            await expect(service.update("rw_1", "user_1", {})).rejects.toThrow(NotFoundError);
+            await expect(service.update(transactionId, "rw_1", "user_1", {})).rejects.toThrow(NotFoundError);
         });
 
         it("should throw BadRequestError for unknown killer slug", async () => {
@@ -166,7 +167,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.findById.mockResolvedValue(mockExisting as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper" }] as any);
 
-            await expect(service.update("rw_1", "user_1", { killer_pool: ["trapper", "unknown-slug"] }))
+            await expect(service.update(transactionId, "rw_1", "user_1", { killer_pool: ["trapper", "unknown-slug"] }))
                 .rejects.toThrow(BadRequestError);
         });
     });
@@ -176,14 +177,14 @@ describe("RandomDBDKillerService", () => {
             const mockExisting = { id: "rw_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
             mockRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
-            expect(mockRepo.delete).toHaveBeenCalledWith("rw_1");
+            expect(mockRepo.delete).toHaveBeenCalledWith(transactionId, "rw_1");
         });
 
         it("should return early if missing", async () => {
             mockRepo.getByOwnerId.mockResolvedValue(null);
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
             expect(mockRepo.delete).not.toHaveBeenCalled();
         });
     });
@@ -191,13 +192,13 @@ describe("RandomDBDKillerService", () => {
     describe("getByUserId", () => {
         it("should return config successfully", async () => {
             mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId(transactionId, "user_1");
             expect(result).toBeDefined();
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.getByUserId("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -209,7 +210,7 @@ describe("RandomDBDKillerService", () => {
 
         it("should return early if config not found", async () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue(null);
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
             expect(publisher.publish).not.toHaveBeenCalled();
         });
 
@@ -219,7 +220,7 @@ describe("RandomDBDKillerService", () => {
                 killer_pool: [],
                 widget: { owner_id: "user_1" }
             } as any);
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
             expect(publisher.publish).not.toHaveBeenCalled();
         });
 
@@ -231,7 +232,7 @@ describe("RandomDBDKillerService", () => {
             } as any);
             mockMasterRepo.getBySlug.mockResolvedValue(null);
 
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
 
             expect(publisher.publish).not.toHaveBeenCalled();
         });
@@ -246,7 +247,7 @@ describe("RandomDBDKillerService", () => {
             mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
 
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
 
             expect(publisher.publish).toHaveBeenCalledWith("random-dbd-killer:result", JSON.stringify({
                 userId: "user_1",
@@ -254,7 +255,7 @@ describe("RandomDBDKillerService", () => {
                 pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
                 animationStyle: "spin"
             }));
-            expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith("widget_1");
+            expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith(transactionId, "widget_1");
         });
 
         it("should send a chat message announcing the result after a 10s delay", async () => {
@@ -267,7 +268,7 @@ describe("RandomDBDKillerService", () => {
             mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
 
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
 
             await jest.advanceTimersByTimeAsync(10_000);
@@ -291,7 +292,7 @@ describe("RandomDBDKillerService", () => {
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
             (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockRejectedValue(new Error("Chat Error"));
 
-            await service.randomizeKiller(event);
+            await service.randomizeKiller(transactionId, event);
             await expect(jest.advanceTimersByTimeAsync(10_000)).resolves.not.toThrow();
             jest.useRealTimers();
         });
@@ -300,9 +301,9 @@ describe("RandomDBDKillerService", () => {
     describe("validateOverlayAccess", () => {
         it("should delegate to widgetService", async () => {
             mockWidgetService.validateOverlayAccess.mockResolvedValue(true);
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
             expect(result).toBe(true);
-            expect(mockWidgetService.validateOverlayAccess).toHaveBeenCalledWith("user_1", "key_1");
+            expect(mockWidgetService.validateOverlayAccess).toHaveBeenCalledWith(transactionId, "user_1", "key_1");
         });
     });
 
@@ -311,16 +312,16 @@ describe("RandomDBDKillerService", () => {
             const mockExisting = { id: "rw_1", widget: { id: "widget_1" } };
             mockRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
-            const result = await service.refreshKey("user_1");
+            const result = await service.refreshKey(transactionId, "user_1");
 
             expect(result.overlay_key).toBe("mocked_uuid");
-            expect(mockWidgetService.updateOverlayKey).toHaveBeenCalledWith("widget_1", "mocked_uuid");
+            expect(mockWidgetService.updateOverlayKey).toHaveBeenCalledWith(transactionId, "widget_1", "mocked_uuid");
             expect(redis.del).toHaveBeenCalled();
         });
 
         it("should throw NotFoundError if missing", async () => {
             mockRepo.getByOwnerId.mockResolvedValue(null);
-            await expect(service.refreshKey("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.refreshKey(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 });

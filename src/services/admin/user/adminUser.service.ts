@@ -24,43 +24,44 @@ export default class AdminUserService {
   }
 
   async list(
+    transactionId: string,
     pagination: Pagination,
     search?: string,
     tier?: number,
     isShowcase?: boolean
   ): Promise<ListResponse<User & { widget_count: number }>> {
         let logger: TLogger = this.logger;
-    logger = this.logger.setContext('service.adminUser.list');
+    logger = this.logger.setContext('service.adminUser.list', transactionId);
     const skip = (pagination.page - 1) * pagination.limit;
     const [users, total] = await Promise.all([
-      this.userRepository.findMany(skip, pagination.limit, search, tier, isShowcase),
-      this.userRepository.count(search, tier, isShowcase),
+      this.userRepository.findMany(transactionId, skip, pagination.limit, search, tier, isShowcase),
+      this.userRepository.count(transactionId, search, tier, isShowcase),
     ]);
     const data = users.map(({ _count, ...user }) => ({ ...user, widget_count: _count.widgets }));
     return { data, pagination: { ...pagination, total } };
   }
 
-  async get(id: string): Promise<User> {
+  async get(transactionId: string, id: string): Promise<User> {
         let logger: TLogger = this.logger;
-    logger = this.logger.setContext('service.adminUser.get');
-    const user = await this.userRepository.get(id);
+    logger = this.logger.setContext('service.adminUser.get', transactionId);
+    const user = await this.userRepository.get(transactionId, id);
     if (!user) {
       throw new NotFoundError('User not found');
     }
     return user;
   }
 
-  async getWidgets(id: string, pagination: Pagination) {
+  async getWidgets(transactionId: string, id: string, pagination: Pagination) {
         let logger: TLogger = this.logger;
-    logger = this.logger.setContext('service.adminUser.getWidgets');
-    await this.get(id);
-    return this.widgetService.list(id, pagination);
+    logger = this.logger.setContext('service.adminUser.getWidgets', transactionId);
+    await this.get(transactionId, id);
+    return this.widgetService.list(transactionId, id, pagination);
   }
 
-  async getEventSubs(id: string) {
+  async getEventSubs(transactionId: string, id: string) {
         let logger: TLogger = this.logger;
-    logger = this.logger.setContext('service.adminUser.getEventSubs');
-    const user = await this.get(id);
+    logger = this.logger.setContext('service.adminUser.getEventSubs', transactionId);
+    const user = await this.get(transactionId, id);
     return this.twitchService.listEventSubs(user.twitch_id);
   }
 }

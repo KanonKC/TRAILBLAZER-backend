@@ -21,25 +21,25 @@ export default class WidgetTypeService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async list(): Promise<WidgetType[]> {
-        return this.widgetTypeRepository.list();
+    async list(transactionId: string): Promise<WidgetType[]> {
+        return this.widgetTypeRepository.list(transactionId);
     }
 
-    async get(id: number): Promise<WidgetType> {
+    async get(transactionId: string, id: number): Promise<WidgetType> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widgetType.get");
-        const widgetType = await this.widgetTypeRepository.get(id);
+        logger = this.logger.setContext("service.widgetType.get", transactionId);
+        const widgetType = await this.widgetTypeRepository.get(transactionId, id);
         if (!widgetType) {
             throw new NotFoundError("Widget type not found");
         }
         return widgetType;
     }
 
-    async create(request: CreateWidgetType): Promise<WidgetType> {
+    async create(transactionId: string, request: CreateWidgetType): Promise<WidgetType> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widgetType.create");
+        logger = this.logger.setContext("service.widgetType.create", transactionId);
         try {
-            return await this.widgetTypeRepository.create(request);
+            return await this.widgetTypeRepository.create(transactionId, request);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);
@@ -48,12 +48,12 @@ export default class WidgetTypeService {
         }
     }
 
-    async update(id: number, request: UpdateWidgetType): Promise<WidgetType> {
+    async update(transactionId: string, id: number, request: UpdateWidgetType): Promise<WidgetType> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widgetType.update");
-        await this.get(id);
+        logger = this.logger.setContext("service.widgetType.update", transactionId);
+        await this.get(transactionId, id);
         try {
-            return await this.widgetTypeRepository.update(id, request);
+            return await this.widgetTypeRepository.update(transactionId, id, request);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);
@@ -62,23 +62,23 @@ export default class WidgetTypeService {
         }
     }
 
-    async delete(id: number): Promise<void> {
+    async delete(transactionId: string, id: number): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widgetType.delete");
-        const widgetType = await this.get(id);
+        logger = this.logger.setContext("service.widgetType.delete", transactionId);
+        const widgetType = await this.get(transactionId, id);
 
-        const widgetsUsingType = await this.widgetTypeRepository.countWidgetsUsingSlug(widgetType.slug);
+        const widgetsUsingType = await this.widgetTypeRepository.countWidgetsUsingSlug(transactionId, widgetType.slug);
         if (widgetsUsingType > 0) {
             logger.warn({ message: "Cannot delete widget type still in use", data: { id, widgetsUsingType } });
             throw new BadRequestError(`${widgetsUsingType} widget(s) still use this type — disable it instead of deleting`);
         }
 
-        await this.widgetTypeRepository.delete(id);
+        await this.widgetTypeRepository.delete(transactionId, id);
     }
 
-    async uploadIcon(filename: string, file: { buffer: Buffer, mimetype: string }): Promise<string> {
+    async uploadIcon(transactionId: string, filename: string, file: { buffer: Buffer, mimetype: string }): Promise<string> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widgetType.uploadIcon");
+        logger = this.logger.setContext("service.widgetType.uploadIcon", transactionId);
         if (!/^[a-zA-Z0-9._-]+\.[a-zA-Z0-9]+$/.test(filename)) {
             throw new BadRequestError("Icon filename must include a file extension, e.g. first-word.svg");
         }

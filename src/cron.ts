@@ -1,4 +1,5 @@
 import { CronJob } from "cron";
+import { randomUUID } from "crypto";
 import UserService from "./services/user/user.service";
 import LinkedAccountService from "./services/linkedAccount/linkedAccount.service";
 
@@ -16,7 +17,7 @@ export default class TbCron {
         // User tier adjustment job
         CronJob.from({
             cronTime: "0 6 * * *",
-            onTick: () => this.userService.bulkAdjustTierAndWidgets(),
+            onTick: () => this.userService.bulkAdjustTierAndWidgets(randomUUID()),
             start: true,
             timeZone: "Asia/Bangkok"
         })
@@ -24,7 +25,7 @@ export default class TbCron {
         // Token refresh job - Every hour
         CronJob.from({
             cronTime: "0 6 * * *",
-            onTick: () => this.linkedAccountService.refreshExpiringTokens(),
+            onTick: () => this.linkedAccountService.refreshExpiringTokens(randomUUID()),
             start: true,
             timeZone: "Asia/Bangkok"
         })

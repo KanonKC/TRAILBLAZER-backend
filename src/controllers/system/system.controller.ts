@@ -11,11 +11,11 @@ export default class SystemController {
         this.logger = new TLogger(Layer.CONTROLLER);
     }
 
-    async health(_: FastifyRequest, res: FastifyReply) {
+    async health(req: FastifyRequest, res: FastifyReply) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("controller.system.health", _.id);
+        logger = this.logger.setContext("controller.system.health", req.id);
         logger.info({ message: "Health check initiated" });
-        const health = await this.systemService.getHealth();
+        const health = await this.systemService.getHealth(req.id);
 
         const isHealthy = health.database && Object.values(health.libs).every(x => x);
 

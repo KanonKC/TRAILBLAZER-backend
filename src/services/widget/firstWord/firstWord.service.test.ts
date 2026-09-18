@@ -54,6 +54,7 @@ jest.mock("node:crypto", () => ({
 }));
 
 describe("FirstWordService", () => {
+    const transactionId = "test-transaction-id";
     let service: FirstWordService;
     let mockCfg: Configurations;
     let mockFirstWordRepo: jest.Mocked<FirstWordRepository>;
@@ -108,13 +109,13 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.create.mockResolvedValue({ id: "fw_1", widget_id: "widget_1" } as any);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue({ widget: { id: "widget_1" } } as any);
 
-            const result = await service.create(request);
+            const result = await service.create(transactionId, request);
 
-            expect(mockUserRepo.get).toHaveBeenCalledWith(request.owner_id);
+            expect(mockUserRepo.get).toHaveBeenCalledWith(transactionId, request.owner_id);
             expect(twitchAppAPI.eventSub.getSubscriptionsForUser).toHaveBeenCalledWith(mockUser.twitch_id);
             expect(createESTransport).toHaveBeenCalledTimes(3);
             expect(mockFirstWordRepo.create).toHaveBeenCalled();
-            expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith("widget_1", "user_1");
+            expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith(transactionId, "widget_1", "user_1");
             expect(result).toBeDefined();
         });
 
@@ -131,7 +132,7 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.create.mockResolvedValue({ id: "fw_1", widget_id: "widget_1" } as any);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue({ widget: { id: "widget_1" } } as any);
 
-            await service.create(request);
+            await service.create(transactionId, request);
 
             expect(createESTransport).not.toHaveBeenCalled();
             expect(twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents).not.toHaveBeenCalled();
@@ -141,7 +142,7 @@ describe("FirstWordService", () => {
         it("should throw NotFoundError if user not found", async () => {
             mockUserRepo.get.mockResolvedValue(null);
 
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(transactionId, request)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -150,7 +151,7 @@ describe("FirstWordService", () => {
             const mockConfig = { widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockConfig));
 
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId(transactionId, "user_1");
 
             expect(redis.get).toHaveBeenCalled();
             expect(mockFirstWordRepo.getByOwnerId).not.toHaveBeenCalled();
@@ -162,9 +163,9 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
 
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId(transactionId, "user_1");
 
-            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith("user_1");
+            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith(transactionId, "user_1");
             expect(redis.set).toHaveBeenCalled();
             expect(result).toEqual(mockConfig);
         });
@@ -173,7 +174,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.getByUserId("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -186,9 +187,9 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.update.mockResolvedValue({ ...mockExisting, ...data } as any);
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { id: "widget_1" } }));
 
-            const result = await service.update("user_1", data);
+            const result = await service.update(transactionId, "user_1", data);
 
-            expect(mockFirstWordRepo.update).toHaveBeenCalledWith("fw_1", data);
+            expect(mockFirstWordRepo.update).toHaveBeenCalledWith(transactionId, "fw_1", data);
             expect(redis.del).toHaveBeenCalledWith("first_word:owner_id:user_1");
             expect(result).toBeDefined();
         });
@@ -196,14 +197,14 @@ describe("FirstWordService", () => {
         it("should throw NotFoundError if config not found", async () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.update("user_1", data)).rejects.toThrow(NotFoundError);
+            await expect(service.update(transactionId, "user_1", data)).rejects.toThrow(NotFoundError);
         });
 
         it("should throw error if repository update fails", async () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue({ id: "fw_1", widget: { id: "widget_1" } } as any);
             mockFirstWordRepo.update.mockRejectedValue(new Error("DB error"));
 
-            await expect(service.update("user_1", data)).rejects.toThrow("DB error");
+            await expect(service.update(transactionId, "user_1", data)).rejects.toThrow("DB error");
         });
     });
 
@@ -212,17 +213,17 @@ describe("FirstWordService", () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" }, audio_key: "audio_1" };
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
             expect(s3.deleteFile).toHaveBeenCalledWith("audio_1");
-            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith("fw_1");
+            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith(transactionId, "fw_1");
             expect(redis.del).toHaveBeenCalledTimes(2);
         });
 
         it("should do nothing if config not found", async () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
             expect(mockFirstWordRepo.delete).not.toHaveBeenCalled();
         });
@@ -232,19 +233,19 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
             (s3.deleteFile as jest.Mock).mockRejectedValue(new Error("S3 error"));
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
-            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith("fw_1");
+            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith(transactionId, "fw_1");
         });
 
         it("should skip S3 delete if audio_key is missing", async () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" }, audio_key: null };
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            await service.delete("user_1");
+            await service.delete(transactionId, "user_1");
 
             expect(s3.deleteFile).not.toHaveBeenCalled();
-            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith("fw_1");
+            expect(mockFirstWordRepo.delete).toHaveBeenCalledWith(transactionId, "fw_1");
         });
     });
 
@@ -254,9 +255,9 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
             mockFirstWordRepo.update.mockResolvedValue({ ...mockFirstWord, overlay_key: "new_key" } as any);
 
-            const result = await service.refreshOverlayKey("user_1");
+            const result = await service.refreshOverlayKey(transactionId, "user_1");
 
-            expect(mockFirstWordRepo.update).toHaveBeenCalledWith("fw_1", expect.objectContaining({ overlay_key: "mocked_hex" }));
+            expect(mockFirstWordRepo.update).toHaveBeenCalledWith(transactionId, "fw_1", expect.objectContaining({ overlay_key: "mocked_hex" }));
             expect(redis.del).toHaveBeenCalledWith("first_word:owner_id:user_1");
             expect(result).toBeDefined();
         });
@@ -264,7 +265,7 @@ describe("FirstWordService", () => {
         it("should throw NotFoundError if config not found", async () => {
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.refreshOverlayKey("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.refreshOverlayKey(transactionId, "user_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -273,7 +274,7 @@ describe("FirstWordService", () => {
             const mockFirstWord = { widget: { id: "widget_1", overlay_key: "key_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
             expect(result).toBe(true);
         });
@@ -282,7 +283,7 @@ describe("FirstWordService", () => {
             const mockFirstWord = { widget: { id: "widget_1", overlay_key: "key_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            const result = await service.validateOverlayAccess("user_1", "key_2");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_2");
 
             expect(result).toBe(false);
         });
@@ -292,9 +293,9 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
-            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith("user_1");
+            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith(transactionId, "user_1");
             expect(redis.set).toHaveBeenCalled();
             expect(result).toBe(true);
         });
@@ -303,7 +304,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            const result = await service.validateOverlayAccess("user_1", "key_1");
+            const result = await service.validateOverlayAccess(transactionId, "user_1", "key_1");
 
             expect(result).toBe(false);
         });
@@ -330,7 +331,7 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.getCustomReplyByTwitchId.mockResolvedValue(null);
             (s3.getSignedURL as jest.Mock).mockResolvedValue("signed_url");
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("default_bot_id", "broadcaster_1", "Hello Chatter One");
             expect(publisher.publish).toHaveBeenCalled();
@@ -342,7 +343,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockUser));
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockFirstWord));
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -353,9 +354,9 @@ describe("FirstWordService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify({ widget: { enabled: false } }));
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
-            expect(mockUserRepo.getByTwitchId).toHaveBeenCalledWith("broadcaster_1");
+            expect(mockUserRepo.getByTwitchId).toHaveBeenCalledWith(transactionId, "broadcaster_1");
             expect(redis.set).toHaveBeenCalled();
         });
 
@@ -363,7 +364,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null);
             mockUserRepo.getByTwitchId.mockResolvedValue(null);
 
-            await expect(service.greetNewChatter(event)).rejects.toThrow(NotFoundError);
+            await expect(service.greetNewChatter(transactionId, event)).rejects.toThrow(NotFoundError);
         });
 
         it("should fetch config from repository if not in cache", async () => {
@@ -373,9 +374,9 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
-            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith("user_1");
+            expect(mockFirstWordRepo.getByOwnerId).toHaveBeenCalledWith(transactionId, "user_1");
             expect(redis.set).toHaveBeenCalled();
         });
 
@@ -385,7 +386,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.greetNewChatter(event)).rejects.toThrow(NotFoundError);
+            await expect(service.greetNewChatter(transactionId, event)).rejects.toThrow(NotFoundError);
         });
 
         it("should return early if chatter is the bot itself", async () => {
@@ -399,7 +400,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockFirstWord));
             
             const botEvent = { ...event, chatter_user_id: "bot_1" };
-            await service.greetNewChatter(botEvent);
+            await service.greetNewChatter(transactionId, botEvent);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -416,9 +417,9 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null); // chatters cache miss
             mockFirstWordRepo.listChatterIdByChannelId.mockResolvedValue([]);
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
-            expect(mockFirstWordRepo.listChatterIdByChannelId).toHaveBeenCalledWith("broadcaster_1");
+            expect(mockFirstWordRepo.listChatterIdByChannelId).toHaveBeenCalledWith(transactionId, "broadcaster_1");
             expect(redis.set).toHaveBeenCalled();
         });
 
@@ -432,7 +433,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockFirstWord));
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(["chatter_1"]));
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -448,7 +449,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify([]));
             mockFirstWordRepo.addChatter.mockRejectedValue(new Error("DB error"));
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -465,7 +466,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify([]));
 
             const testEvent = { ...event, chatter_user_id: "0" };
-            await service.greetNewChatter(testEvent);
+            await service.greetNewChatter(transactionId, testEvent);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
             expect(mockFirstWordRepo.addChatter).not.toHaveBeenCalled();
@@ -490,7 +491,7 @@ describe("FirstWordService", () => {
             mockFirstWordRepo.getCustomReplyByTwitchId.mockResolvedValue(mockCustomReply as any);
             (s3.getSignedURL as jest.Mock).mockResolvedValue("custom_url");
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("default_bot_id", "broadcaster_1", "Custom Chatter One");
             expect(publisher.publish).toHaveBeenCalledWith("first-word-audio", expect.stringContaining('"audioUrl":"custom_url"'));
@@ -508,7 +509,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockFirstWord));
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify([]));
 
-            await service.greetNewChatter(event);
+            await service.greetNewChatter(transactionId, event);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });
@@ -523,15 +524,15 @@ describe("FirstWordService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            await service.resetChattersOnStartStream(event);
+            await service.resetChattersOnStartStream(transactionId, event);
 
-            expect(mockFirstWordRepo.clearChatters).toHaveBeenCalledWith("fw_1");
+            expect(mockFirstWordRepo.clearChatters).toHaveBeenCalledWith(transactionId, "fw_1");
         });
 
         it("should log error if reset fails", async () => {
             mockUserRepo.getByTwitchId.mockRejectedValue(new Error("DB error"));
 
-            await service.resetChattersOnStartStream(event);
+            await service.resetChattersOnStartStream(transactionId, event);
             // Should not throw
         });
     });
@@ -543,16 +544,16 @@ describe("FirstWordService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(mockFirstWord as any);
 
-            await service.resetChatter("twitch_1");
+            await service.resetChatter(transactionId, "twitch_1");
 
-            expect(mockFirstWordRepo.clearChatters).toHaveBeenCalledWith("fw_1");
+            expect(mockFirstWordRepo.clearChatters).toHaveBeenCalledWith(transactionId, "fw_1");
             expect(redis.del).toHaveBeenCalledTimes(2);
         });
 
         it("should throw NotFoundError if user not found", async () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(null);
 
-            await expect(service.resetChatter("twitch_1")).rejects.toThrow(NotFoundError);
+            await expect(service.resetChatter(transactionId, "twitch_1")).rejects.toThrow(NotFoundError);
         });
 
         it("should throw NotFoundError if first word config not found", async () => {
@@ -560,7 +561,7 @@ describe("FirstWordService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             mockFirstWordRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.resetChatter("twitch_1")).rejects.toThrow(NotFoundError);
+            await expect(service.resetChatter(transactionId, "twitch_1")).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -568,7 +569,7 @@ describe("FirstWordService", () => {
         it("should clear all related caches", async () => {
             (redis.keys as jest.Mock).mockResolvedValue(["key1", "key2"]);
 
-            await service.clearCaches();
+            await service.clearCaches(transactionId);
 
             expect(redis.del).toHaveBeenCalledTimes(2);
         });
@@ -580,7 +581,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
             mockFirstWordRepo.listCustomReplies.mockResolvedValue([[], 0]);
 
-            const result = await service.listCustomReplies("user_1", {}, { page: 1, limit: 10 } as any);
+            const result = await service.listCustomReplies(transactionId, "user_1", {}, { page: 1, limit: 10 } as any);
 
             expect(result.data).toEqual([]);
             expect(result.pagination.total).toBe(0);
@@ -595,7 +596,7 @@ describe("FirstWordService", () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            await service.createCustomReply("user_1", request);
+            await service.createCustomReply(transactionId, "user_1", request);
 
             expect(mockFirstWordRepo.createCustomReply).toHaveBeenCalled();
             expect(redis.keys).toHaveBeenCalled();
@@ -604,7 +605,7 @@ describe("FirstWordService", () => {
         it("should throw NotFoundError if twitch user not found", async () => {
             (twitchAppAPI.users.getUserById as jest.Mock).mockResolvedValue(null);
 
-            await expect(service.createCustomReply("user_1", request)).rejects.toThrow(NotFoundError);
+            await expect(service.createCustomReply(transactionId, "user_1", request)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -616,7 +617,7 @@ describe("FirstWordService", () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            await service.updateCustomReply("user_1", 1, request);
+            await service.updateCustomReply(transactionId, "user_1", 1, request);
 
             expect(mockFirstWordRepo.updateCustomReply).toHaveBeenCalled();
         });
@@ -626,17 +627,17 @@ describe("FirstWordService", () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            await expect(service.updateCustomReply("user_1", 1, request)).rejects.toThrow(NotFoundError);
+            await expect(service.updateCustomReply(transactionId, "user_1", 1, request)).rejects.toThrow(NotFoundError);
         });
 
         it("should update custom reply without twitch user info if twitch_chatter_id is missing", async () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            await service.updateCustomReply("user_1", 1, { reply_message: "new" });
+            await service.updateCustomReply(transactionId, "user_1", 1, { reply_message: "new" });
 
             expect(twitchAppAPI.users.getUserById).not.toHaveBeenCalled();
-            expect(mockFirstWordRepo.updateCustomReply).toHaveBeenCalledWith(1, { reply_message: "new" });
+            expect(mockFirstWordRepo.updateCustomReply).toHaveBeenCalledWith(transactionId, 1, { reply_message: "new" });
         });
     });
 
@@ -645,9 +646,9 @@ describe("FirstWordService", () => {
             const mockFirstWord = { id: "fw_1", widget: { id: "widget_1" } };
             (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockFirstWord));
 
-            await service.deleteCustomReply("user_1", 1);
+            await service.deleteCustomReply(transactionId, "user_1", 1);
 
-            expect(mockFirstWordRepo.deleteCustomReply).toHaveBeenCalledWith(1);
+            expect(mockFirstWordRepo.deleteCustomReply).toHaveBeenCalledWith(transactionId, 1);
         });
     });
 
@@ -658,7 +659,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(null); // cache miss
             mockFirstWordRepo.listChatters.mockResolvedValue([[], 0]);
 
-            const result = await service.listChatters("user_1");
+            const result = await service.listChatters(transactionId, "user_1");
 
             expect(result.data).toEqual([]);
             expect(redis.set).toHaveBeenCalled();
@@ -670,7 +671,7 @@ describe("FirstWordService", () => {
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockFirstWord));
             (redis.get as jest.Mock).mockResolvedValueOnce(JSON.stringify(cached));
 
-            const result = await service.listChatters("user_1");
+            const result = await service.listChatters(transactionId, "user_1");
 
             expect(result).toEqual(cached);
             expect(mockFirstWordRepo.listChatters).not.toHaveBeenCalled();

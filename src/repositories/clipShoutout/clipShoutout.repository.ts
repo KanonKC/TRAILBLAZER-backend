@@ -11,7 +11,7 @@ export default class ClipShoutoutRepository {
     constructor() {
     }
 
-    async create(request: CreateClipShoutout): Promise<ClipShoutoutWidget> {
+    async create(transactionId: string, request: CreateClipShoutout): Promise<ClipShoutoutWidget> {
         try {
         return prisma.clipShoutout.create({
             data: {
@@ -37,12 +37,12 @@ export default class ClipShoutoutRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateClipShoutout): Promise<ClipShoutoutWidget> {
+    async update(transactionId: string, id: string, request: UpdateClipShoutout): Promise<ClipShoutoutWidget> {
         try {
         return prisma.clipShoutout.update({
             where: { id },
@@ -56,23 +56,23 @@ export default class ClipShoutoutRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(transactionId: string, id: string): Promise<void> {
         try {
         await prisma.clipShoutout.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async findById(id: string): Promise<ClipShoutoutWidget | null> {
+    async findById(transactionId: string, id: string): Promise<ClipShoutoutWidget | null> {
         try {
         return prisma.clipShoutout.findUnique({
             where: { id },
@@ -85,12 +85,12 @@ export default class ClipShoutoutRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.findById").error({ message: "findById failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.findById", transactionId).error({ message: "findById failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<ClipShoutoutWidget | null> {
+    async getByOwnerId(transactionId: string, ownerId: string): Promise<ClipShoutoutWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -111,12 +111,12 @@ export default class ClipShoutoutRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<ClipShoutoutWidget | null> {
+    async getByTwitchId(transactionId: string, twitchId: string): Promise<ClipShoutoutWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -137,7 +137,7 @@ export default class ClipShoutoutRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.clipShoutout.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.clipShoutout.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }

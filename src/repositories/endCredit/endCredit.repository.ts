@@ -12,7 +12,7 @@ export default class EndCreditRepository {
     constructor() {
     }
 
-    async create(request: CreateEndCredit): Promise<EndCreditWidget> {
+    async create(transactionId: string, request: CreateEndCredit): Promise<EndCreditWidget> {
         try {
         return prisma.endCredit.create({
             data: {
@@ -48,12 +48,12 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.endCredit.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<EndCreditWidget | null> {
+    async getByOwnerId(transactionId: string, ownerId: string): Promise<EndCreditWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -77,12 +77,12 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.endCredit.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<EndCreditWidget | null> {
+    async getByTwitchId(transactionId: string, twitchId: string): Promise<EndCreditWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -106,12 +106,12 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.endCredit.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async createViewerRecord(request: CreateEndCreditViewerRecord): Promise<EndCreditViewerRecord> {
+    async createViewerRecord(transactionId: string, request: CreateEndCreditViewerRecord): Promise<EndCreditViewerRecord> {
         try {
         return prisma.endCreditViewerRecord.create({
             data: {
@@ -123,12 +123,12 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.createViewerRecord").error({ message: "createViewerRecord failed", error: error as Error });
+            logger.setContext("repository.endCredit.createViewerRecord", transactionId).error({ message: "createViewerRecord failed", error: error as Error });
             throw error;
         }
     }
 
-    async getById(id: string): Promise<EndCreditWidget | null> {
+    async getById(transactionId: string, id: string): Promise<EndCreditWidget | null> {
         try {
         return prisma.endCredit.findUnique({
             where: { id },
@@ -141,12 +141,12 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.getById").error({ message: "getById failed", error: error as Error });
+            logger.setContext("repository.endCredit.getById", transactionId).error({ message: "getById failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateEndCredit): Promise<EndCreditWidget> {
+    async update(transactionId: string, id: string, request: UpdateEndCredit): Promise<EndCreditWidget> {
         try {
         const { overlay_key, ...endCreditData } = request;
 
@@ -171,41 +171,41 @@ export default class EndCreditRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.endCredit.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(transactionId: string, id: string): Promise<void> {
         try {
         await prisma.endCredit.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.endCredit.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async getViewerRecordsByEndCreditId(endCreditId: string): Promise<EndCreditViewerRecord[]> {
+    async getViewerRecordsByEndCreditId(transactionId: string, endCreditId: string): Promise<EndCreditViewerRecord[]> {
         try {
         return prisma.endCreditViewerRecord.findMany({
             where: { end_credit_id: endCreditId },
             orderBy: { platform_created_at: "asc" },
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.getViewerRecordsByEndCreditId").error({ message: "getViewerRecordsByEndCreditId failed", error: error as Error });
+            logger.setContext("repository.endCredit.getViewerRecordsByEndCreditId", transactionId).error({ message: "getViewerRecordsByEndCreditId failed", error: error as Error });
             throw error;
         }
     }
 
-    async deleteViewerRecordsByEndCreditId(endCreditId: string): Promise<void> {
+    async deleteViewerRecordsByEndCreditId(transactionId: string, endCreditId: string): Promise<void> {
         try {
         await prisma.endCreditViewerRecord.deleteMany({
             where: { end_credit_id: endCreditId },
         });
     } catch (error) {
-            logger.setContext("repository.endCredit.deleteViewerRecordsByEndCreditId").error({ message: "deleteViewerRecordsByEndCreditId failed", error: error as Error });
+            logger.setContext("repository.endCredit.deleteViewerRecordsByEndCreditId", transactionId).error({ message: "deleteViewerRecordsByEndCreditId failed", error: error as Error });
             throw error;
         }
     }

@@ -11,7 +11,7 @@ export default class RandomDBDKillerRepository {
     constructor() {
     }
 
-    async create(request: CreateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async create(transactionId: string, request: CreateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
         try {
         return prisma.randomDBDKiller.create({
             data: {
@@ -35,12 +35,12 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
+    async update(transactionId: string, id: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
         try {
         return prisma.randomDBDKiller.update({
             where: { id },
@@ -58,23 +58,23 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(transactionId: string, id: string): Promise<void> {
         try {
         await prisma.randomDBDKiller.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async findById(id: string): Promise<RandomDBDKillerWidget | null> {
+    async findById(transactionId: string, id: string): Promise<RandomDBDKillerWidget | null> {
         try {
         return prisma.randomDBDKiller.findUnique({
             where: { id },
@@ -87,12 +87,12 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.findById").error({ message: "findById failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.findById", transactionId).error({ message: "findById failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByOwnerId(transactionId: string, ownerId: string): Promise<RandomDBDKillerWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -116,12 +116,12 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByTwitchId(transactionId: string, twitchId: string): Promise<RandomDBDKillerWidget | null> {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
@@ -145,12 +145,12 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchRewardId(twitchRewardId: string): Promise<RandomDBDKillerWidget | null> {
+    async getByTwitchRewardId(transactionId: string, twitchRewardId: string): Promise<RandomDBDKillerWidget | null> {
         try {
         return prisma.randomDBDKiller.findUnique({
             where: { twitch_reward_id: twitchRewardId },
@@ -163,7 +163,7 @@ export default class RandomDBDKillerRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDBDKiller.getByTwitchRewardId").error({ message: "getByTwitchRewardId failed", error: error as Error });
+            logger.setContext("repository.randomDBDKiller.getByTwitchRewardId", transactionId).error({ message: "getByTwitchRewardId failed", error: error as Error });
             throw error;
         }
     }

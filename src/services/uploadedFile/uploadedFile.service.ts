@@ -32,9 +32,9 @@ export class UploadedFileService {
         this.userService = userService
     }
 
-    async extend(uf: UploadedFile): Promise<UploadedFileResponse> {
+    async extend(transactionId: string, uf: UploadedFile): Promise<UploadedFileResponse> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.extend");
+        logger = this.logger.setContext("service.uploadedFile.extend", transactionId);
         logger.info({ message: "Extending uploaded file with signed URL", data: { id: uf.id } });
         const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 })
         return {
@@ -43,14 +43,14 @@ export class UploadedFileService {
         }
     }
 
-    async create(userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
+    async create(transactionId: string, userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.create");
+        logger = this.logger.setContext("service.uploadedFile.create", transactionId);
         logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
 
-        const currentTotalSize = await this.getTotalFileSize(userId);
+        const currentTotalSize = await this.getTotalFileSize(transactionId, userId);
         const fileSizeKb = Math.round(file.buffer.length / 1024);
-        const maxStorageMb = await this.userService.getMaxStorageMB(userId)
+        const maxStorageMb = await this.userService.getMaxStorageMB(transactionId, userId)
         const limitKb = maxStorageMb * 1024;
 
         if (currentTotalSize.total_size_kb + fileSizeKb > limitKb) {
@@ -66,7 +66,7 @@ export class UploadedFileService {
         const ext = path.extname(file.filename);
         const base = path.basename(file.filename, ext);
 
-        const existingFiles = await this.ufr.listByPattern(userId, base, ext);
+        const existingFiles = await this.ufr.listByPattern(transactionId, userId, base, ext);
         const fileNames = existingFiles.map(f => f.name);
 
         if (fileNames.includes(filename)) {
@@ -86,7 +86,7 @@ export class UploadedFileService {
             filename = `${base} (${maxCounter + 1})${ext}`;
         }
 
-        await this.ufr.create({
+        await this.ufr.create(transactionId, {
             name: filename,
             type: file.mimetype,
             owner_id: userId,
@@ -96,9 +96,9 @@ export class UploadedFileService {
         await redis.del(`uploadedFile:totalSize:${userId}`)
     }
 
-    async get(id: string, userId: string): Promise<UploadedFileResponse> {
+    async get(transactionId: string, id: string, userId: string): Promise<UploadedFileResponse> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.get");
+        logger = this.logger.setContext("service.uploadedFile.get", transactionId);
         logger.info({ message: "Getting uploaded file", data: { id, userId } });
         const cacheKey = `uploadedFile:${id}`
         const cachedData = await redis.get(cacheKey)
@@ -106,7 +106,7 @@ export class UploadedFileService {
             logger.info({ message: "Found file in cache", data: { id } });
             return JSON.parse(cachedData)
         }
-        const data = await this.ufr.get(id)
+        const data = await this.ufr.get(transactionId, id)
         if (!data) {
             logger.warn({ message: "File not found", data: { id } });
             throw new NotFoundError("File not found")
@@ -115,14 +115,14 @@ export class UploadedFileService {
             logger.warn({ message: "User not allowed to access this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to access this file")
         }
-        const res = await this.extend(data)
+        const res = await this.extend(transactionId, data)
         redis.set(cacheKey, JSON.stringify(res), TTL.ONE_HOUR)
         return res
     }
 
-    async list(userId: string, filters: UploadedFileFilters, pagination: Pagination): Promise<ListResponse<UploadedFileResponse>> {
+    async list(transactionId: string, userId: string, filters: UploadedFileFilters, pagination: Pagination): Promise<ListResponse<UploadedFileResponse>> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.list");
+        logger = this.logger.setContext("service.uploadedFile.list", transactionId);
         logger.info({ message: "Listing uploaded files", data: { userId, filters, pagination } });
 
         const req: ListUploadedFileRequest = {
@@ -132,9 +132,9 @@ export class UploadedFileService {
         }
 
         try {
-            const [data, count] = await this.ufr.list(req, pagination)
+            const [data, count] = await this.ufr.list(transactionId, req, pagination)
             const extendData = await Promise.all(data.map(async (file) => {
-                return this.extend(file)
+                return this.extend(transactionId, file)
             }))
             const res = {
                 data: extendData,
@@ -151,11 +151,11 @@ export class UploadedFileService {
         }
     }
 
-    async update(id: string, userId: string, request: UpdateUploadedFileRequest) {
+    async update(transactionId: string, id: string, userId: string, request: UpdateUploadedFileRequest) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.update");
+        logger = this.logger.setContext("service.uploadedFile.update", transactionId);
         logger.info({ message: "Updating uploaded file", data: { id, userId, request } });
-        const data = await this.ufr.get(id)
+        const data = await this.ufr.get(transactionId, id)
         if (!data) {
             logger.warn({ message: "File not found for update", data: { id } });
             throw new NotFoundError("File not found")
@@ -164,14 +164,14 @@ export class UploadedFileService {
             logger.warn({ message: "User not allowed to update this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to update this file")
         }
-        return this.ufr.update(id, request)
+        return this.ufr.update(transactionId, id, request)
     }
 
-    async delete(id: string, userId: string) {
+    async delete(transactionId: string, id: string, userId: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.uploadedFile.delete");
+        logger = this.logger.setContext("service.uploadedFile.delete", transactionId);
         logger.info({ message: "Deleting uploaded file", data: { id, userId } });
-        const data = await this.ufr.get(id)
+        const data = await this.ufr.get(transactionId, id)
         if (!data) {
             logger.warn({ message: "File not found for deletion", data: { id } });
             throw new NotFoundError("File not found")
@@ -180,19 +180,19 @@ export class UploadedFileService {
             logger.warn({ message: "User not allowed to delete this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to delete this file")
         }
-        const res = await this.ufr.delete(id)
+        const res = await this.ufr.delete(transactionId, id)
         await redis.del(`uploadedFile:totalSize:${userId}`)
         return res
     }
 
-    async getTotalFileSize(ownerId: string): Promise<TotalFileSizeResponse> {
+    async getTotalFileSize(transactionId: string, ownerId: string): Promise<TotalFileSizeResponse> {
         const cacheKey = `uploadedFile:totalSize:${ownerId}`
         const cachedData = await redis.get(cacheKey)
         if (cachedData) {
             return JSON.parse(cachedData)
         }
-        const totalFileSize = await this.ufr.getTotalFileSize(ownerId)
-        const maxFileSize = await this.userService.getMaxStorageMB(ownerId)
+        const totalFileSize = await this.ufr.getTotalFileSize(transactionId, ownerId)
+        const maxFileSize = await this.userService.getMaxStorageMB(transactionId, ownerId)
         const res = {
             total_size_kb: totalFileSize,
             max_storage_kb: maxFileSize * 1024
