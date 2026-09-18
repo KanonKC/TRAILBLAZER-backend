@@ -18,10 +18,15 @@ if (process.env.BETTERSTACK_SOURCE_TOKEN) {
     const { Logtail } = require('@logtail/node');
     const { LogtailTransport } = require('@logtail/winston');
 
+    const ingestingHost = process.env.BETTERSTACK_INGESTING_HOST;
+    const endpoint = ingestingHost
+        ? (ingestingHost.startsWith("http://") || ingestingHost.startsWith("https://")
+            ? ingestingHost
+            : `https://${ingestingHost}`)
+        : undefined;
+
     const logtail = new Logtail(process.env.BETTERSTACK_SOURCE_TOKEN, {
-        endpoint: process.env.BETTERSTACK_INGESTING_HOST
-            ? `https://${process.env.BETTERSTACK_INGESTING_HOST}`
-            : undefined,
+        endpoint,
     });
 
     transports.push(new LogtailTransport(logtail));
