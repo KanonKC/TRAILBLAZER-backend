@@ -33,8 +33,9 @@ export class UploadedFileService {
     }
 
     async extend(uf: UploadedFile): Promise<UploadedFileResponse> {
-        this.logger.setContext("service.uploadedFile.extend");
-        this.logger.info({ message: "Extending uploaded file with signed URL", data: { id: uf.id } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.extend");
+        logger.info({ message: "Extending uploaded file with signed URL", data: { id: uf.id } });
         const url = await s3.getSignedURL(uf.key, { expiresIn: 3600 })
         return {
             ...uf,
@@ -43,8 +44,9 @@ export class UploadedFileService {
     }
 
     async create(userId: string, file: { buffer: Buffer, filename: string, mimetype: string }) {
-        this.logger.setContext("service.uploadedFile.create");
-        this.logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.create");
+        logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
 
         const currentTotalSize = await this.getTotalFileSize(userId);
         const fileSizeKb = Math.round(file.buffer.length / 1024);
@@ -52,7 +54,7 @@ export class UploadedFileService {
         const limitKb = maxStorageMb * 1024;
 
         if (currentTotalSize.total_size_kb + fileSizeKb > limitKb) {
-            this.logger.warn({ message: "Storage limit reached", data: { userId, currentTotalSize, fileSizeKb, limitKb } });
+            logger.warn({ message: "Storage limit reached", data: { userId, currentTotalSize, fileSizeKb, limitKb } });
             throw new BadRequestError(`Storage limit reached (${maxStorageMb} MB). Please delete some files and try again.`);
         }
 
@@ -95,21 +97,22 @@ export class UploadedFileService {
     }
 
     async get(id: string, userId: string): Promise<UploadedFileResponse> {
-        this.logger.setContext("service.uploadedFile.get");
-        this.logger.info({ message: "Getting uploaded file", data: { id, userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.get");
+        logger.info({ message: "Getting uploaded file", data: { id, userId } });
         const cacheKey = `uploadedFile:${id}`
         const cachedData = await redis.get(cacheKey)
         if (cachedData) {
-            this.logger.info({ message: "Found file in cache", data: { id } });
+            logger.info({ message: "Found file in cache", data: { id } });
             return JSON.parse(cachedData)
         }
         const data = await this.ufr.get(id)
         if (!data) {
-            this.logger.warn({ message: "File not found", data: { id } });
+            logger.warn({ message: "File not found", data: { id } });
             throw new NotFoundError("File not found")
         }
         if (data.owner_id !== userId) {
-            this.logger.warn({ message: "User not allowed to access this file", data: { id, userId, ownerId: data.owner_id } });
+            logger.warn({ message: "User not allowed to access this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to access this file")
         }
         const res = await this.extend(data)
@@ -118,8 +121,9 @@ export class UploadedFileService {
     }
 
     async list(userId: string, filters: UploadedFileFilters, pagination: Pagination): Promise<ListResponse<UploadedFileResponse>> {
-        this.logger.setContext("service.uploadedFile.list");
-        this.logger.info({ message: "Listing uploaded files", data: { userId, filters, pagination } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.list");
+        logger.info({ message: "Listing uploaded files", data: { userId, filters, pagination } });
 
         const req: ListUploadedFileRequest = {
             search: filters.search,
@@ -139,39 +143,41 @@ export class UploadedFileService {
                     total: count
                 }
             }
-            this.logger.info({ message: "Listed uploaded files successfully", data: { ...res } })
+            logger.info({ message: "Listed uploaded files successfully", data: { ...res } })
             return res
         } catch (error) {
-            this.logger.error({ message: "Failed to list uploaded files", data: { userId, filters, pagination }, error: String(error) })
+            logger.error({ message: "Failed to list uploaded files", data: { userId, filters, pagination }, error: String(error) })
             throw error
         }
     }
 
     async update(id: string, userId: string, request: UpdateUploadedFileRequest) {
-        this.logger.setContext("service.uploadedFile.update");
-        this.logger.info({ message: "Updating uploaded file", data: { id, userId, request } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.update");
+        logger.info({ message: "Updating uploaded file", data: { id, userId, request } });
         const data = await this.ufr.get(id)
         if (!data) {
-            this.logger.warn({ message: "File not found for update", data: { id } });
+            logger.warn({ message: "File not found for update", data: { id } });
             throw new NotFoundError("File not found")
         }
         if (data.owner_id !== userId) {
-            this.logger.warn({ message: "User not allowed to update this file", data: { id, userId, ownerId: data.owner_id } });
+            logger.warn({ message: "User not allowed to update this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to update this file")
         }
         return this.ufr.update(id, request)
     }
 
     async delete(id: string, userId: string) {
-        this.logger.setContext("service.uploadedFile.delete");
-        this.logger.info({ message: "Deleting uploaded file", data: { id, userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.uploadedFile.delete");
+        logger.info({ message: "Deleting uploaded file", data: { id, userId } });
         const data = await this.ufr.get(id)
         if (!data) {
-            this.logger.warn({ message: "File not found for deletion", data: { id } });
+            logger.warn({ message: "File not found for deletion", data: { id } });
             throw new NotFoundError("File not found")
         }
         if (data.owner_id !== userId) {
-            this.logger.warn({ message: "User not allowed to delete this file", data: { id, userId, ownerId: data.owner_id } });
+            logger.warn({ message: "User not allowed to delete this file", data: { id, userId, ownerId: data.owner_id } });
             throw new ForbiddenError("You are not allowed to delete this file")
         }
         const res = await this.ufr.delete(id)

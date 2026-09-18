@@ -51,12 +51,13 @@ export default class SpotifySongRequestService {
     }
 
     async create(request: CreateSpotifySongRequestServiceRequest): Promise<SpotifySongRequestWidget> {
-        this.logger.setContext("service.spotifySongRequest.create");
-        this.logger.info({ message: "Creating spotify song request config", data: { request } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.create");
+        logger.info({ message: "Creating spotify song request config", data: { request } });
 
         const user = await this.userRepository.get(request.owner_id);
         if (!user) {
-            this.logger.warn({ message: "User not found", data: { request } });
+            logger.warn({ message: "User not found", data: { request } });
             throw new NotFoundError("User not found");
         }
 
@@ -80,42 +81,45 @@ export default class SpotifySongRequestService {
         });
 
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
-        this.logger.info({ message: "Spotify song request config created", data: { userId: user.id } });
+        logger.info({ message: "Spotify song request config created", data: { userId: user.id } });
         return res;
     }
 
     async getByUserId(userId: string): Promise<SpotifySongRequestWidget> {
-        this.logger.setContext("service.spotifySongRequest.getByUserId");
-        this.logger.info({ message: "Getting spotify song request config", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.getByUserId");
+        logger.info({ message: "Getting spotify song request config", data: { userId } });
         const config = await this.spotifyRepository.getByOwnerId(userId);
         if (!config) {
-            this.logger.error({ message: "Spotify song request config not found", data: { userId } });
+            logger.error({ message: "Spotify song request config not found", data: { userId } });
             throw new NotFoundError("Spotify song request config not found");
         }
-        this.logger.info({ message: "Got spotify song request config", data: { userId, config } });
+        logger.info({ message: "Got spotify song request config", data: { userId, config } });
         return config;
     }
 
     async update(userId: string, data: UpdateSpotifySongRequest): Promise<SpotifySongRequestWidget> {
-        this.logger.setContext("service.spotifySongRequest.update");
-        this.logger.info({ message: "Updating spotify song request config", data: { userId, data } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.update");
+        logger.info({ message: "Updating spotify song request config", data: { userId, data } });
         const existing = await this.getByUserId(userId);
         this.authorize(userId, existing);
         const updated = await this.spotifyRepository.update(existing.id, data);
-        this.logger.info({ message: "Spotify song request config updated", data: { userId } });
+        logger.info({ message: "Spotify song request config updated", data: { userId } });
         return updated;
     }
 
     async delete(userId: string): Promise<void> {
-        this.logger.setContext("service.spotifySongRequest.delete");
-        this.logger.info({ message: "Deleting spotify song request config", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.delete");
+        logger.info({ message: "Deleting spotify song request config", data: { userId } });
         const existing = await this.spotifyRepository.getByOwnerId(userId);
         if (!existing) {
             return;
         }
         this.authorize(userId, existing);
         await this.spotifyRepository.delete(existing.id);
-        this.logger.info({ message: "Spotify song request config deleted", data: { userId } });
+        logger.info({ message: "Spotify song request config deleted", data: { userId } });
     }
 
     private authorize(userId: string, config: SpotifySongRequestWidget): void {
@@ -129,8 +133,9 @@ export default class SpotifySongRequestService {
     }
 
     async test(userId: string): Promise<void> {
-        this.logger.setContext("service.spotifySongRequest.test");
-        this.logger.info({ message: "Running test insert", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.test");
+        logger.info({ message: "Running test insert", data: { userId } });
         const config = await this.getByUserId(userId);
         this.authorize(userId, config);
         if (!config.twitch_reward_id) {
@@ -161,8 +166,9 @@ export default class SpotifySongRequestService {
     }
 
     async insertSpotifyTrack(userId: string, query: string): Promise<InsertSpotifyTrackResponse> {
-        this.logger.setContext("service.spotifySongRequest.insertSpotifyTrack");
-        this.logger.info({ message: "Inserting spotify track to queue", data: { userId, query } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.spotifySongRequest.insertSpotifyTrack");
+        logger.info({ message: "Inserting spotify track to queue", data: { userId, query } });
         try {
             const spotifyAPI = await this.spotify.createUserAPI(userId);
 
@@ -202,7 +208,7 @@ export default class SpotifySongRequestService {
                 url: track.external_urls.spotify
             };
         } catch (error) {
-            this.logger.error({ message: "Failed to insert spotify track", error: String(error), data: { userId, query } });
+            logger.error({ message: "Failed to insert spotify track", error: String(error), data: { userId, query } });
             throw error;
         }
     }

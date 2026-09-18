@@ -9,14 +9,15 @@ export default class SystemService {
     private logger = new TLogger(Layer.SERVICE);
 
     async getHealth() {
-        this.logger.setContext("service.system.getHealth");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.system.getHealth");
         // Database Check
         let dbStatus = false;
         try {
             await prisma.$queryRaw`SELECT 1`;
             dbStatus = true;
         } catch (e) {
-            this.logger.error({ message: 'Database check failed', error: e as Error });
+            logger.error({ message: 'Database check failed', error: e as Error });
             dbStatus = false;
         }
 
@@ -46,7 +47,7 @@ export default class SystemService {
             await redis.ping();
             libsStatus.redis = true;
         } catch (e) {
-            this.logger.error({ message: 'Redis check failed', error: e as Error });
+            logger.error({ message: 'Redis check failed', error: e as Error });
             libsStatus.redis = false;
         }
 
@@ -70,7 +71,7 @@ export default class SystemService {
                 await twitchAppAPI.getTokenInfo();
                 libsStatus.twurple = true;
             } catch (subError) {
-                this.logger.error({ message: 'Twurple check failed', error: e as Error });
+                logger.error({ message: 'Twurple check failed', error: e as Error });
                 libsStatus.twurple = false;
             }
         }

@@ -34,10 +34,11 @@ export default class FirstWordService {
     }
 
     async create(request: CreateFirstWordRequest): Promise<FirstWordWidget> {
-        this.logger.setContext("service.firstWord.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.create");
         const user = await this.userRepository.get(request.owner_id);
         if (!user) {
-            this.logger.warn({ message: "User not found", data: { request } });
+            logger.warn({ message: "User not found", data: { request } });
             throw new NotFoundError("User not found");
         }
 
@@ -75,8 +76,9 @@ export default class FirstWordService {
     }
 
     async getByUserId(userId: string): Promise<FirstWordWidget> {
-        this.logger.setContext("service.firstWord.getByUserId");
-        this.logger.info({ message: "Getting first word config", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.getByUserId");
+        logger.info({ message: "Getting first word config", data: { userId } });
         let config: FirstWordWidget | null = null
         const cacheKey = `first_word:owner_id:${userId}`
         const cached = await redis.get(cacheKey)
@@ -86,39 +88,41 @@ export default class FirstWordService {
         if (!config) {
             const res = await this.firstWordRepository.getByOwnerId(userId)
             if (!res) {
-                this.logger.error({ message: "First word config not found", data: { userId, res } });
+                logger.error({ message: "First word config not found", data: { userId, res } });
                 throw new NotFoundError("First word config not found")
             }
             config = res
         }
         await this.widgetService.authorizeOwnership(userId, config.widget.id)
         redis.set(cacheKey, JSON.stringify(config), TTL.ONE_DAY)
-        this.logger.info({ message: "Get first word config success", data: { userId, config } });
+        logger.info({ message: "Get first word config success", data: { userId, config } });
         return config
     }
 
     async update(userId: string, data: UpdateFirstWord): Promise<FirstWordWidget> {
-        this.logger.setContext("service.firstWord.update");
-        this.logger.info({ message: "Initializing update first word config", data: { userId, data } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.update");
+        logger.info({ message: "Initializing update first word config", data: { userId, data } });
         const existing = await this.firstWordRepository.getByOwnerId(userId)
         if (!existing) {
-            this.logger.error({ message: "First word config not found", data: { userId } });
+            logger.error({ message: "First word config not found", data: { userId } });
             throw new NotFoundError("First word config not found")
         }
         await this.widgetService.authorizeOwnership(userId, existing.widget.id)
         try {
             const res = await this.firstWordRepository.update(existing.id, data)
             await redis.del(`first_word:owner_id:${userId}`)
-            this.logger.info({ message: "First word config updated", data: { userId, config: res } });
+            logger.info({ message: "First word config updated", data: { userId, config: res } });
             return this.getByUserId(userId)
         } catch (error) {
-            this.logger.error({ message: "Failed to update first word config", error: error as Error });
+            logger.error({ message: "Failed to update first word config", error: error as Error });
             throw error
         }
     }
 
     async delete(userId: string): Promise<void> {
-        this.logger.setContext("service.firstWord.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.delete");
         const firstWord = await this.firstWordRepository.getByOwnerId(userId);
         if (!firstWord) {
             return;
@@ -128,15 +132,15 @@ export default class FirstWordService {
         if (firstWord.audio_key) {
             try {
                 await s3.deleteFile(firstWord.audio_key);
-                this.logger.info({ message: "Audio file deleted from s3", data: { audio_key: firstWord.audio_key } });
+                logger.info({ message: "Audio file deleted from s3", data: { audio_key: firstWord.audio_key } });
             } catch (error) {
-                this.logger.error({ message: "Failed to delete audio file from s3", error: error as Error });
+                logger.error({ message: "Failed to delete audio file from s3", error: error as Error });
                 // Continue deletion even if S3 fails
             }
         }
 
         await this.firstWordRepository.delete(firstWord.id);
-        this.logger.info({ message: "First word config deleted", data: { userId } });
+        logger.info({ message: "First word config deleted", data: { userId } });
 
         // Clear caches
         await redis.del(`first_word:owner_id:${userId}`);
@@ -144,10 +148,11 @@ export default class FirstWordService {
     }
 
     async refreshOverlayKey(userId: string): Promise<FirstWord> {
-        this.logger.setContext("service.firstWord.refreshOverlayKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.refreshOverlayKey");
         const firstWord = await this.firstWordRepository.getByOwnerId(userId);
         if (!firstWord) {
-            this.logger.error({ message: "First word config not found", data: { userId } });
+            logger.error({ message: "First word config not found", data: { userId } });
             throw new NotFoundError("First word config not found");
         }
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
@@ -157,12 +162,13 @@ export default class FirstWordService {
         const updated = await this.firstWordRepository.update(firstWord.id, { overlay_key: newKey });
 
         await redis.del(`first_word:owner_id:${userId}`);
-        this.logger.info({ message: "First word config updated", data: { userId } });
+        logger.info({ message: "First word config updated", data: { userId } });
         return updated;
     }
 
     async validateOverlayAccess(userId: string, key: string): Promise<boolean> {
-        this.logger.setContext("service.firstWord.validateOverlayAccess");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.validateOverlayAccess");
         // We can use cache here for performance since this hits frequently on connection
         const firstWordCacheKey = `first_word:owner_id:${userId}`
         let firstWord: FirstWordWidget | null = null
@@ -177,20 +183,21 @@ export default class FirstWordService {
             }
         }
 
-        this.logger.debug({ message: "firstWord", data: firstWord });
+        logger.debug({ message: "firstWord", data: firstWord });
 
         if (!firstWord) return false;
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
 
-        this.logger.debug({ message: "firstWord validate passed", data: { overlay_key: firstWord.widget.overlay_key, key } });
+        logger.debug({ message: "firstWord validate passed", data: { overlay_key: firstWord.widget.overlay_key, key } });
         // Use constant time comparison if possible, but for UUIDs/strings here standard checks are okay 
         // as long as we handle missing keys.
         return firstWord.widget.overlay_key === key;
     }
 
     async greetNewChatter(e: TwitchChannelChatMessageEventRequest): Promise<void> {
-        this.logger.setContext("service.firstWord.greetNewChatter");
-        this.logger.info({ message: "Initiate greeting new chatter", data: { event: e } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.greetNewChatter");
+        logger.info({ message: "Initiate greeting new chatter", data: { event: e } });
         let user: User | null = null
         const userCacheKey = `user:twitch_id:${e.broadcaster_user_id}`
         const userCache = await redis.get(userCacheKey)
@@ -205,11 +212,11 @@ export default class FirstWordService {
         }
 
         if (!user) {
-            this.logger.error({ message: "User not found", data: { event: e } });
+            logger.error({ message: "User not found", data: { event: e } });
             throw new NotFoundError("User not found");
         }
 
-        this.logger.info({ message: "Found user", data: { user } });
+        logger.info({ message: "Found user", data: { user } });
 
         const firstWordCacheKey = `first_word:owner_id:${user.id}`
         const firstWordCache = await redis.get(firstWordCacheKey)
@@ -225,15 +232,15 @@ export default class FirstWordService {
         }
 
         if (!firstWord) {
-            this.logger.error({ message: "First word config not found", data: { user } });
+            logger.error({ message: "First word config not found", data: { user } });
             throw new NotFoundError("First word config not found");
         }
 
-        this.logger.info({ message: "First word config found", data: { firstWord } });
+        logger.info({ message: "First word config found", data: { firstWord } });
 
         // Check if first word is enabled
         if (!firstWord.widget.enabled) {
-            this.logger.info({ message: "First word is not enabled", data: { firstWord } });
+            logger.info({ message: "First word is not enabled", data: { firstWord } });
             return
         }
 
@@ -242,7 +249,7 @@ export default class FirstWordService {
 
         // Check if user is bot itself
         if (e.chatter_user_id === senderId) {
-            this.logger.info({ message: "User is bot itself", data: { firstWord } });
+            logger.info({ message: "User is bot itself", data: { firstWord } });
             return
         }
 
@@ -257,18 +264,18 @@ export default class FirstWordService {
             redis.set(chattersCacheKey, JSON.stringify(chattersIds), TTL.TWO_HOURS)
         }
 
-        this.logger.info({ message: "Found chatters", data: { chattersIds } });
+        logger.info({ message: "Found chatters", data: { chattersIds } });
         const chatter = chattersIds.find(chatterId => chatterId === e.chatter_user_id)
 
         // Check if user is already greeted and not a test user
         if (chatter && e.chatter_user_id !== "0") {
-            this.logger.info({ message: "User is already greeted", data: { chatter } });
+            logger.info({ message: "User is already greeted", data: { chatter } });
             return
         }
 
         if (e.chatter_user_id !== "0") {
             // Add chatter to database if not test user to prevent duplicate greetings
-            this.logger.info({ message: "Adding chatter to database", data: { chatter: e.chatter_user_id } });
+            logger.info({ message: "Adding chatter to database", data: { chatter: e.chatter_user_id } });
             try {
                 await this.firstWordRepository.addChatter({
                     first_word_id: firstWord.id,
@@ -279,24 +286,24 @@ export default class FirstWordService {
                 redis.del(chattersCacheKey)
                 redis.set(chattersCacheKey, JSON.stringify(chattersIds), TTL.TWO_HOURS)
             } catch (error) {
-                this.logger.error({ message: "Failed to add chatter to database", error: error as Error });
+                logger.error({ message: "Failed to add chatter to database", error: error as Error });
                 return
             }
 
             // Increase chatter greet count
-            this.logger.info({ message: "Increasing chatter greet count", data: { chatter: e.chatter_user_id } });
+            logger.info({ message: "Increasing chatter greet count", data: { chatter: e.chatter_user_id } });
             try {
                 await this.firstWordRepository.createOrIncrementGreetCount(firstWord.id, e.chatter_user_id, e.broadcaster_user_id)
             } catch (error) {
-                this.logger.error({ message: "Failed to increase chatter greet count", error: error as Error });
+                logger.error({ message: "Failed to increase chatter greet count", error: error as Error });
                 return
             }
         }
 
-        this.logger.info({ message: "Found custom reply", data: { firstWord, chatterId: e.chatter_user_id } });
+        logger.info({ message: "Found custom reply", data: { firstWord, chatterId: e.chatter_user_id } });
         const customReply = await this.firstWordRepository.getCustomReplyByTwitchId(firstWord.id, e.chatter_user_id)
 
-        this.logger.info({ message: "Custom reply result", data: { customReply, isFound: !!customReply } });
+        logger.info({ message: "Custom reply result", data: { customReply, isFound: !!customReply } });
 
         let message = customReply?.reply_message || firstWord.reply_message
 
@@ -308,52 +315,54 @@ export default class FirstWordService {
                 "{{greet_count}}": (greetCount?.count || 0).toString()
             }
             message = mapMessageVariables(message, replaceMap)
-            this.logger.debug({ message: "send chat message", data: { broadcaster_user_id: e.broadcaster_user_id, message } });
-            this.logger.info({ message: "Sending chat message", data: { message } });
+            logger.debug({ message: "send chat message", data: { broadcaster_user_id: e.broadcaster_user_id, message } });
+            logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, e.broadcaster_user_id, message)
         }
 
         // If audio key does not empty -> Send audio to overlay
         if (firstWord.audio_key) {
-            this.logger.debug({ message: "audio_key", data: { audio_key: firstWord.audio_key } });
+            logger.debug({ message: "audio_key", data: { audio_key: firstWord.audio_key } });
             const audioKey = customReply?.audio_key || firstWord.audio_key
             const audioVolume = customReply?.audio_volume ?? firstWord.audio_volume ?? 100
             const url = await s3.getSignedURL(audioKey, { expiresIn: 3600 });
-            this.logger.debug({ message: "url", data: { url } });
-            this.logger.info({ message: "Sending audio to overlay", data: { url } });
+            logger.debug({ message: "url", data: { url } });
+            logger.info({ message: "Sending audio to overlay", data: { url } });
             await publisher.publish("first-word-audio", JSON.stringify({
                 userId: user.id,
                 audioUrl: url,
                 volume: audioVolume
             }))
-            this.logger.debug({ message: "published" });
+            logger.debug({ message: "published" });
         }
 
         await this.widgetService.increaseTriggeredCount(firstWord.widget.id)
     }
 
     async resetChattersOnStartStream(e: TwitchStreamOnlineEventRequest): Promise<void> {
-        this.logger.setContext("service.firstWord.resetChattersOnStartStream");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.resetChattersOnStartStream");
         try {
-            this.logger.info({ message: "Resetting chatters on start stream", data: { event: e } });
+            logger.info({ message: "Resetting chatters on start stream", data: { event: e } });
             await this.resetChatter(e.broadcaster_user_id)
-            this.logger.info({ message: "Reset chatters on start stream successfully", data: { event: e } });
+            logger.info({ message: "Reset chatters on start stream successfully", data: { event: e } });
         } catch (error) {
-            this.logger.error({ message: "Failed to reset chatters on start stream", error: error as Error });
+            logger.error({ message: "Failed to reset chatters on start stream", error: error as Error });
         }
     }
 
     async resetChatter(twitchId: string): Promise<void> {
-        this.logger.setContext("service.firstWord.resetChatters");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.resetChatters");
         const user = await this.userRepository.getByTwitchId(twitchId);
         if (!user) {
-            this.logger.error({ message: "User not found", data: { twitchId } });
+            logger.error({ message: "User not found", data: { twitchId } });
             throw new NotFoundError("User not found");
         }
 
         const firstWord = await this.firstWordRepository.getByOwnerId(user.id);
         if (!firstWord) {
-            this.logger.error({ message: "First word not found", data: { user } });
+            logger.error({ message: "First word not found", data: { user } });
             throw new NotFoundError("First word not found");
         }
 
@@ -363,7 +372,8 @@ export default class FirstWordService {
     }
 
     async clearCaches(): Promise<void> {
-        this.logger.setContext("service.firstWord.clearCaches");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.clearCaches");
         const keys = await redis.keys("first_word:*")
         for (const key of keys) {
             await redis.del(key)
@@ -371,17 +381,18 @@ export default class FirstWordService {
     }
 
     async listCustomReplies(userId: string, filters: ListCustomerReplyFilters, pagination: Pagination): Promise<ListResponse<FirstWordCustomReply>> {
-        this.logger.setContext("service.firstWord.listCustomReplies");
-        this.logger.info({ message: "Get user first word", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.listCustomReplies");
+        logger.info({ message: "Get user first word", data: { userId } });
         const firstWord = await this.getByUserId(userId);
-        this.logger.info({ message: "Found user first word", data: { firstWord } });
+        logger.info({ message: "Found user first word", data: { firstWord } });
         const req: ListCustomerReplyRequest = {
             search: filters.search,
             first_word_id: firstWord.id
         }
-        this.logger.info({ message: "List custom replies", data: { req, pagination } });
+        logger.info({ message: "List custom replies", data: { req, pagination } });
         const [data, count] = await this.firstWordRepository.listCustomReplies(req, pagination)
-        this.logger.info({ message: "Found custom replies", data: { data, count } });
+        logger.info({ message: "Found custom replies", data: { data, count } });
         return {
             data: data,
             pagination: {
@@ -392,18 +403,19 @@ export default class FirstWordService {
     }
 
     async createCustomReply(userId: string, request: CreateCustomReplyRequest): Promise<void> {
-        this.logger.setContext("service.firstWord.createCustomReply");
-        this.logger.info({ message: "Get twitch user", data: { twitch_chatter_id: request.twitch_chatter_id } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.createCustomReply");
+        logger.info({ message: "Get twitch user", data: { twitch_chatter_id: request.twitch_chatter_id } });
         const twitchUser = await twitchAppAPI.users.getUserById(request.twitch_chatter_id)
-        this.logger.info({ message: "Found twitch user", data: { twitchUser } });
+        logger.info({ message: "Found twitch user", data: { twitchUser } });
         if (!twitchUser) {
-            this.logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
+            logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
             throw new NotFoundError("Twitch user not found");
         }
 
-        this.logger.info({ message: "Get user first word", data: { userId } });
+        logger.info({ message: "Get user first word", data: { userId } });
         const firstWord = await this.getByUserId(userId);
-        this.logger.info({ message: "Found user first word", data: { firstWord } });
+        logger.info({ message: "Found user first word", data: { firstWord } });
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
 
         const req: CreateCustomReply = {
@@ -412,20 +424,21 @@ export default class FirstWordService {
             twitch_chatter_username: twitchUser.displayName,
             twitch_chatter_avatar_url: twitchUser.profilePictureUrl
         };
-        this.logger.info({ message: "Creating custom reply", data: { req } });
+        logger.info({ message: "Creating custom reply", data: { req } });
         await this.firstWordRepository.createCustomReply(req);
-        this.logger.info({ message: "Clearing caches" });
+        logger.info({ message: "Clearing caches" });
         await this.clearCaches();
-        this.logger.info({ message: "Custom reply created successfully" });
+        logger.info({ message: "Custom reply created successfully" });
     }
 
     async updateCustomReply(userId: string, id: number, request: UpdateCustomReplyRequest): Promise<void> {
-        this.logger.setContext("service.firstWord.updateCustomReply");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.updateCustomReply");
         // Verify ownership indirectly: user owns first word, and we could check if this custom reply belongs to their first word.
         // For simplicity, we get the widget ID and could verify, though the repo might just update by id.
-        this.logger.info({ message: "Get user first word", data: { userId } });
+        logger.info({ message: "Get user first word", data: { userId } });
         const firstWord = await this.getByUserId(userId);
-        this.logger.info({ message: "Found user first word", data: { firstWord } });
+        logger.info({ message: "Found user first word", data: { firstWord } });
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
 
         const req: UpdateCustomReply = {
@@ -433,55 +446,57 @@ export default class FirstWordService {
         };
 
         if (request.twitch_chatter_id) {
-            this.logger.info({ message: "Get twitch user", data: { twitch_chatter_id: request.twitch_chatter_id } });
+            logger.info({ message: "Get twitch user", data: { twitch_chatter_id: request.twitch_chatter_id } });
             const twitchUser = await twitchAppAPI.users.getUserById(request.twitch_chatter_id)
-            this.logger.info({ message: "Found twitch user", data: { twitchUser } });
+            logger.info({ message: "Found twitch user", data: { twitchUser } });
             if (!twitchUser) {
-                this.logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
+                logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
                 throw new NotFoundError("Twitch user not found");
             }
             req.twitch_chatter_username = twitchUser.displayName;
             req.twitch_chatter_avatar_url = twitchUser.profilePictureUrl;
         }
 
-        this.logger.info({ message: "Updating custom reply", data: { req } });
+        logger.info({ message: "Updating custom reply", data: { req } });
         await this.firstWordRepository.updateCustomReply(id, req);
-        this.logger.info({ message: "Clearing caches" });
+        logger.info({ message: "Clearing caches" });
         await this.clearCaches();
-        this.logger.info({ message: "Custom reply updated successfully" });
+        logger.info({ message: "Custom reply updated successfully" });
     }
 
     async deleteCustomReply(userId: string, id: number): Promise<void> {
-        this.logger.setContext("service.firstWord.deleteCustomReply");
-        this.logger.info({ message: "Get user first word", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.deleteCustomReply");
+        logger.info({ message: "Get user first word", data: { userId } });
         const firstWord = await this.getByUserId(userId);
-        this.logger.info({ message: "Found user first word", data: { firstWord } });
+        logger.info({ message: "Found user first word", data: { firstWord } });
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
 
-        this.logger.info({ message: "Deleting custom reply", data: { id } });
+        logger.info({ message: "Deleting custom reply", data: { id } });
         await this.firstWordRepository.deleteCustomReply(id);
-        this.logger.info({ message: "Clearing caches" });
+        logger.info({ message: "Clearing caches" });
         await this.clearCaches();
-        this.logger.info({ message: "Custom reply deleted successfully" });
+        logger.info({ message: "Custom reply deleted successfully" });
     }
 
     async listChatters(userId: string): Promise<ListResponse<FirstWordChatter>> {
-        this.logger.setContext("service.firstWord.listChatters");
-        this.logger.info({ message: "Get user first word", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.firstWord.listChatters");
+        logger.info({ message: "Get user first word", data: { userId } });
         const firstWord = await this.getByUserId(userId);
-        this.logger.info({ message: "Found user first word", data: { firstWord } });
+        logger.info({ message: "Found user first word", data: { firstWord } });
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id)
 
         const cacheKey = `first_word:chatters:${firstWord.id}`
         const cachedChatters = await redis.get(cacheKey)
         if (cachedChatters) {
-            this.logger.info({ message: "Found cached chatters", data: { cacheKey } });
+            logger.info({ message: "Found cached chatters", data: { cacheKey } });
             return JSON.parse(cachedChatters)
         }
 
-        this.logger.info({ message: "Listing chatters", data: { firstWord } });
+        logger.info({ message: "Listing chatters", data: { firstWord } });
         const [chatters, count] = await this.firstWordRepository.listChatters(firstWord.id)
-        this.logger.info({ message: "Found chatters", data: { chatters } });
+        logger.info({ message: "Found chatters", data: { chatters } });
         await redis.set(cacheKey, JSON.stringify({
             data: chatters,
             pagination: {
@@ -490,7 +505,7 @@ export default class FirstWordService {
                 total: count
             }
         }), TTL.ONE_DAY)
-        this.logger.info({ message: "Cached chatters", data: { cacheKey } });
+        logger.info({ message: "Cached chatters", data: { cacheKey } });
         return {
             data: chatters,
             pagination: {

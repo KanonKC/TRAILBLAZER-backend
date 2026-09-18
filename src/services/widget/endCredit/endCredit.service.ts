@@ -74,18 +74,19 @@ export default class EndCreditService {
     }
 
     async create(request: CreateEndCreditServiceRequest): Promise<EndCreditWidget> {
-        this.logger.setContext("service.endCredit.create");
-        this.logger.info({ message: "Creating end credit config", data: request });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.create");
+        logger.info({ message: "Creating end credit config", data: request });
         try {
             const user = await this.userRepository.get(request.userId);
             if (!user) {
-                this.logger.warn({ message: "User not found for setup", data: request });
+                logger.warn({ message: "User not found for setup", data: request });
                 throw new NotFoundError("User not found");
             }
 
             const existing = await this.endCreditRepository.getByOwnerId(user.id);
             if (existing) {
-                this.logger.warn({ message: "End credit config already exists", data: request });
+                logger.warn({ message: "End credit config already exists", data: request });
                 throw new BadRequestError("End credit config already exists");
             }
 
@@ -113,14 +114,15 @@ export default class EndCreditService {
             await this.widgetService.setInitialEnabled(res.widget_id, user.id);
             return res;
         } catch (error) {
-            this.logger.error({ message: "Failed to create end credit widget", error: error as Error, data: request });
+            logger.error({ message: "Failed to create end credit widget", error: error as Error, data: request });
             throw error;
         }
     }
 
     async getByUserId(userId: string): Promise<EndCreditWidget> {
-        this.logger.setContext("service.endCredit.getByUserId");
-        this.logger.info({ message: "Fetching end credit config for user", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.getByUserId");
+        logger.info({ message: "Fetching end credit config for user", data: { userId } });
         try {
             const res = await this.endCreditRepository.getByOwnerId(userId);
             if (!res) {
@@ -129,18 +131,19 @@ export default class EndCreditService {
             await this.widgetService.authorizeOwnership(userId, res.widget.id);
             return res;
         } catch (error) {
-            this.logger.error({ message: "Failed to get end credit widget", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to get end credit widget", error: error as Error, data: { userId } });
             throw error;
         }
     }
 
     async update(id: string, userId: string, request: UpdateEndCreditServiceRequest): Promise<EndCreditWidget> {
-        this.logger.setContext("service.endCredit.update");
-        this.logger.info({ message: "Updating end credit config", data: { id, userId, request } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.update");
+        logger.info({ message: "Updating end credit config", data: { id, userId, request } });
         try {
             const endCredit = await this.endCreditRepository.getById(id);
             if (!endCredit) {
-                this.logger.warn({ message: "EndCredit widget not found", data: { id, userId } });
+                logger.warn({ message: "EndCredit widget not found", data: { id, userId } });
                 throw new NotFoundError("End Credit config not found");
             }
 
@@ -148,18 +151,19 @@ export default class EndCreditService {
 
             return await this.endCreditRepository.update(id, request);
         } catch (error) {
-            this.logger.error({ message: "Failed to update end credit widget", error: error as Error, data: request });
+            logger.error({ message: "Failed to update end credit widget", error: error as Error, data: request });
             throw error;
         }
     }
 
     async delete(userId: string): Promise<void> {
-        this.logger.setContext("service.endCredit.delete");
-        this.logger.info({ message: "Deleting end credit config", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.delete");
+        logger.info({ message: "Deleting end credit config", data: { userId } });
         try {
             const endCredit = await this.endCreditRepository.getByOwnerId(userId).catch(() => null);
             if (!endCredit) {
-                this.logger.info({ message: "End credit config not found, skip delete", data: { userId } });
+                logger.info({ message: "End credit config not found, skip delete", data: { userId } });
                 return;
             }
 
@@ -167,18 +171,19 @@ export default class EndCreditService {
 
             await this.endCreditRepository.delete(endCredit.id);
         } catch (error) {
-            this.logger.error({ message: "Failed to delete end credit widget", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to delete end credit widget", error: error as Error, data: { userId } });
             throw error;
         }
     }
 
     async refreshOverlayKey(userId: string): Promise<EndCreditWidget> {
-        this.logger.setContext("service.endCredit.refreshOverlayKey");
-        this.logger.info({ message: "Refreshing end credit overlay key", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.refreshOverlayKey");
+        logger.info({ message: "Refreshing end credit overlay key", data: { userId } });
         try {
             const endCredit = await this.endCreditRepository.getByOwnerId(userId);
             if (!endCredit) {
-                this.logger.warn({ message: "EndCredit widget not found", data: { userId } });
+                logger.warn({ message: "EndCredit widget not found", data: { userId } });
                 throw new NotFoundError("End Credit config not found");
             }
 
@@ -186,14 +191,15 @@ export default class EndCreditService {
                 overlay_key: randomUUID()
             });
         } catch (error) {
-            this.logger.error({ message: "Failed to refresh end credit overlay key", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to refresh end credit overlay key", error: error as Error, data: { userId } });
             throw error;
         }
     }
 
     async getViewerRecordsForOverlay(userId: string, overlayKey: string): Promise<{ records: EnrichedEndCreditViewerRecord[]; config: EndCreditWidget }> {
-        this.logger.setContext("service.endCredit.getViewerRecordsForOverlay");
-        this.logger.info({ message: "Fetching end credit viewer records for overlay", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.getViewerRecordsForOverlay");
+        logger.info({ message: "Fetching end credit viewer records for overlay", data: { userId } });
         try {
             const isValid = await this.widgetService.validateOverlayAccess(userId, overlayKey);
             if (!isValid) {
@@ -207,7 +213,7 @@ export default class EndCreditService {
             const enriched = await this.enrichRecordsWithTwitchProfile(records);
             return { records: this.filterRecordsBySectionToggle(enriched, endCredit), config: endCredit };
         } catch (error) {
-            this.logger.error({ message: "Failed to get end credit viewer records", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to get end credit viewer records", error: error as Error, data: { userId } });
             throw error;
         }
     }
@@ -224,7 +230,8 @@ export default class EndCreditService {
     }
 
     private async enrichRecordsWithTwitchProfile(records: EndCreditViewerRecord[]): Promise<EnrichedEndCreditViewerRecord[]> {
-        this.logger.setContext("service.endCredit.enrichRecordsWithTwitchProfile");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.enrichRecordsWithTwitchProfile");
         const uniqueViewerIds = [...new Set(records.map(r => r.viewer_id))];
         if (uniqueViewerIds.length === 0) {
             return [];
@@ -237,7 +244,7 @@ export default class EndCreditService {
                 profileById.set(user.id, { displayName: user.displayName, profilePictureUrl: user.profilePictureUrl });
             }
         } catch (error) {
-            this.logger.error({ message: "Failed to fetch Twitch user profiles", error: error as Error, data: { count: uniqueViewerIds.length } });
+            logger.error({ message: "Failed to fetch Twitch user profiles", error: error as Error, data: { count: uniqueViewerIds.length } });
         }
 
         return records.map(record => {
@@ -255,8 +262,9 @@ export default class EndCreditService {
      * Nothing is written to the database, so a test never pollutes the real credits.
      */
     async test(userId: string): Promise<void> {
-        this.logger.setContext("service.endCredit.test");
-        this.logger.info({ message: "Pushing mock end credit roll", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.test");
+        logger.info({ message: "Pushing mock end credit roll", data: { userId } });
         try {
             const endCredit = await this.endCreditRepository.getByOwnerId(userId);
             if (!endCredit) {
@@ -305,7 +313,7 @@ export default class EndCreditService {
 
             await this.publishRoll(userId, endCredit, records);
         } catch (error) {
-            this.logger.error({ message: "Failed to push mock end credit roll", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to push mock end credit roll", error: error as Error, data: { userId } });
             throw error;
         }
     }
@@ -314,15 +322,16 @@ export default class EndCreditService {
      * Triggered when the streamer raids another channel — rolls the credits for the stream that just ended.
      */
     async handleTwitchChannelRaidEvent(event: TwitchChannelRaidEventRequest): Promise<void> {
-        this.logger.setContext("service.endCredit.handleTwitchChannelRaidEvent");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.handleTwitchChannelRaidEvent");
         try {
             const endCredit = await this.endCreditRepository.getByTwitchId(event.from_broadcaster_user_id);
             if (!endCredit) {
-                this.logger.info({ message: "No end credit config for raider, skipping", data: { twitchId: event.from_broadcaster_user_id } });
+                logger.info({ message: "No end credit config for raider, skipping", data: { twitchId: event.from_broadcaster_user_id } });
                 return;
             }
             if (!endCredit.widget.enabled) {
-                this.logger.info({ message: "End credit widget disabled, skipping", data: { widgetId: endCredit.widget.id } });
+                logger.info({ message: "End credit widget disabled, skipping", data: { widgetId: endCredit.widget.id } });
                 return;
             }
 
@@ -332,7 +341,7 @@ export default class EndCreditService {
             await this.publishRoll(endCredit.widget.owner_id, endCredit, enriched);
             await this.widgetService.increaseTriggeredCount(endCredit.widget_id);
         } catch (error) {
-            this.logger.error({ message: "Failed to handle raid event for end credit", error: error as Error, data: { event } });
+            logger.error({ message: "Failed to handle raid event for end credit", error: error as Error, data: { event } });
         }
     }
 
@@ -355,11 +364,12 @@ export default class EndCreditService {
     }
 
     async recordViewerAction(twitchId: string, viewerId: string, type: string, value: string, platformCreatedAt: Date): Promise<void> {
-        this.logger.setContext("service.endCredit.recordViewerAction");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.recordViewerAction");
         try {
             const endCredit = await this.endCreditRepository.getByTwitchId(twitchId);
             if (!endCredit) {
-                this.logger.warn({ message: "No end credit config for twitch_id", data: { twitchId } });
+                logger.warn({ message: "No end credit config for twitch_id", data: { twitchId } });
                 return;
             }
             await this.endCreditRepository.createViewerRecord({
@@ -369,9 +379,9 @@ export default class EndCreditService {
                 value,
                 platform_created_at: platformCreatedAt,
             });
-            this.logger.info({ message: "Recorded end credit viewer action", data: { twitchId, viewerId } });
+            logger.info({ message: "Recorded end credit viewer action", data: { twitchId, viewerId } });
         } catch (error) {
-            this.logger.error({ message: "Failed to record viewer action", error: error as Error, data: { twitchId, viewerId } });
+            logger.error({ message: "Failed to record viewer action", error: error as Error, data: { twitchId, viewerId } });
         }
     }
 
@@ -379,23 +389,25 @@ export default class EndCreditService {
      * Triggered when the stream goes online — clears out last stream's viewer records so the credit roll starts fresh.
      */
     async handleTwitchStreamOnlineEvent(event: TwitchStreamOnlineEventRequest): Promise<void> {
-        this.logger.setContext("service.endCredit.handleTwitchStreamOnlineEvent");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.handleTwitchStreamOnlineEvent");
         try {
             const endCredit = await this.endCreditRepository.getByTwitchId(event.broadcaster_user_id);
             if (!endCredit) {
-                this.logger.info({ message: "No end credit config for broadcaster, skipping", data: { twitchId: event.broadcaster_user_id } });
+                logger.info({ message: "No end credit config for broadcaster, skipping", data: { twitchId: event.broadcaster_user_id } });
                 return;
             }
 
             await this.endCreditRepository.deleteViewerRecordsByEndCreditId(endCredit.id);
-            this.logger.info({ message: "Cleared end credit viewer records on stream online", data: { endCreditId: endCredit.id } });
+            logger.info({ message: "Cleared end credit viewer records on stream online", data: { endCreditId: endCredit.id } });
         } catch (error) {
-            this.logger.error({ message: "Failed to clear end credit viewer records on stream online", error: error as Error, data: { event } });
+            logger.error({ message: "Failed to clear end credit viewer records on stream online", error: error as Error, data: { event } });
         }
     }
 
     private async subscribeToEndCreditEvents(twitchId: string, userId: string): Promise<void> {
-        this.logger.setContext("service.endCredit.subscribeToEndCreditEvents");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.endCredit.subscribeToEndCreditEvents");
 
         const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
         const enabledSubs = userSubs.data.filter(sub => sub.status === "enabled");
@@ -403,16 +415,16 @@ export default class EndCreditService {
         for (const { eventType, route, subscribe } of END_CREDIT_EVENT_SUBSCRIPTIONS) {
             const existingSub = enabledSubs.filter(sub => sub.type === eventType);
             if (existingSub.length > 0) {
-                this.logger.info({ message: "Already subscribed to EventSub type, skipping", data: { userId, twitchId, eventType } });
+                logger.info({ message: "Already subscribed to EventSub type, skipping", data: { userId, twitchId, eventType } });
                 continue;
             }
 
             try {
                 const transport = createESTransport(route);
                 await subscribe(twitchId, transport, this.authService);
-                this.logger.info({ message: "Subscribed to EventSub type", data: { userId, twitchId, eventType } });
+                logger.info({ message: "Subscribed to EventSub type", data: { userId, twitchId, eventType } });
             } catch (error) {
-                this.logger.error({ message: "Failed to subscribe to EventSub type", error: error as Error, data: { userId, twitchId, eventType } });
+                logger.error({ message: "Failed to subscribe to EventSub type", error: error as Error, data: { userId, twitchId, eventType } });
                 throw new EndCreditSubscriptionError(eventType);
             }
         }

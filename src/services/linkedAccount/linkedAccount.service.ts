@@ -37,8 +37,9 @@ export default class LinkedAccountService {
     }
 
     async listByUserId(userId: string) {
-        this.logger.setContext("service.linkedAccount.listByUserId");
-        this.logger.info({ message: "Listing linked accounts", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.listByUserId");
+        logger.info({ message: "Listing linked accounts", data: { userId } });
 
         const accounts = await this.linkedAccountRepository.listByUserId(userId);
 
@@ -53,25 +54,26 @@ export default class LinkedAccountService {
     }
 
     async bindAccount(userId: string, platform: string, code: string, codeVerifier?: string) {
-        this.logger.setContext("service.linkedAccount.bindAccount");
-        this.logger.info({ message: "Binding account", data: { userId, platform } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.bindAccount");
+        logger.info({ message: "Binding account", data: { userId, platform } });
 
         this.validatePlatform(platform);
 
         const existing = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, platform);
         if (existing) {
-            this.logger.warn({ message: "Account already bound", data: { userId, platform } });
+            logger.warn({ message: "Account already bound", data: { userId, platform } });
             throw new BadRequestError(`Account already bound to ${platform}`);
         }
 
         const { accessToken, refreshToken, expiresAt } = await this.exchangeCode(platform as Platform, code, codeVerifier);
-        this.logger.info({ message: "OAuth code exchanged successfully" });
+        logger.info({ message: "OAuth code exchanged successfully" });
 
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
         const profile = await this.fetchPlatformProfile(platform as Platform, accessToken);
-        this.logger.info({ message: "Fetched platform profile", data: { platformUserId: profile.platform_user_id, platformUsername: profile.platform_username } });
+        logger.info({ message: "Fetched platform profile", data: { platformUserId: profile.platform_user_id, platformUsername: profile.platform_username } });
 
         const linkedAccount = await this.linkedAccountRepository.create({
             user_id: userId,
@@ -83,7 +85,7 @@ export default class LinkedAccountService {
             token_expires_at: expiresAt,
         });
 
-        this.logger.info({ message: "Account bound successfully", data: { userId, platform, platformUserId: profile.platform_user_id } });
+        logger.info({ message: "Account bound successfully", data: { userId, platform, platformUserId: profile.platform_user_id } });
 
         return {
             id: linkedAccount.id,
@@ -96,8 +98,9 @@ export default class LinkedAccountService {
     }
 
     async unbindAccount(userId: string, platform: string) {
-        this.logger.setContext("service.linkedAccount.unbindAccount");
-        this.logger.info({ message: "Unbinding account", data: { userId, platform } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.unbindAccount");
+        logger.info({ message: "Unbinding account", data: { userId, platform } });
 
         this.validatePlatform(platform);
 
@@ -115,11 +118,12 @@ export default class LinkedAccountService {
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         await redis.del(redisKey);
 
-        this.logger.info({ message: "Account unbound successfully", data: { userId, platform } });
+        logger.info({ message: "Account unbound successfully", data: { userId, platform } });
     }
 
     async getAccessToken(userId: string, platform: string): Promise<string> {
-        this.logger.setContext("service.linkedAccount.getAccessToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.getAccessToken");
 
         const redisKey = `linked_account:access_token:${platform}:${userId}`;
         const cachedToken = await redis.get(redisKey);
@@ -138,7 +142,7 @@ export default class LinkedAccountService {
 
         // Update tokens in DB if changed
         if (expiresAt || refreshToken) {
-            this.logger.info({ message: "Refreshed access token", data: { userId, platform } });
+            logger.info({ message: "Refreshed access token", data: { userId, platform } });
             await this.linkedAccountRepository.update(account.id, {
                 token_expires_at: expiresAt,
                 refresh_token: refreshToken || account.refresh_token
@@ -149,17 +153,18 @@ export default class LinkedAccountService {
     }
 
     async refreshExpiringTokens() {
-        this.logger.setContext("service.linkedAccount.refreshExpiringTokens");
-        this.logger.info({ message: "Starting bulk refresh of expiring tokens" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.refreshExpiringTokens");
+        logger.info({ message: "Starting bulk refresh of expiring tokens" });
 
         const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
         const accounts = await this.linkedAccountRepository.listExpiring(tomorrow);
 
-        this.logger.info({ message: `Found ${accounts.length} accounts with expiring tokens` });
+        logger.info({ message: `Found ${accounts.length} accounts with expiring tokens` });
 
         for (const account of accounts) {
             try {
-                this.logger.info({ message: "Refreshing token for account", data: { id: account.id, platform: account.platform } });
+                logger.info({ message: "Refreshing token for account", data: { id: account.id, platform: account.platform } });
 
                 const { accessToken, refreshToken, expiresAt } = await this.refreshAccessToken(account.platform as Platform, account.refresh_token!);
 
@@ -172,9 +177,9 @@ export default class LinkedAccountService {
                 const redisKey = `linked_account:access_token:${account.platform}:${account.user_id}`;
                 await redis.set(redisKey, accessToken, TTL.ONE_HOUR);
 
-                this.logger.info({ message: "Successfully refreshed token", data: { accountId: account.id, platform: account.platform } });
+                logger.info({ message: "Successfully refreshed token", data: { accountId: account.id, platform: account.platform } });
             } catch (error) {
-                this.logger.error({
+                logger.error({
                     message: "Failed to refresh token",
                     data: { accountId: account.id, platform: account.platform },
                     error: error as Error
@@ -182,7 +187,7 @@ export default class LinkedAccountService {
             }
         }
 
-        this.logger.info({ message: "Bulk refresh completed" });
+        logger.info({ message: "Bulk refresh completed" });
     }
 
     private validatePlatform(platform: string): void {
@@ -192,7 +197,8 @@ export default class LinkedAccountService {
     }
 
     private async exchangeCode(platform: Platform, code: string, codeVerifier?: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
-        this.logger.setContext("service.linkedAccount.exchangeCode");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.exchangeCode");
 
         try {
             if (platform === "youtube") {
@@ -225,21 +231,22 @@ export default class LinkedAccountService {
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof OAuth2RequestError) {
-                this.logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
+                logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
                 throw new BadRequestError("Invalid OAuth code, credentials, or redirect URI");
             }
             if (error instanceof ArcticFetchError) {
-                this.logger.error({ message: "Arctic fetch error", error: error as Error });
+                logger.error({ message: "Arctic fetch error", error: error as Error });
                 throw new BadRequestError("Failed to communicate with OAuth provider");
             }
             if (error instanceof BadRequestError) throw error;
-            this.logger.error({ message: "Failed to exchange OAuth code", error: error as Error });
+            logger.error({ message: "Failed to exchange OAuth code", error: error as Error });
             throw new BadRequestError("Failed to exchange OAuth code. The code may be expired or invalid.");
         }
     }
 
     private async refreshAccessToken(platform: Platform, refreshToken: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {
-        this.logger.setContext("service.linkedAccount.refreshAccessToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.refreshAccessToken");
 
         try {
             if (platform === "youtube") {
@@ -272,13 +279,14 @@ export default class LinkedAccountService {
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof BadRequestError) throw error;
-            this.logger.error({ message: "Failed to refresh access token", error: error as Error });
+            logger.error({ message: "Failed to refresh access token", error: error as Error });
             throw new BadRequestError("Failed to refresh access token");
         }
     }
 
     private async fetchPlatformProfile(platform: Platform, accessToken: string): Promise<PlatformUserProfile> {
-        this.logger.setContext("service.linkedAccount.fetchPlatformProfile");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.linkedAccount.fetchPlatformProfile");
 
         if (platform === "youtube") {
             return await this.fetchYouTubeProfile(accessToken);

@@ -26,7 +26,8 @@ export default class WidgetTypeService {
     }
 
     async get(id: number): Promise<WidgetType> {
-        this.logger.setContext("service.widgetType.get");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widgetType.get");
         const widgetType = await this.widgetTypeRepository.get(id);
         if (!widgetType) {
             throw new NotFoundError("Widget type not found");
@@ -35,7 +36,8 @@ export default class WidgetTypeService {
     }
 
     async create(request: CreateWidgetType): Promise<WidgetType> {
-        this.logger.setContext("service.widgetType.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widgetType.create");
         try {
             return await this.widgetTypeRepository.create(request);
         } catch (error) {
@@ -47,7 +49,8 @@ export default class WidgetTypeService {
     }
 
     async update(id: number, request: UpdateWidgetType): Promise<WidgetType> {
-        this.logger.setContext("service.widgetType.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widgetType.update");
         await this.get(id);
         try {
             return await this.widgetTypeRepository.update(id, request);
@@ -60,12 +63,13 @@ export default class WidgetTypeService {
     }
 
     async delete(id: number): Promise<void> {
-        this.logger.setContext("service.widgetType.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widgetType.delete");
         const widgetType = await this.get(id);
 
         const widgetsUsingType = await this.widgetTypeRepository.countWidgetsUsingSlug(widgetType.slug);
         if (widgetsUsingType > 0) {
-            this.logger.warn({ message: "Cannot delete widget type still in use", data: { id, widgetsUsingType } });
+            logger.warn({ message: "Cannot delete widget type still in use", data: { id, widgetsUsingType } });
             throw new BadRequestError(`${widgetsUsingType} widget(s) still use this type — disable it instead of deleting`);
         }
 
@@ -73,7 +77,8 @@ export default class WidgetTypeService {
     }
 
     async uploadIcon(filename: string, file: { buffer: Buffer, mimetype: string }): Promise<string> {
-        this.logger.setContext("service.widgetType.uploadIcon");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widgetType.uploadIcon");
         if (!/^[a-zA-Z0-9._-]+\.[a-zA-Z0-9]+$/.test(filename)) {
             throw new BadRequestError("Icon filename must include a file extension, e.g. first-word.svg");
         }
@@ -82,7 +87,7 @@ export default class WidgetTypeService {
         // Icons must land in the CDN's own bucket (cdnBucketName) — the default
         // S3_BUCKET_NAME is a separate, non-public bucket used for user uploads.
         await s3.uploadFile(file.buffer, key, file.mimetype, this.cfg.cdnBucketName);
-        this.logger.info({ message: "Widget icon uploaded", data: { key, bucket: this.cfg.cdnBucketName } });
+        logger.info({ message: "Widget icon uploaded", data: { key, bucket: this.cfg.cdnBucketName } });
 
         return `${this.cfg.cdnOrigin}/${key}`;
     }
