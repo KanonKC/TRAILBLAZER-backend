@@ -28,8 +28,9 @@ export default class UserController {
     }
 
     async login(req: FastifyRequest<{ Querystring: LoginQuery }>, res: FastifyReply) {
-        this.logger.setContext("controller.user.login");
-        this.logger.info({ message: "Login attempt initiated" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.login", req.id);
+        logger.info({ message: "Login attempt initiated" });
         try {
             const query = loginSchema.parse(req.query);
 
@@ -51,24 +52,25 @@ export default class UserController {
 
             setAuthCookies(res, { accessToken, refreshToken });
             res.redirect(this.cfg.frontendOrigin);
-            this.logger.info({ message: "Login successful", data: user });
+            logger.info({ message: "Login successful", data: user });
         } catch (err) {
             if (err instanceof z.ZodError) {
-                this.logger.warn({ message: "Validation error", data: req.query, error: err.message });
+                logger.warn({ message: "Validation error", data: req.query, error: err.message });
                 return res.status(400).send({ message: "Validation Error", errors: err.issues });
             }
             if (err instanceof TError) {
-                this.logger.error({ message: err.message, data: req.query, error: err });
+                logger.error({ message: err.message, data: req.query, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
-            this.logger.error({ message: "Login failed", data: req.query, error: err as Error | string });
+            logger.error({ message: "Login failed", data: req.query, error: err as Error | string });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async me(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.user.me");
-        this.logger.info({ message: "Getting current user info" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.me", req.id);
+        logger.info({ message: "Getting current user info" });
         const decoded = await this.authMiddleware.authenticate(req, res);
         if (!decoded) return; // 401 already sent
 
@@ -78,10 +80,10 @@ export default class UserController {
             info.tier = await this.userService.getTier(user.id);
             info.extraWidgetQuota = user.extra_widget_quota;
             info.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id);
-            this.logger.info({ message: "Successfully retrieved user info", data: info });
+            logger.info({ message: "Successfully retrieved user info", data: info });
             res.send(info);
         } catch (err) {
-            this.logger.error({ message: "Failed to get current user info", error: err as string | Error });
+            logger.error({ message: "Failed to get current user info", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -90,18 +92,19 @@ export default class UserController {
     }
 
     async getTier(req: FastifyRequest<{ Querystring: GetTierQuery }>, res: FastifyReply) {
-        this.logger.setContext("controller.user.getTier");
-        this.logger.info({ message: "Getting user tier" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.getTier", req.id);
+        logger.info({ message: "Getting user tier" });
         const decoded = await this.authMiddleware.authenticate(req, res);
         if (!decoded) return; // 401 already sent
 
         try {
             const force = req.query.force === "true";
             const tier = await this.userService.getTier(decoded.id, { forceTwitch: force });
-            this.logger.info({ message: "Successfully retrieved user tier", data: { userId: decoded.id, tier, force } });
+            logger.info({ message: "Successfully retrieved user tier", data: { userId: decoded.id, tier, force } });
             res.send({ tier });
         } catch (err) {
-            this.logger.error({ message: "Failed to get user tier", error: err as string | Error });
+            logger.error({ message: "Failed to get user tier", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -110,11 +113,12 @@ export default class UserController {
     }
 
     async refresh(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.user.refresh");
-        this.logger.info({ message: "Token refresh requested" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.refresh", req.id);
+        logger.info({ message: "Token refresh requested" });
         const { refreshToken } = req.cookies;
         if (!refreshToken) {
-            this.logger.warn({ message: "No refresh token provided" });
+            logger.warn({ message: "No refresh token provided" });
             return res.status(401).send({ message: "No refresh token" });
         }
 
@@ -123,29 +127,30 @@ export default class UserController {
 
             setAuthCookies(res, tokens);
 
-            this.logger.info({ message: "Token refreshed successfully" });
+            logger.info({ message: "Token refreshed successfully" });
             res.send({ message: "Token refreshed" });
         } catch (err) {
             if (err instanceof TError) {
-                this.logger.error({ message: err.message, error: err });
+                logger.error({ message: err.message, error: err });
                 clearAuthCookies(res);
                 return res.status(err.status).send(err.toJSON());
             }
-            this.logger.error({ message: "Token refresh failed", error: err as string | Error });
+            logger.error({ message: "Token refresh failed", error: err as string | Error });
             clearAuthCookies(res);
             res.status(401).send({ message: "Invalid refresh token" });
         }
     }
 
     async listShowcase(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.user.listShowcase");
-        this.logger.info({ message: "Listing user showcase" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.listShowcase", req.id);
+        logger.info({ message: "Listing user showcase" });
         try {
             const showcase = await this.userService.listShowcase();
-            this.logger.info({ message: "Successfully retrieved user showcase" });
+            logger.info({ message: "Successfully retrieved user showcase" });
             res.send(showcase);
         } catch (err) {
-            this.logger.error({ message: "Failed to list user showcase", error: err as string | Error });
+            logger.error({ message: "Failed to list user showcase", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -154,7 +159,8 @@ export default class UserController {
     }
 
     async getReferralStatus(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.user.getReferralStatus");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.user.getReferralStatus", req.id);
         const decoded = await this.authMiddleware.authenticate(req, res);
         if (!decoded) return; // 401 already sent
 
@@ -165,7 +171,7 @@ export default class UserController {
 
             res.send({ ...status, code });
         } catch (err) {
-            this.logger.error({ message: "Failed to get referral status", error: err as string | Error });
+            logger.error({ message: "Failed to get referral status", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }

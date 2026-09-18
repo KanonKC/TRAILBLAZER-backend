@@ -14,10 +14,11 @@ export default class TwitchController {
     }
 
     async listChannelRewards(req: FastifyRequest<{ Querystring: { user_input_required?: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.twitch.getChannelRewards");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.twitch.getChannelRewards", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -30,19 +31,20 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to get channel rewards", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to get channel rewards", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async listEventSubs(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.twitch.listEventSubs");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.twitch.listEventSubs", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -51,19 +53,20 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to list event subs", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to list event subs", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async getUser(req: FastifyRequest<{ Querystring: { username?: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.twitch.getUser");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.twitch.getUser", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -79,10 +82,10 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to get user", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to get user", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

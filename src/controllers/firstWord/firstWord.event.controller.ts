@@ -16,15 +16,16 @@ export default class FirstWordEventController {
 
     // TODO: Make rate limited
     async sse(req: FastifyRequest<{ Params: { userId: string }, Querystring: { key: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.firstWordEvent.sse");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.firstWordEvent.sse", req.id);
         const { userId } = req.params;
         const { key } = req.query;
 
-        this.logger.info({ message: "SSE connection attempt", data: { userId } });
+        logger.info({ message: "SSE connection attempt", data: { userId } });
 
         const isValid = await this.firstWordService.validateOverlayAccess(userId, key);
         if (!isValid) {
-            this.logger.warn({ message: "Invalid key for SSE connection", data: { userId } });
+            logger.warn({ message: "Invalid key for SSE connection", data: { userId } });
             return res.status(401).send({ message: "Invalid overlay key" });
         }
 
@@ -65,10 +66,11 @@ export default class FirstWordEventController {
     }
 
     public disconnectUser(userId: string) {
-        this.logger.setContext("controller.firstWordEvent.disconnectUser");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.firstWordEvent.disconnectUser");
         const userConns = this.connections.get(userId);
         if (userConns) {
-            this.logger.info({ message: "Disconnecting clients", data: { userId, clientCount: userConns.size } });
+            logger.info({ message: "Disconnecting clients", data: { userId, clientCount: userConns.size } });
             for (const res of userConns) {
                 res.raw.end();
             }
