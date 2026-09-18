@@ -18,10 +18,10 @@ export default class ReferralService {
     /**
      * Generates or retrieves a unique referral code for a user based on their Twitch ID.
      */
-    async getOrCreateCode(userId: string, twitchId: string): Promise<string> {
+    async getOrCreateCode(userId: string, twitchId: string, transactionId?: string): Promise<string> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.referral.getOrCreateCode");
-        const existing = await this.referralRepository.getReferralCodeByUserId(userId);
+        logger = this.logger.setContext("service.referral.getOrCreateCode", transactionId);
+        const existing = await this.referralRepository.getReferralCodeByUserId(userId, transactionId);
         if (existing) return existing.code;
 
         // Generate a code based on Twitch ID
@@ -32,22 +32,22 @@ export default class ReferralService {
             .substring(0, 10)
             .toUpperCase();
 
-        const referralCode = await this.referralRepository.getOrCreateReferralCode(userId, code);
+        const referralCode = await this.referralRepository.getOrCreateReferralCode(userId, code, transactionId);
         return referralCode.code;
     }
 
     /**
      * Processes a referral when a new user registers using a referral link.
      */
-    async handleReferralRegistration(code: string, refereeId: string): Promise<void> {
+    async handleReferralRegistration(code: string, refereeId: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.referral.handleReferralRegistration");
+        logger = this.logger.setContext("service.referral.handleReferralRegistration", transactionId);
         logger.info({ message: "Processing referral registration", data: { code, refereeId } });
 
         try {
             await prisma.$transaction(async (tx) => {
                 // 1. Resolve code to referrer
-                const referralCode = await this.referralRepository.getReferralCodeByCode(code);
+                const referralCode = await this.referralRepository.getReferralCodeByCode(code, transactionId);
                 if (!referralCode) {
                     this.logger.warn({ message: "Invalid referral code", data: { code } });
                     return;
@@ -63,7 +63,7 @@ export default class ReferralService {
 
                 // 2. Create referral record (will fail if referee already referred due to @unique)
                 try {
-                    await this.referralRepository.createReferral(referrerId, refereeId, tx);
+                    await this.referralRepository.createReferral(referrerId, refereeId, tx, transactionId);
                 } catch (error) {
                     this.logger.warn({ message: "Referee already referred or error creating record", error: error as Error });
                     return;
@@ -77,13 +77,13 @@ export default class ReferralService {
                     extra_widget_quota: {
                         increment: 1
                     } as any // Prisma increment
-                }, tx);
+                }, tx, transactionId);
                 this.logger.info({ message: "Applied referee reward", data: { refereeId } });
 
                 // 4. Apply Inviter Rewards (Milestones: 1, 2, 3)
                 // TODO: If a reward fails to apply for count 1, it won't be 
                 // re-evaluated when count becomes 2.
-                const referralCount = await this.referralRepository.countReferralsByReferrerId(referrerId, tx);
+                const referralCount = await this.referralRepository.countReferralsByReferrerId(referrerId, tx, transactionId);
 
                 let inviterUpdate: any = {};
                 if (referralCount === 1) {
@@ -95,7 +95,7 @@ export default class ReferralService {
                 }
 
                 if (Object.keys(inviterUpdate).length > 0) {
-                    await this.userService.update(referrerId, inviterUpdate, tx);
+                    await this.userService.update(referrerId, inviterUpdate, tx, transactionId);
                     this.logger.info({
                         message: "Applied inviter milestone reward",
                         data: { referrerId, referralCount, reward: inviterUpdate }
@@ -107,11 +107,11 @@ export default class ReferralService {
         }
     }
 
-    async getReferralStatus(userId: string) {
+    async getReferralStatus(userId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.referral.getReferralStatus");
-        const count = await this.referralRepository.countReferralsByReferrerId(userId);
-        const referralCode = await this.referralRepository.getReferralCodeByUserId(userId);
+        logger = this.logger.setContext("service.referral.getReferralStatus", transactionId);
+        const count = await this.referralRepository.countReferralsByReferrerId(userId, transactionId);
+        const referralCode = await this.referralRepository.getReferralCodeByUserId(userId, transactionId);
 
         return {
             count,

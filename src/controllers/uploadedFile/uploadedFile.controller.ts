@@ -36,7 +36,7 @@ export default class UploadedFileController {
                 buffer,
                 filename: file.filename,
                 mimetype: file.mimetype
-            });
+            }, req.id);
             logger.info({ message: "Successfully uploaded file", data: { userId: user.id, filename: file.filename } });
             res.status(201).send();
         } catch (error) {
@@ -60,7 +60,7 @@ export default class UploadedFileController {
         }
 
         try {
-            const file = await this.service.get(id, user.id);
+            const file = await this.service.get(id, user.id, req.id);
             // Optional: Check ownership? The service `get` just gets by ID. 
             // In FirstWord/etc access is checked by `getByUserId`. 
             // Here files might be public or private. The schema has `owner_id`.
@@ -96,7 +96,7 @@ export default class UploadedFileController {
             // Again, ownership check? Service implementation `ufr.update` just updates by ID.
             // I should probably add ownership check if not present in service.
             // But for now sticking to exposing service methods.
-            const updated = await this.service.update(id, user.id, request);
+            const updated = await this.service.update(id, user.id, request, req.id);
             logger.info({ message: "Successfully updated uploaded file", data: { id } });
             res.send(updated);
         } catch (error) {
@@ -123,7 +123,7 @@ export default class UploadedFileController {
         }
 
         try {
-            await this.service.delete(id, user.id);
+            await this.service.delete(id, user.id, req.id);
             logger.info({ message: "Successfully deleted uploaded file", data: { id } });
             res.status(204).send();
         } catch (error) {
@@ -153,7 +153,7 @@ export default class UploadedFileController {
             }, {
                 page: query.page,
                 limit: query.limit
-            });
+            }, req.id);
             logger.info({ message: "Successfully listed uploaded files" });
             res.send(result);
         } catch (error) {
@@ -176,7 +176,7 @@ export default class UploadedFileController {
         }
 
         try {
-            const result = await this.service.getTotalFileSize(user.id);
+            const result = await this.service.getTotalFileSize(user.id, req.id);
             logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize: result.total_size_kb } });
             res.send(result);
         } catch (error) {

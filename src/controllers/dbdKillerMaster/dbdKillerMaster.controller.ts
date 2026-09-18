@@ -15,7 +15,7 @@ export default class DBDKillerMasterController {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("controller.dbdKillerMaster.list", req.id);
         try {
-            const data = await this.repository.list();
+            const data = await this.repository.list(req.id);
             res.send({ data });
         } catch (error) {
             logger.error({ message: "Failed to list DBD killer masters", error: error as Error });

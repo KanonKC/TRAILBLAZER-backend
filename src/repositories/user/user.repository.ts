@@ -10,18 +10,18 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class UserRepository {
     constructor() { }
 
-    async create(request: CreateUserRequest): Promise<User> {
+    async create(request: CreateUserRequest, transactionId?: string): Promise<User> {
         try {
         return prisma.user.create({
             data: request
         })
     } catch (error) {
-            logger.setContext("repository.user.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.user.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async upsert(request: CreateUserRequest): Promise<User> {
+    async upsert(request: CreateUserRequest, transactionId?: string): Promise<User> {
         try {
         return prisma.user.upsert({
             where: {
@@ -31,39 +31,39 @@ export default class UserRepository {
             update: request
         })
     } catch (error) {
-            logger.setContext("repository.user.upsert").error({ message: "upsert failed", error: error as Error });
+            logger.setContext("repository.user.upsert", transactionId).error({ message: "upsert failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: string): Promise<User | null> {
+    async get(id: string, transactionId?: string): Promise<User | null> {
         try {
         return prisma.user.findUnique({ where: { id } })
     } catch (error) {
-            logger.setContext("repository.user.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.user.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string) {
+    async getByTwitchId(twitchId: string, transactionId?: string) {
         try {
         return prisma.user.findUnique({ where: { twitch_id: twitchId }, include: { auth: true } })
     } catch (error) {
-            logger.setContext("repository.user.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.user.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async count(search?: string, tier?: number, isShowcase?: boolean): Promise<number> {
+    async count(search?: string, tier?: number, isShowcase?: boolean, transactionId?: string): Promise<number> {
         try {
         return prisma.user.count({ where: this.buildFilterWhere(search, tier, isShowcase) });
     } catch (error) {
-            logger.setContext("repository.user.count").error({ message: "count failed", error: error as Error });
+            logger.setContext("repository.user.count", transactionId).error({ message: "count failed", error: error as Error });
             throw error;
         }
     }
 
-    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean) {
+    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string) {
         try {
         return prisma.user.findMany({
             where: this.buildFilterWhere(search, tier, isShowcase),
@@ -75,7 +75,7 @@ export default class UserRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.user.findMany").error({ message: "findMany failed", error: error as Error });
+            logger.setContext("repository.user.findMany", transactionId).error({ message: "findMany failed", error: error as Error });
             throw error;
         }
     }
@@ -102,7 +102,7 @@ export default class UserRepository {
         return Object.keys(where).length > 0 ? where : undefined;
     }
 
-    async update(id: string, request: Partial<User>, tx?: any): Promise<User> {
+    async update(id: string, request: Partial<User>, tx?: any, transactionId?: string): Promise<User> {
         try {
         const client = tx || prisma;
         return client.user.update({
@@ -110,12 +110,12 @@ export default class UserRepository {
             data: request
         })
     } catch (error) {
-            logger.setContext("repository.user.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.user.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async listExpired(pagination: Pagination, excludeIds: string[] = []): Promise<User[]> {
+    async listExpired(pagination: Pagination, excludeIds: string[] = [], transactionId?: string): Promise<User[]> {
         try {
         const now = new Date()
         return prisma.user.findMany({
@@ -131,12 +131,12 @@ export default class UserRepository {
             take: pagination.limit
         })
     } catch (error) {
-            logger.setContext("repository.user.listExpired").error({ message: "listExpired failed", error: error as Error });
+            logger.setContext("repository.user.listExpired", transactionId).error({ message: "listExpired failed", error: error as Error });
             throw error;
         }
     }
 
-    async listByIds(ids: string[], pagination: Pagination): Promise<User[]> {
+    async listByIds(ids: string[], pagination: Pagination, transactionId?: string): Promise<User[]> {
         try {
         return prisma.user.findMany({
             where: {
@@ -148,12 +148,12 @@ export default class UserRepository {
             take: pagination.limit
         })
     } catch (error) {
-            logger.setContext("repository.user.listByIds").error({ message: "listByIds failed", error: error as Error });
+            logger.setContext("repository.user.listByIds", transactionId).error({ message: "listByIds failed", error: error as Error });
             throw error;
         }
     }
 
-    async listShowcase(): Promise<Partial<User>[]> {
+    async listShowcase(transactionId?: string): Promise<Partial<User>[]> {
         try {
         return prisma.user.findMany({
             where: {
@@ -166,7 +166,7 @@ export default class UserRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.user.listShowcase").error({ message: "listShowcase failed", error: error as Error });
+            logger.setContext("repository.user.listShowcase", transactionId).error({ message: "listShowcase failed", error: error as Error });
             throw error;
         }
     }

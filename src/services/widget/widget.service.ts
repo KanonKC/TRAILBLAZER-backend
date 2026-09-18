@@ -29,24 +29,24 @@ export default class WidgetService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async authorizeOwnership(userId: string, widgetId: string) {
+    async authorizeOwnership(userId: string, widgetId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.authorizeOwnership");
-        const widget = await this.get(widgetId);
+        logger = this.logger.setContext("service.widget.authorizeOwnership", transactionId);
+        const widget = await this.get(widgetId, transactionId);
         if (widget.owner_id !== userId) {
             logger.warn({ message: "You are not the owner of this widget", data: { userId, widgetId: widget.id } });
             throw new ForbiddenError("You are not the owner of this widget");
         }
     }
 
-    async authorizeTierUsage(userId: string, widgetId?: string, isEnabling?: boolean) {
+    async authorizeTierUsage(userId: string, widgetId?: string, isEnabling?: boolean, transactionId?: string) {
         let logger: TLogger = this.logger;
         try {
-            logger = this.logger.setContext("service.widget.authorizeTierUsage");
+            logger = this.logger.setContext("service.widget.authorizeTierUsage", transactionId);
 
             if (isEnabling === false) return; // Disabling is always allowed
 
-            const user = await this.userService.get(userId);
+            const user = await this.userService.get(userId, transactionId);
             const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
             const quota = baseQuota + user.extra_widget_quota;
 
@@ -54,14 +54,14 @@ export default class WidgetService {
             let willBeEnabled: boolean = isEnabling ?? true;
 
             if (widgetId) {
-                const currentWidget = await this.get(widgetId);
+                const currentWidget = await this.get(widgetId, transactionId);
                 currentWidgetCost = currentWidget.widget_type?.cost ?? 1;
                 willBeEnabled = isEnabling ?? currentWidget.enabled;
             }
 
             if (!willBeEnabled) return; // Disabling — skip quota check
 
-            const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, widgetId ? [widgetId] : []);
+            const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, widgetId ? [widgetId] : [], transactionId);
             const resultingQuota = usedQuota + currentWidgetCost;
 
             if (resultingQuota > quota) {
@@ -77,61 +77,61 @@ export default class WidgetService {
         }
     }
 
-    async update(id: string, userId: string, request: UpdateWidget) {
+    async update(id: string, userId: string, request: UpdateWidget, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.update");
-        const existing = await this.widgetRepository.get(id);
+        logger = this.logger.setContext("service.widget.update", transactionId);
+        const existing = await this.widgetRepository.get(id, transactionId);
         if (!existing) {
             throw new NotFoundError("Widget not found");
         }
-        await this.authorizeOwnership(userId, existing.id);
-        const res = await this.widgetRepository.update(id, request);
+        await this.authorizeOwnership(userId, existing.id, transactionId);
+        const res = await this.widgetRepository.update(id, request, transactionId);
         await redis.del(`widget:${id}`)
         await redis.del(`widget:total:owner:${userId}`)
         return res
     }
 
-    async updateEnable(id: string, userId: string, value: boolean) {
+    async updateEnable(id: string, userId: string, value: boolean, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.updateEnable");
+        logger = this.logger.setContext("service.widget.updateEnable", transactionId);
         logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
-        await this.authorizeTierUsage(userId, id, value);
-        return this.update(id, userId, { enabled: value });
+        await this.authorizeTierUsage(userId, id, value, transactionId);
+        return this.update(id, userId, { enabled: value }, transactionId);
     }
 
-    async setInitialEnabled(id: string, userId: string) {
+    async setInitialEnabled(id: string, userId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.setInitialEnabled");
-        const widget = await this.get(id);
+        logger = this.logger.setContext("service.widget.setInitialEnabled", transactionId);
+        const widget = await this.get(id, transactionId);
         const cost = widget.widget_type?.cost ?? 1;
-        const user = await this.userService.get(userId);
+        const user = await this.userService.get(userId, transactionId);
         const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
         const quota = baseQuota + user.extra_widget_quota;
-        const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id]);
+        const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id], transactionId);
         const isEnabled = usedQuota + cost <= quota;
         logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
-        await this.update(id, userId, { enabled: isEnabled });
+        await this.update(id, userId, { enabled: isEnabled }, transactionId);
     }
 
-    async delete(id: string, userId: string) {
+    async delete(id: string, userId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.delete");
-        const existing = await this.widgetRepository.get(id);
+        logger = this.logger.setContext("service.widget.delete", transactionId);
+        const existing = await this.widgetRepository.get(id, transactionId);
         if (!existing) {
             throw new NotFoundError("Widget not found");
         }
-        await this.authorizeOwnership(userId, existing.id);
+        await this.authorizeOwnership(userId, existing.id, transactionId);
 
-        return this.widgetRepository.delete(id);
+        return this.widgetRepository.delete(id, transactionId);
     }
 
-    async validateOverlayAccess(userId: string, key: string) {
+    async validateOverlayAccess(userId: string, key: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.validateOverlayAccess");
+        logger = this.logger.setContext("service.widget.validateOverlayAccess", transactionId);
         logger.info({ message: "Validating overlay access", data: { userId } });
         try {
-            const widget = await this.widgetRepository.getByOverlayKey(key);
+            const widget = await this.widgetRepository.getByOverlayKey(key, transactionId);
             if (!widget) {
                 logger.warn({ message: "Widget not found", data: { userId } });
                 return false;
@@ -149,16 +149,16 @@ export default class WidgetService {
         }
     }
 
-    async get(widgetId: string): Promise<ExtendedWidget> {
+    async get(widgetId: string, transactionId?: string): Promise<ExtendedWidget> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.get");
+        logger = this.logger.setContext("service.widget.get", transactionId);
         const cacheKey = `widget:${widgetId}`;
         const cachedWidget = await redis.get(cacheKey);
         if (cachedWidget) {
             return JSON.parse(cachedWidget);
         }
 
-        const widget = await this.widgetRepository.get(widgetId);
+        const widget = await this.widgetRepository.get(widgetId, transactionId);
         if (!widget) {
             throw new NotFoundError("Widget not found");
         }
@@ -167,11 +167,11 @@ export default class WidgetService {
         return widget;
     }
 
-    async list(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters): Promise<ListResponse<ExtendedWidget>> {
+    async list(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters, transactionId?: string): Promise<ListResponse<ExtendedWidget>> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.list");
+        logger = this.logger.setContext("service.widget.list", transactionId);
         logger.info({ message: "Listing widgets by owner ID", data: { ownerId } });
-        const [widgets, total] = await this.widgetRepository.listByOwnerId(ownerId, pagination, filters);
+        const [widgets, total] = await this.widgetRepository.listByOwnerId(ownerId, pagination, filters, transactionId);
         logger.info({ message: "Widgets listed successfully", data: { widgets, total } });
         return {
             data: widgets,
@@ -182,62 +182,62 @@ export default class WidgetService {
         };
     }
 
-    async getTotalByOwnerId(ownerId: string, filters?: ListWidgetFilters): Promise<number> {
+    async getTotalByOwnerId(ownerId: string, filters?: ListWidgetFilters, transactionId?: string): Promise<number> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.getTotalByOwnerId");
-        const total = await this.list(ownerId, { page: 1, limit: 1 }, filters);
+        logger = this.logger.setContext("service.widget.getTotalByOwnerId", transactionId);
+        const total = await this.list(ownerId, { page: 1, limit: 1 }, filters, transactionId);
 
         const res = total.pagination.total || 0;
         return res
     }
 
-    async disableAll(ownerId: string) {
+    async disableAll(ownerId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.disableAll");
+        logger = this.logger.setContext("service.widget.disableAll", transactionId);
         logger.info({ message: "Disabling all widgets", data: { ownerId } });
-        await this.widgetRepository.disableAll(ownerId);
+        await this.widgetRepository.disableAll(ownerId, transactionId);
     }
 
-    async refreshOverlayKey(widgetId: string): Promise<void> {
+    async refreshOverlayKey(widgetId: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.refreshOverlayKey");
+        logger = this.logger.setContext("service.widget.refreshOverlayKey", transactionId);
         const newKey = crypto.randomUUID();
-        await this.widgetRepository.updateOverlayKey(widgetId, newKey);
+        await this.widgetRepository.updateOverlayKey(widgetId, newKey, transactionId);
     }
 
-    async updateOverlayKey(widgetId: string, overlayKey: string): Promise<void> {
+    async updateOverlayKey(widgetId: string, overlayKey: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.updateOverlayKey");
-        await this.widgetRepository.updateOverlayKey(widgetId, overlayKey);
+        logger = this.logger.setContext("service.widget.updateOverlayKey", transactionId);
+        await this.widgetRepository.updateOverlayKey(widgetId, overlayKey, transactionId);
     }
 
-    async getFirstEnabled(ownerId: string) {
+    async getFirstEnabled(ownerId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.getFirstEnabled");
-        const first = await this.widgetRepository.getFirstEnabled(ownerId)
+        logger = this.logger.setContext("service.widget.getFirstEnabled", transactionId);
+        const first = await this.widgetRepository.getFirstEnabled(ownerId, transactionId)
         if (!first) {
             throw new NotFoundError("Widget not found")
         }
         return first
     }
 
-    async getQuota(userId: string): Promise<{ total_quota: number; used_quota: number; remaining_quota: number }> {
+    async getQuota(userId: string, transactionId?: string): Promise<{ total_quota: number; used_quota: number; remaining_quota: number }> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.getQuota");
+        logger = this.logger.setContext("service.widget.getQuota", transactionId);
         logger.info({ message: "Fetching quota info", data: { userId } });
-        const user = await this.userService.get(userId);
+        const user = await this.userService.get(userId, transactionId);
         const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
         const total_quota = baseQuota + user.extra_widget_quota;
-        const used_quota = await this.widgetRepository.getEnabledQuotaUsed(userId);
+        const used_quota = await this.widgetRepository.getEnabledQuotaUsed(userId, undefined, transactionId);
         const remaining_quota = Math.max(0, total_quota - used_quota);
         return { total_quota, used_quota, remaining_quota };
     }
 
-    async increaseTriggeredCount(id: string): Promise<void> {
+    async increaseTriggeredCount(id: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.widget.increaseTriggeredCount");
+        logger = this.logger.setContext("service.widget.increaseTriggeredCount", transactionId);
         try {
-            await this.widgetRepository.increaseTriggeredCount(id)
+            await this.widgetRepository.increaseTriggeredCount(id, transactionId)
             await redis.del(`widget:${id}`)
         } catch (err) {
             logger.error({ message: "Failed to increase Widget triggered count", data: { widgetId: id }, error: err as Error });

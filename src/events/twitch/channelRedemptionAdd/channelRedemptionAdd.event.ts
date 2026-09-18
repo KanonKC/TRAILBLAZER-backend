@@ -35,8 +35,8 @@ export default class TwitchChannelRedemptionAddEvent {
             logger.info({ message: "Handling channel redemption add event", data: event })
             try {
                 await Promise.allSettled([
-                    this.randomDbdPerkService.randomPerk(event),
-                    this.randomDBDKillerService.randomizeKiller(event),
+                    this.randomDbdPerkService.randomPerk(event, req.id),
+                    this.randomDBDKillerService.randomizeKiller(event, req.id),
                 ])
             } catch (err: any) {
                 logger.error({ message: "Handle event failed", error: err })

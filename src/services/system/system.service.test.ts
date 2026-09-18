@@ -29,6 +29,7 @@ jest.mock("node:crypto", () => ({
 }));
 
 describe("SystemService", () => {
+    const transactionId = "test-transaction-id";
     let service: SystemService;
 
     beforeEach(() => {
@@ -43,7 +44,7 @@ describe("SystemService", () => {
             (s3.healthCheck as jest.Mock).mockResolvedValue(true);
             (twitchAppAPI.getTokenInfo as jest.Mock).mockResolvedValue({ clientId: "id" });
 
-            const result = await service.getHealth();
+            const result = await service.getHealth(transactionId);
 
             expect(result.database).toBe(true);
             expect(result.libs.redis).toBe(true);
@@ -57,7 +58,7 @@ describe("SystemService", () => {
             (s3.healthCheck as jest.Mock).mockResolvedValue(false);
             (twitchAppAPI.getTokenInfo as jest.Mock).mockRejectedValue(new Error("Twitch Error"));
 
-            const result = await service.getHealth();
+            const result = await service.getHealth(transactionId);
 
             expect(result.database).toBe(false);
             expect(result.libs.redis).toBe(false);
@@ -75,7 +76,7 @@ describe("SystemService", () => {
                 .mockRejectedValueOnce(new Error("First hit failed"))
                 .mockResolvedValueOnce({ clientId: "id" });
 
-            const result = await service.getHealth();
+            const result = await service.getHealth(transactionId);
 
             expect(result.libs.twurple).toBe(true);
         });

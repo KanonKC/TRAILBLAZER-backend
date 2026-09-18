@@ -27,7 +27,7 @@ export default class EndCreditController {
 
         try {
             const request = createEndCreditSchema.parse(req.body);
-            const created = await this.endCreditService.create({ userId: user.id, ...request });
+            const created = await this.endCreditService.create({ userId: user.id, ...request }, req.id);
             logger.info({ message: "Successfully created end credit config", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
@@ -55,7 +55,7 @@ export default class EndCreditController {
         }
 
         try {
-            const config = await this.endCreditService.getByUserId(user.id);
+            const config = await this.endCreditService.getByUserId(user.id, req.id);
             logger.info({ message: "Successfully retrieved end credit config", data: { userId: user.id } });
             res.send(config);
         } catch (error) {
@@ -80,12 +80,12 @@ export default class EndCreditController {
 
         try {
             const request = updateEndCreditSchema.parse(req.body);
-            const config = await this.endCreditService.getByUserId(user.id);
+            const config = await this.endCreditService.getByUserId(user.id, req.id);
             if (!config) {
                 throw new NotFoundError("End credit config not found");
             }
 
-            const updated = await this.endCreditService.update(config.id, user.id, request);
+            const updated = await this.endCreditService.update(config.id, user.id, request, req.id);
             logger.info({ message: "Successfully updated end credit config", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -113,7 +113,7 @@ export default class EndCreditController {
         }
 
         try {
-            await this.endCreditService.delete(user.id);
+            await this.endCreditService.delete(user.id, req.id);
             logger.info({ message: "Successfully deleted end credit config", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -137,7 +137,7 @@ export default class EndCreditController {
         }
 
         try {
-            const updated = await this.endCreditService.refreshOverlayKey(user.id);
+            const updated = await this.endCreditService.refreshOverlayKey(user.id, req.id);
             logger.info({ message: "Successfully refreshed overlay key", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
@@ -158,7 +158,7 @@ export default class EndCreditController {
         logger.info({ message: "Getting end credit viewer records", data: { userId } });
 
         try {
-            const { records, config } = await this.endCreditService.getViewerRecordsForOverlay(userId, key);
+            const { records, config } = await this.endCreditService.getViewerRecordsForOverlay(userId, key, req.id);
             logger.info({ message: "Successfully retrieved end credit viewer records", data: { userId, count: records.length } });
             res.send({
                 records,
@@ -194,7 +194,7 @@ export default class EndCreditController {
         }
 
         try {
-            await this.endCreditService.test(user.id);
+            await this.endCreditService.test(user.id, req.id);
             logger.info({ message: "Successfully inserted test end credit records", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {

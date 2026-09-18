@@ -30,6 +30,7 @@ jest.mock("node:crypto", () => ({
 }));
 
 describe("AuthService", () => {
+    const transactionId = "test-transaction-id";
     let service: AuthService;
     let mockAuthRepo: jest.Mocked<AuthRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
@@ -72,7 +73,7 @@ describe("AuthService", () => {
             (createTwitchUserAPI as jest.Mock).mockReturnValue(mockUserAPI);
 
             // Accessing private method for testing
-            const result = await (service as any).getTwitchAccessToken(twitchId);
+            const result = await (service as any).getTwitchAccessToken(twitchId, transactionId);
 
             expect(result).toBe("cached_token");
             expect(redis.get).toHaveBeenCalledWith(cacheKey);
@@ -92,7 +93,7 @@ describe("AuthService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue({ id: "u1", auth: { twitch_refresh_token: "rt" } } as any);
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
 
-            await (service as any).getTwitchAccessToken(twitchId);
+            await (service as any).getTwitchAccessToken(twitchId, transactionId);
 
             expect(redis.del).toHaveBeenCalledWith(cacheKey);
         });
@@ -107,7 +108,7 @@ describe("AuthService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue({ id: "u1", auth: { twitch_refresh_token: "rt" } } as any);
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
 
-            await (service as any).getTwitchAccessToken(twitchId);
+            await (service as any).getTwitchAccessToken(twitchId, transactionId);
 
             expect(redis.del).toHaveBeenCalledWith(cacheKey);
         });
@@ -116,7 +117,7 @@ describe("AuthService", () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             mockUserRepo.getByTwitchId.mockResolvedValue(null);
 
-            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(NotFoundError);
+            await expect((service as any).getTwitchAccessToken(twitchId, transactionId)).rejects.toThrow(NotFoundError);
         });
 
         it("should create auth record if missing", async () => {
@@ -126,8 +127,8 @@ describe("AuthService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any); // for logout call
             mockAuthRepo.create.mockResolvedValue({ id: "a1", twitch_refresh_token: null } as any);
 
-            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
-            expect(mockAuthRepo.create).toHaveBeenCalledWith("u1");
+            await expect((service as any).getTwitchAccessToken(twitchId, transactionId)).rejects.toThrow(UnauthorizedError);
+            expect(mockAuthRepo.create).toHaveBeenCalledWith("u1", transactionId);
         });
 
         it("should throw UnauthorizedError if refresh token missing", async () => {
@@ -136,8 +137,8 @@ describe("AuthService", () => {
             mockUserRepo.getByTwitchId.mockResolvedValue(mockUser as any);
             mockUserRepo.get.mockResolvedValue(mockUser as any); // for logout call
 
-            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
-            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow(UnauthorizedError);
+            await expect((service as any).getTwitchAccessToken(twitchId, transactionId)).rejects.toThrow(UnauthorizedError);
+            await expect((service as any).getTwitchAccessToken(twitchId, transactionId)).rejects.toThrow(UnauthorizedError);
         });
 
         it("should refresh token successfully if not in cache", async () => {
@@ -152,12 +153,12 @@ describe("AuthService", () => {
                 expiresIn: 3600
             });
 
-            const result = await (service as any).getTwitchAccessToken(twitchId);
+            const result = await (service as any).getTwitchAccessToken(twitchId, transactionId);
 
             expect(result).toBe("new_at");
             expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalledWith("a1", expect.objectContaining({
                 twitch_refresh_token: "new_rt",
-            }));
+            }), transactionId);
             expect(redis.set).toHaveBeenCalledWith(cacheKey, "new_at", TTL.QUARTER_HOUR);
         });
 
@@ -173,12 +174,12 @@ describe("AuthService", () => {
                 expiresIn: null
             });
 
-            const result = await (service as any).getTwitchAccessToken(twitchId);
+            const result = await (service as any).getTwitchAccessToken(twitchId, transactionId);
 
             expect(result).toBe("new_at");
             expect(mockAuthRepo.updateTwitchToken).toHaveBeenCalledWith("a1", expect.objectContaining({
                 twitch_token_expires_at: null,
-            }));
+            }), transactionId);
         });
 
         it("should handle error during DB update after refresh", async () => {
@@ -189,7 +190,7 @@ describe("AuthService", () => {
             (refreshUserToken as jest.Mock).mockResolvedValue({ accessToken: "new_at", refreshToken: "new_rt" });
             mockAuthRepo.updateTwitchToken.mockRejectedValue(new Error("DB Update Error"));
 
-            await expect((service as any).getTwitchAccessToken(twitchId)).rejects.toThrow("DB Update Error");
+            await expect((service as any).getTwitchAccessToken(twitchId, transactionId)).rejects.toThrow("DB Update Error");
         });
     });
 
@@ -199,7 +200,7 @@ describe("AuthService", () => {
             const mockUserAPI = { getTokenInfo: jest.fn().mockResolvedValue({ expiryDate: new Date(Date.now() + 10000) }) };
             (createTwitchUserAPI as jest.Mock).mockReturnValue(mockUserAPI);
 
-            const result = await service.createTwitchUserAPI("twitch_1");
+            const result = await service.createTwitchUserAPI("twitch_1", transactionId);
 
             expect(result).toBe(mockUserAPI);
         });
@@ -209,7 +210,7 @@ describe("AuthService", () => {
         it("should logout successfully", async () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
 
-            await service.logout("u1");
+            await service.logout("u1", undefined, transactionId);
 
             expect(redis.del).toHaveBeenCalledWith("auth:twitch_access_token:twitch_id:v2:t1");
         });
@@ -217,7 +218,7 @@ describe("AuthService", () => {
         it("should revoke the refresh token in Redis when provided", async () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
 
-            await service.logout("u1", "some-refresh-token");
+            await service.logout("u1", "some-refresh-token", transactionId);
 
             expect(redis.del).toHaveBeenCalledWith("refresh_token:some-refresh-token");
         });
@@ -225,14 +226,14 @@ describe("AuthService", () => {
         it("should not attempt to delete a refresh token when none is provided", async () => {
             mockUserRepo.get.mockResolvedValue({ id: "u1", twitch_id: "t1" } as any);
 
-            await service.logout("u1");
+            await service.logout("u1", undefined, transactionId);
 
             expect(redis.del).not.toHaveBeenCalledWith(expect.stringContaining("refresh_token:"));
         });
 
         it("should throw NotFoundError if user not found", async () => {
             mockUserRepo.get.mockResolvedValue(null);
-            await expect(service.logout("u1")).rejects.toThrow(NotFoundError);
+            await expect(service.logout("u1", undefined, transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 });

@@ -9,35 +9,35 @@ export default class DBDKillerMasterRepository {
     constructor() {
     }
 
-    async getBySlug(slug: string): Promise<DBDKillerMaster | null> {
+    async getBySlug(slug: string, transactionId?: string): Promise<DBDKillerMaster | null> {
         try {
         return prisma.dBDKillerMaster.findUnique({
             where: { slug }
         });
     } catch (error) {
-            logger.setContext("repository.dbdKillerMaster.getBySlug").error({ message: "getBySlug failed", error: error as Error });
+            logger.setContext("repository.dbdKillerMaster.getBySlug", transactionId).error({ message: "getBySlug failed", error: error as Error });
             throw error;
         }
     }
 
-    async getBySlugs(slugs: string[]): Promise<DBDKillerMaster[]> {
+    async getBySlugs(slugs: string[], transactionId?: string): Promise<DBDKillerMaster[]> {
         try {
         return prisma.dBDKillerMaster.findMany({
             where: { slug: { in: slugs } }
         });
     } catch (error) {
-            logger.setContext("repository.dbdKillerMaster.getBySlugs").error({ message: "getBySlugs failed", error: error as Error });
+            logger.setContext("repository.dbdKillerMaster.getBySlugs", transactionId).error({ message: "getBySlugs failed", error: error as Error });
             throw error;
         }
     }
 
-    async list(): Promise<DBDKillerMaster[]> {
+    async list(transactionId?: string): Promise<DBDKillerMaster[]> {
         try {
         return prisma.dBDKillerMaster.findMany({
             orderBy: { title: "asc" }
         });
     } catch (error) {
-            logger.setContext("repository.dbdKillerMaster.list").error({ message: "list failed", error: error as Error });
+            logger.setContext("repository.dbdKillerMaster.list", transactionId).error({ message: "list failed", error: error as Error });
             throw error;
         }
     }

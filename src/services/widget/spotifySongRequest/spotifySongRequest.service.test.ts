@@ -48,6 +48,7 @@ const mockEvent = {
 } as any;
 
 describe("SpotifySongRequestService", () => {
+    const transactionId = "test-transaction-id";
     let service: SpotifySongRequestService;
     let mockSpotifyRepo: jest.Mocked<SpotifySongRequestRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
@@ -116,23 +117,23 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyRepo.create.mockResolvedValue(mockConfig);
             mockWidgetService.setInitialEnabled.mockResolvedValue(undefined as any);
 
-            const result = await service.create(request);
+            const result = await service.create(request, transactionId);
 
-            expect(mockUserRepo.get).toHaveBeenCalledWith("user_1");
+            expect(mockUserRepo.get).toHaveBeenCalledWith("user_1", transactionId);
             expect(twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents).toHaveBeenCalledWith("twitch_1", "transport");
             expect(mockSpotifyRepo.create).toHaveBeenCalledWith(expect.objectContaining({
                 twitch_id: "twitch_1",
                 owner_id: "user_1",
                 overlay_key: "mocked_hex",
-            }));
-            expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith(mockConfig.widget_id, "user_1");
+            }), transactionId);
+            expect(mockWidgetService.setInitialEnabled).toHaveBeenCalledWith(mockConfig.widget_id, "user_1", transactionId);
             expect(result).toBe(mockConfig);
         });
 
         it("should throw NotFoundError if user not found", async () => {
             mockUserRepo.get.mockResolvedValue(null);
 
-            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(request, transactionId)).rejects.toThrow(NotFoundError);
         });
 
         it("should skip creating EventSub subscription if one already exists and is enabled", async () => {
@@ -143,7 +144,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyRepo.create.mockResolvedValue(mockConfig);
             mockWidgetService.setInitialEnabled.mockResolvedValue(undefined as any);
 
-            await service.create(request);
+            await service.create(request, transactionId);
 
             expect(twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents).not.toHaveBeenCalled();
         });
@@ -153,16 +154,16 @@ describe("SpotifySongRequestService", () => {
         it("should return config when found", async () => {
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(mockConfig);
 
-            const result = await service.getByUserId("user_1");
+            const result = await service.getByUserId("user_1", transactionId);
 
-            expect(mockSpotifyRepo.getByOwnerId).toHaveBeenCalledWith("user_1");
+            expect(mockSpotifyRepo.getByOwnerId).toHaveBeenCalledWith("user_1", transactionId);
             expect(result).toBe(mockConfig);
         });
 
         it("should throw NotFoundError when config not found", async () => {
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.getByUserId("user_1")).rejects.toThrow(NotFoundError);
+            await expect(service.getByUserId("user_1", transactionId)).rejects.toThrow(NotFoundError);
         });
     });
 
@@ -173,9 +174,9 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(mockConfig);
             mockSpotifyRepo.update.mockResolvedValue(updatedConfig as any);
 
-            const result = await service.update("user_1", updateData);
+            const result = await service.update("user_1", updateData, transactionId);
 
-            expect(mockSpotifyRepo.update).toHaveBeenCalledWith("ssr_1", updateData);
+            expect(mockSpotifyRepo.update).toHaveBeenCalledWith("ssr_1", updateData, transactionId);
             expect(result).toBe(updatedConfig);
         });
 
@@ -183,7 +184,7 @@ describe("SpotifySongRequestService", () => {
             const foreignConfig = { ...mockConfig, widget: { ...mockConfig.widget, owner_id: "other_user" } };
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(foreignConfig as any);
 
-            await expect(service.update("user_1", {})).rejects.toThrow(ForbiddenError);
+            await expect(service.update("user_1", {}, transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
 
@@ -191,15 +192,15 @@ describe("SpotifySongRequestService", () => {
         it("should delete config successfully when authorized", async () => {
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(mockConfig);
 
-            await service.delete("user_1");
+            await service.delete("user_1", transactionId);
 
-            expect(mockSpotifyRepo.delete).toHaveBeenCalledWith("ssr_1");
+            expect(mockSpotifyRepo.delete).toHaveBeenCalledWith("ssr_1", transactionId);
         });
 
         it("should return early without error if config not found", async () => {
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(null);
 
-            await expect(service.delete("user_1")).resolves.toBeUndefined();
+            await expect(service.delete("user_1", transactionId)).resolves.toBeUndefined();
             expect(mockSpotifyRepo.delete).not.toHaveBeenCalled();
         });
 
@@ -207,7 +208,7 @@ describe("SpotifySongRequestService", () => {
             const foreignConfig = { ...mockConfig, widget: { ...mockConfig.widget, owner_id: "other_user" } };
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(foreignConfig as any);
 
-            await expect(service.delete("user_1")).rejects.toThrow(ForbiddenError);
+            await expect(service.delete("user_1", transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
 
@@ -215,16 +216,16 @@ describe("SpotifySongRequestService", () => {
         it("should return config from repository", async () => {
             mockSpotifyRepo.getByTwitchId.mockResolvedValue(mockConfig);
 
-            const result = await service.getByTwitchId("twitch_1");
+            const result = await service.getByTwitchId("twitch_1", transactionId);
 
-            expect(mockSpotifyRepo.getByTwitchId).toHaveBeenCalledWith("twitch_1");
+            expect(mockSpotifyRepo.getByTwitchId).toHaveBeenCalledWith("twitch_1", transactionId);
             expect(result).toBe(mockConfig);
         });
 
         it("should return null if not found", async () => {
             mockSpotifyRepo.getByTwitchId.mockResolvedValue(null);
 
-            const result = await service.getByTwitchId("twitch_1");
+            const result = await service.getByTwitchId("twitch_1", transactionId);
 
             expect(result).toBeNull();
         });
@@ -243,7 +244,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.tracks.get.mockResolvedValue(mockTrack);
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockResolvedValue(undefined);
 
-            await service.test("user_1");
+            await service.test("user_1", transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1",
@@ -257,7 +258,7 @@ describe("SpotifySongRequestService", () => {
             const configNoReward = { ...mockConfig, twitch_reward_id: null };
             mockSpotifyRepo.getByOwnerId.mockResolvedValue(configNoReward as any);
 
-            await expect(service.test("user_1")).rejects.toThrow("No reward configured");
+            await expect(service.test("user_1", transactionId)).rejects.toThrow("No reward configured");
         });
     });
 
@@ -272,9 +273,9 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [mockTrack] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockResolvedValue(undefined);
 
-            const result = await service.insertSpotifyTrack("user_1", "my song artist a");
+            const result = await service.insertSpotifyTrack("user_1", "my song artist a", transactionId);
 
-            expect(mockSpotify.createUserAPI).toHaveBeenCalledWith("user_1");
+            expect(mockSpotify.createUserAPI).toHaveBeenCalledWith("user_1", transactionId);
             expect(mockSpotifyAPI.search).toHaveBeenCalledWith("my song artist a", ["track"]);
             expect(mockSpotifyAPI.player.addItemToPlaybackQueue).toHaveBeenCalledWith("spotify:track:xyz");
             expect(result).toEqual({
@@ -294,7 +295,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.tracks.get.mockResolvedValue(mockTrack);
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockResolvedValue(undefined);
 
-            const result = await service.insertSpotifyTrack("user_1", "https://open.spotify.com/track/abc123");
+            const result = await service.insertSpotifyTrack("user_1", "https://open.spotify.com/track/abc123", transactionId);
 
             expect(mockSpotifyAPI.tracks.get).toHaveBeenCalledWith("abc123");
             expect(mockSpotifyAPI.search).not.toHaveBeenCalled();
@@ -304,7 +305,7 @@ describe("SpotifySongRequestService", () => {
         it("should throw error when search returns no results", async () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [] } });
 
-            await expect(service.insertSpotifyTrack("user_1", "unknown song")).rejects.toThrow("Track not found");
+            await expect(service.insertSpotifyTrack("user_1", "unknown song", transactionId)).rejects.toThrow("Track not found");
         });
 
         it("should throw NoActiveDeviceError when Spotify returns NO_ACTIVE_DEVICE", async () => {
@@ -315,7 +316,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [mockTrack] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockRejectedValue(new Error("NO_ACTIVE_DEVICE"));
 
-            await expect(service.insertSpotifyTrack("user_1", "some song")).rejects.toThrow(NoActiveDeviceError);
+            await expect(service.insertSpotifyTrack("user_1", "some song", transactionId)).rejects.toThrow(NoActiveDeviceError);
         });
 
         it("should silently ignore Unexpected token errors from addItemToPlaybackQueue", async () => {
@@ -326,7 +327,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [mockTrack] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockRejectedValue(new Error("Unexpected token < in JSON"));
 
-            const result = await service.insertSpotifyTrack("user_1", "some song");
+            const result = await service.insertSpotifyTrack("user_1", "some song", transactionId);
 
             expect(result).toEqual({ name: "T", artists: ["A"], url: "u" });
         });
@@ -339,7 +340,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [mockTrack] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockRejectedValue(new Error("Internal server error"));
 
-            const result = await service.insertSpotifyTrack("user_1", "some song");
+            const result = await service.insertSpotifyTrack("user_1", "some song", transactionId);
 
             expect(result).toEqual({ name: "T", artists: ["A"], url: "u" });
         });
@@ -352,7 +353,7 @@ describe("SpotifySongRequestService", () => {
         });
 
         it("should return early if channel_points_custom_reward_id is absent", async () => {
-            await service.handleTwitchEvent({ ...mockEvent, channel_points_custom_reward_id: null });
+            await service.handleTwitchEvent({ ...mockEvent, channel_points_custom_reward_id: null }, transactionId);
 
             expect(mockSpotifyRepo.getByTwitchId).not.toHaveBeenCalled();
         });
@@ -360,7 +361,7 @@ describe("SpotifySongRequestService", () => {
         it("should return early if config not found for broadcaster", async () => {
             mockSpotifyRepo.getByTwitchId.mockResolvedValue(null);
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(mockAuthService.createTwitchUserAPI).not.toHaveBeenCalled();
         });
@@ -369,13 +370,13 @@ describe("SpotifySongRequestService", () => {
             const disabledConfig = { ...mockConfig, widget: { ...mockConfig.widget, enabled: false } };
             mockSpotifyRepo.getByTwitchId.mockResolvedValue(disabledConfig as any);
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(mockAuthService.createTwitchUserAPI).not.toHaveBeenCalled();
         });
 
         it("should return early if reward ID does not match config", async () => {
-            await service.handleTwitchEvent({ ...mockEvent, channel_points_custom_reward_id: "wrong_reward" });
+            await service.handleTwitchEvent({ ...mockEvent, channel_points_custom_reward_id: "wrong_reward" }, transactionId);
 
             expect(mockAuthService.createTwitchUserAPI).not.toHaveBeenCalled();
         });
@@ -390,7 +391,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [mockTrack] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockResolvedValue(undefined);
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1",
@@ -404,7 +405,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [{ name: "T", artists: [{ name: "A" }], external_urls: { spotify: "u" }, uri: "spotify:track:t" }] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockRejectedValue(new Error("NO_ACTIVE_DEVICE"));
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1",
@@ -417,7 +418,7 @@ describe("SpotifySongRequestService", () => {
         it("should send invalid_message when a generic error is thrown", async () => {
             mockSpotifyAPI.search.mockRejectedValue(new Error("Spotify API failure"));
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1",
@@ -438,7 +439,7 @@ describe("SpotifySongRequestService", () => {
                 ...mockEvent,
                 message_id: "test-message-id-1234",
                 message: { text: "https://open.spotify.com/track/abc" },
-            });
+            }, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
                 "bot_1",
@@ -454,7 +455,7 @@ describe("SpotifySongRequestService", () => {
             mockSpotifyAPI.search.mockResolvedValue({ tracks: { items: [{ name: "T", artists: [{ name: "A" }], external_urls: { spotify: "u" }, uri: "spotify:track:t" }] } });
             mockSpotifyAPI.player.addItemToPlaybackQueue.mockResolvedValue(undefined);
 
-            await service.handleTwitchEvent(mockEvent);
+            await service.handleTwitchEvent(mockEvent, transactionId);
 
             expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
         });

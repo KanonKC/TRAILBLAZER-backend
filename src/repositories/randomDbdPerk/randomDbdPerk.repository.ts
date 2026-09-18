@@ -12,7 +12,7 @@ export default class RandomDbdPerkRepository {
     constructor() {
     }
 
-    async create(request: CreateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+    async create(request: CreateRandomDbdPerk, transactionId?: string): Promise<RandomDbdPerkWidget> {
         try {
         const classType = [RandomDbdPerkClassType.SURVIVOR, RandomDbdPerkClassType.KILLER]
         return prisma.randomDbdPerk.create({
@@ -47,12 +47,12 @@ export default class RandomDbdPerkRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDbdPerk.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.randomDbdPerk.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateRandomDbdPerk): Promise<RandomDbdPerkWidget> {
+    async update(id: string, request: UpdateRandomDbdPerk, transactionId?: string): Promise<RandomDbdPerkWidget> {
         try {
         return prisma.randomDbdPerk.update({
             where: { id },
@@ -87,23 +87,23 @@ export default class RandomDbdPerkRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDbdPerk.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.randomDbdPerk.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.randomDbdPerk.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.randomDbdPerk.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.randomDbdPerk.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async findById(id: string): Promise<RandomDbdPerkWidget | null> {
+    async findById(id: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
         return prisma.randomDbdPerk.findUnique({
             where: { id },
@@ -121,12 +121,12 @@ export default class RandomDbdPerkRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.randomDbdPerk.findById").error({ message: "findById failed", error: error as Error });
+            logger.setContext("repository.randomDbdPerk.findById", transactionId).error({ message: "findById failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<RandomDbdPerkWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
@@ -155,11 +155,12 @@ export default class RandomDbdPerkRepository {
                 }
             });
         } catch (error) {
+            logger.setContext("repository.randomDbdPerk.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             return null;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<RandomDbdPerkWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<RandomDbdPerkWidget | null> {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
@@ -188,11 +189,12 @@ export default class RandomDbdPerkRepository {
                 },
             });
         } catch (error) {
+            logger.setContext("repository.randomDbdPerk.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             return null;
         }
     }
 
-    async getClassByRewardId(rewardId: string): Promise<RandomDbdPerkClass | null> {
+    async getClassByRewardId(rewardId: string, transactionId?: string): Promise<RandomDbdPerkClass | null> {
         try {
         return prisma.randomDbdPerkClass.findUnique({
             where: {
@@ -200,7 +202,7 @@ export default class RandomDbdPerkRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.randomDbdPerk.getClassByRewardId").error({ message: "getClassByRewardId failed", error: error as Error });
+            logger.setContext("repository.randomDbdPerk.getClassByRewardId", transactionId).error({ message: "getClassByRewardId failed", error: error as Error });
             throw error;
         }
     }

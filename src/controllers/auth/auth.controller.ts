@@ -19,7 +19,7 @@ export default class AuthController {
         if (!user) return; // 401 already sent
 
         try {
-            await this.authService.logout(user.id, req.cookies.refreshToken);
+            await this.authService.logout(user.id, req.cookies.refreshToken, req.id);
             clearAuthCookies(res);
             logger.info({ message: "Successfully logged out" });
             res.status(200).send({ message: "Logged out" });
@@ -47,7 +47,7 @@ export default class AuthController {
         }
 
         try {
-            await this.authService.updateTwitchGqlToken(user.id, token);
+            await this.authService.updateTwitchGqlToken(user.id, token, req.id);
             logger.info({ message: "Twitch GQL token synced", data: { userId: user.id } });
             res.status(204).send();
         } catch (err) {

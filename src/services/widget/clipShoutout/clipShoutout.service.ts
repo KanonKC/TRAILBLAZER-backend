@@ -35,10 +35,10 @@ export default class ClipShoutoutService {
         this.logger = new TLogger(Layer.SERVICE);
     }
 
-    async create(request: ClipShoutoutCreateRequest) {
+    async create(request: ClipShoutoutCreateRequest, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.clipShoutout.create");
-        const user = await this.userRepository.get(request.owner_id);
+        logger = this.logger.setContext("service.clipShoutout.create", transactionId);
+        const user = await this.userRepository.get(request.owner_id, transactionId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
@@ -57,14 +57,14 @@ export default class ClipShoutoutService {
             reply_message: "{{user_name}} พาคนมาทั้งหมด {{viewer_count}} คน!",
             twitch_bot_id: user.twitch_id,
             overlay_key: randomBytes(16).toString("hex")
-        });
-        await this.widgetService.setInitialEnabled(res.widget_id, user.id)
-        return this.getByUserId(user.id)
+        }, transactionId);
+        await this.widgetService.setInitialEnabled(res.widget_id, user.id, transactionId)
+        return this.getByUserId(user.id, transactionId)
     }
 
-    async shoutoutRaider(event: TwitchChannelChatNotificationEventRequest) {
+    async shoutoutRaider(event: TwitchChannelChatNotificationEventRequest, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.clipShoutout.shoutoutRaider");
+        logger = this.logger.setContext("service.clipShoutout.shoutoutRaider", transactionId);
         if (event.notice_type !== "raid" || !event.raid) {
             return
         }
@@ -85,7 +85,7 @@ export default class ClipShoutoutService {
         if (cachedCsConfig) {
             csConfig = JSON.parse(cachedCsConfig)
         } else {
-            csConfig = await this.clipShoutoutRepository.getByTwitchId(event.broadcaster_user_id)
+            csConfig = await this.clipShoutoutRepository.getByTwitchId(event.broadcaster_user_id, transactionId)
         }
         logger.info({ message: "csConfig", data: csConfig });
         if (!csConfig || !csConfig.widget.enabled) {
@@ -102,7 +102,7 @@ export default class ClipShoutoutService {
         const senderId = csConfig.twitch_bot_id || this.cfg.twitch.defaultBotId
         logger.info({ message: "shouting out", data: { channel: csConfig.widget.twitch_id, raider: event.raid.user_id } });
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(senderId)
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(senderId, transactionId)
             await twitchUserAPI.chat.shoutoutUser(csConfig.widget.twitch_id, event.raid.user_id)
         } catch (err) {
             const e = err as Error & { code?: string; cause?: unknown }
@@ -123,7 +123,7 @@ export default class ClipShoutoutService {
             logger.info({ message: "Sending reply", data: { twitch_bot_id: csConfig.twitch_bot_id, broadcaster_user_id: event.broadcaster_user_id, message } });
             try {
                 await twitchAppAPI.chat.sendChatMessageAsApp(senderId, event.broadcaster_user_id, message)
-                this.widgetService.increaseTriggeredCount(csConfig.widget_id)
+                this.widgetService.increaseTriggeredCount(csConfig.widget_id, transactionId)
             } catch (err) {
                 const e = err as Error & { code?: string; cause?: unknown }
                 logger.error({
@@ -177,46 +177,46 @@ export default class ClipShoutoutService {
 
     }
 
-    async getByUserId(userId: string): Promise<ClipShoutoutWidget | null> {
-        const res = await this.clipShoutoutRepository.getByOwnerId(userId)
+    async getByUserId(userId: string, transactionId?: string): Promise<ClipShoutoutWidget | null> {
+        const res = await this.clipShoutoutRepository.getByOwnerId(userId, transactionId)
         if (!res) {
             throw new NotFoundError("Clip shoutout config not found");
         }
-        await this.widgetService.authorizeOwnership(userId, res.widget.id);
+        await this.widgetService.authorizeOwnership(userId, res.widget.id, transactionId);
         return res
     }
 
-    async update(id: string, userId: string, data: ClipShoutoutUpdateRequest): Promise<ClipShoutout> {
+    async update(id: string, userId: string, data: ClipShoutoutUpdateRequest, transactionId?: string): Promise<ClipShoutout> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.clipShoutout.update");
-        const existing = await this.clipShoutoutRepository.findById(id);
+        logger = this.logger.setContext("service.clipShoutout.update", transactionId);
+        const existing = await this.clipShoutoutRepository.findById(id, transactionId);
 
         if (!existing) {
             throw new NotFoundError("Clip shoutout config not found");
         }
 
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
+        await this.widgetService.authorizeOwnership(userId, existing.widget.id, transactionId);
 
         const res = await this.clipShoutoutRepository.update(id, {
             ...data,
             twitch_bot_id: data.twitch_bot_id || this.cfg.twitch.defaultBotId
-        });
+        }, transactionId);
         await redis.del(`clip_shoutout:twitch_id:${existing.widget.twitch_id}`)
         await redis.del(`clip_shoutout:owner_id:${userId}`)
         return res
     }
 
-    async delete(userId: string): Promise<void> {
+    async delete(userId: string, transactionId?: string): Promise<void> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.clipShoutout.delete");
-        const existing = await this.clipShoutoutRepository.getByOwnerId(userId);
+        logger = this.logger.setContext("service.clipShoutout.delete", transactionId);
+        const existing = await this.clipShoutoutRepository.getByOwnerId(userId, transactionId);
         if (!existing) {
             return;
         }
 
-        await this.widgetService.authorizeTierUsage(userId, existing.widget.id);
-        await this.widgetService.authorizeOwnership(userId, existing.widget.id);
-        await this.clipShoutoutRepository.delete(existing.id);
+        await this.widgetService.authorizeTierUsage(userId, existing.widget.id, undefined, transactionId);
+        await this.widgetService.authorizeOwnership(userId, existing.widget.id, transactionId);
+        await this.clipShoutoutRepository.delete(existing.id, transactionId);
 
         await redis.del(`clip_shoutout:twitch_id:${existing.widget.twitch_id}`);
         await redis.del(`clip_shoutout:owner_id:${userId}`);
@@ -228,8 +228,8 @@ export default class ClipShoutoutService {
     //     }
     // }
 
-    async getOverlay(id: string) {
-        const existing = await this.clipShoutoutRepository.findById(id);
+    async getOverlay(id: string, transactionId?: string) {
+        const existing = await this.clipShoutoutRepository.findById(id, transactionId);
 
         if (!existing) {
             throw new NotFoundError("Clip shoutout config not found");
@@ -238,23 +238,23 @@ export default class ClipShoutoutService {
         return existing;
     }
 
-    async refreshOverlayKey(userId: string): Promise<ClipShoutout> {
+    async refreshOverlayKey(userId: string, transactionId?: string): Promise<ClipShoutout> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.clipShoutout.refreshOverlayKey");
-        const existing = await this.clipShoutoutRepository.getByOwnerId(userId);
+        logger = this.logger.setContext("service.clipShoutout.refreshOverlayKey", transactionId);
+        const existing = await this.clipShoutoutRepository.getByOwnerId(userId, transactionId);
         if (!existing) {
             throw new NotFoundError("Clip shoutout config not found");
         }
 
         const newKey = randomBytes(16).toString("hex");
-        const updated = await this.clipShoutoutRepository.update(existing.id, { overlay_key: newKey });
+        const updated = await this.clipShoutoutRepository.update(existing.id, { overlay_key: newKey }, transactionId);
 
         await redis.del(`clip_shoutout:twitch_id:${existing.widget.twitch_id}`);
         await redis.del(`clip_shoutout:owner_id:${userId}`);
         return updated;
     }
 
-    async validateOverlayAccess(userId: string, key: string): Promise<boolean> {
+    async validateOverlayAccess(userId: string, key: string, transactionId?: string): Promise<boolean> {
         let logger: TLogger = this.logger;
         const cacheKey = `clip_shoutout:owner_id:${userId}`
         let config: ClipShoutoutWidget | null = null
@@ -263,12 +263,12 @@ export default class ClipShoutoutService {
         if (cached) {
             config = JSON.parse(cached)
         } else {
-            config = await this.clipShoutoutRepository.getByOwnerId(userId);
+            config = await this.clipShoutoutRepository.getByOwnerId(userId, transactionId);
             if (config) {
                 redis.set(cacheKey, JSON.stringify(config), TTL.TWO_HOURS)
             }
         }
-        logger = this.logger.setContext("service.clipShoutout.validateOverlayAccess");
+        logger = this.logger.setContext("service.clipShoutout.validateOverlayAccess", transactionId);
         logger.debug({ message: "Validating overlay access", data: { configFound: !!config } });
 
         if (!config) return false;

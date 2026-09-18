@@ -8,9 +8,9 @@ import { twitchAppAPI } from "../../libs/twurple";
 export default class SystemService {
     private logger = new TLogger(Layer.SERVICE);
 
-    async getHealth() {
+    async getHealth(transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.system.getHealth");
+        logger = this.logger.setContext("service.system.getHealth", transactionId);
         // Database Check
         let dbStatus = false;
         try {

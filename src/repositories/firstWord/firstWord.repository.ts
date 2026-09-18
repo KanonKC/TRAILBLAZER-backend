@@ -11,7 +11,7 @@ const logger = new TLogger(Layer.REPOSITORY);
 export default class FirstWordRepository {
     constructor() { }
 
-    async create(request: CreateFirstWord): Promise<FirstWordWidget> {
+    async create(request: CreateFirstWord, transactionId?: string): Promise<FirstWordWidget> {
         try {
         return prisma.firstWord.create({
             data: {
@@ -36,12 +36,12 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.create").error({ message: "create failed", error: error as Error });
+            logger.setContext("repository.firstWord.create", transactionId).error({ message: "create failed", error: error as Error });
             throw error;
         }
     }
 
-    async get(id: string) {
+    async get(id: string, transactionId?: string) {
         try {
         return prisma.firstWord.findUnique({ 
             where: { id }, 
@@ -55,12 +55,12 @@ export default class FirstWordRepository {
             } 
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.firstWord.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOwnerId(ownerId: string): Promise<FirstWordWidget | null> {
+    async getByOwnerId(ownerId: string, transactionId?: string): Promise<FirstWordWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -82,12 +82,12 @@ export default class FirstWordRepository {
             } 
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            logger.setContext("repository.firstWord.getByOwnerId", transactionId).error({ message: "getByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByTwitchId(twitchId: string): Promise<FirstWordWidget | null> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<FirstWordWidget | null> {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
@@ -109,12 +109,12 @@ export default class FirstWordRepository {
             } 
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            logger.setContext("repository.firstWord.getByTwitchId", transactionId).error({ message: "getByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateFirstWord): Promise<FirstWordWidget> {
+    async update(id: string, request: UpdateFirstWord, transactionId?: string): Promise<FirstWordWidget> {
         try {
         return prisma.firstWord.update({
             where: { id },
@@ -129,32 +129,32 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.firstWord.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWord.delete({ where: { id } });
     } catch (error) {
-            logger.setContext("repository.firstWord.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.firstWord.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async addChatter(request: AddChatter): Promise<FirstWordChatter> {
+    async addChatter(request: AddChatter, transactionId?: string): Promise<FirstWordChatter> {
         try {
         return prisma.firstWordChatter.create({
             data: request
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.addChatter").error({ message: "addChatter failed", error: error as Error });
+            logger.setContext("repository.firstWord.addChatter", transactionId).error({ message: "addChatter failed", error: error as Error });
             throw error;
         }
     }
 
-    async getChatter(id: string, chatterId: string): Promise<FirstWordChatter | null> {
+    async getChatter(id: string, chatterId: string, transactionId?: string): Promise<FirstWordChatter | null> {
         try {
         return prisma.firstWordChatter.findUnique({
             where: {
@@ -165,12 +165,12 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getChatter").error({ message: "getChatter failed", error: error as Error });
+            logger.setContext("repository.firstWord.getChatter", transactionId).error({ message: "getChatter failed", error: error as Error });
             throw error;
         }
     }
 
-    async listChatters(id: string): Promise<[FirstWordChatter[], number]> {
+    async listChatters(id: string, transactionId?: string): Promise<[FirstWordChatter[], number]> {
         try {
         const res = await prisma.firstWordChatter.findMany({
             where: {
@@ -181,12 +181,12 @@ export default class FirstWordRepository {
         const count = res.length;
         return [res, count];
     } catch (error) {
-            logger.setContext("repository.firstWord.listChatters").error({ message: "listChatters failed", error: error as Error });
+            logger.setContext("repository.firstWord.listChatters", transactionId).error({ message: "listChatters failed", error: error as Error });
             throw error;
         }
     }
 
-    async listChatterIdByChannelId(channelId: string): Promise<string[]> {
+    async listChatterIdByChannelId(channelId: string, transactionId?: string): Promise<string[]> {
         try {
         const res = await prisma.firstWordChatter.findMany({
             where: {
@@ -198,12 +198,12 @@ export default class FirstWordRepository {
         });
         return res.map(r => r.twitch_chatter_id);
     } catch (error) {
-            logger.setContext("repository.firstWord.listChatterIdByChannelId").error({ message: "listChatterIdByChannelId failed", error: error as Error });
+            logger.setContext("repository.firstWord.listChatterIdByChannelId", transactionId).error({ message: "listChatterIdByChannelId failed", error: error as Error });
             throw error;
         }
     }
 
-    async getChattersByChannelId(channelId: string): Promise<FirstWordChatter[]> {
+    async getChattersByChannelId(channelId: string, transactionId?: string): Promise<FirstWordChatter[]> {
         try {
         return prisma.firstWordChatter.findMany({
             where: {
@@ -211,12 +211,12 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getChattersByChannelId").error({ message: "getChattersByChannelId failed", error: error as Error });
+            logger.setContext("repository.firstWord.getChattersByChannelId", transactionId).error({ message: "getChattersByChannelId failed", error: error as Error });
             throw error;
         }
     }
 
-    async clearChatters(id: string): Promise<void> {
+    async clearChatters(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordChatter.deleteMany({
             where: {
@@ -224,12 +224,12 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.clearChatters").error({ message: "clearChatters failed", error: error as Error });
+            logger.setContext("repository.firstWord.clearChatters", transactionId).error({ message: "clearChatters failed", error: error as Error });
             throw error;
         }
     }
 
-    async getCustomReplyByTwitchId(firstWordId: string, twitchId: string): Promise<FirstWordCustomReply | null> {
+    async getCustomReplyByTwitchId(firstWordId: string, twitchId: string, transactionId?: string): Promise<FirstWordCustomReply | null> {
         try {
         return prisma.firstWordCustomReply.findUnique({
             where: {
@@ -240,44 +240,44 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getCustomReplyByTwitchId").error({ message: "getCustomReplyByTwitchId failed", error: error as Error });
+            logger.setContext("repository.firstWord.getCustomReplyByTwitchId", transactionId).error({ message: "getCustomReplyByTwitchId failed", error: error as Error });
             throw error;
         }
     }
 
-    async createCustomReply(request: CreateCustomReply): Promise<void> {
+    async createCustomReply(request: CreateCustomReply, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.create({
             data: request
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.createCustomReply").error({ message: "createCustomReply failed", error: error as Error });
+            logger.setContext("repository.firstWord.createCustomReply", transactionId).error({ message: "createCustomReply failed", error: error as Error });
             throw error;
         }
     }
 
-    async updateCustomReply(id: number, request: UpdateCustomReply): Promise<void> {
+    async updateCustomReply(id: number, request: UpdateCustomReply, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.update({
             where: { id },
             data: request
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.updateCustomReply").error({ message: "updateCustomReply failed", error: error as Error });
+            logger.setContext("repository.firstWord.updateCustomReply", transactionId).error({ message: "updateCustomReply failed", error: error as Error });
             throw error;
         }
     }
 
-    async deleteCustomReply(id: number): Promise<void> {
+    async deleteCustomReply(id: number, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordCustomReply.delete({ where: { id } });
     } catch (error) {
-            logger.setContext("repository.firstWord.deleteCustomReply").error({ message: "deleteCustomReply failed", error: error as Error });
+            logger.setContext("repository.firstWord.deleteCustomReply", transactionId).error({ message: "deleteCustomReply failed", error: error as Error });
             throw error;
         }
     }
 
-    async listCustomReplies(request: ListCustomerReplyRequest, pagination: Pagination): Promise<[FirstWordCustomReply[], number]> {
+    async listCustomReplies(request: ListCustomerReplyRequest, pagination: Pagination, transactionId?: string): Promise<[FirstWordCustomReply[], number]> {
         try {
         const where: any = {
             first_word_id: request.first_word_id
@@ -306,12 +306,12 @@ export default class FirstWordRepository {
 
         return [data, count]
     } catch (error) {
-            logger.setContext("repository.firstWord.listCustomReplies").error({ message: "listCustomReplies failed", error: error as Error });
+            logger.setContext("repository.firstWord.listCustomReplies", transactionId).error({ message: "listCustomReplies failed", error: error as Error });
             throw error;
         }
     }
 
-    async createOrIncrementGreetCount(firstWordId: string, chatterId: string, channelId: string): Promise<void> {
+    async createOrIncrementGreetCount(firstWordId: string, chatterId: string, channelId: string, transactionId?: string): Promise<void> {
         try {
         await prisma.firstWordGreetCount.upsert({
             where: {
@@ -331,12 +331,12 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.createOrIncrementGreetCount").error({ message: "createOrIncrementGreetCount failed", error: error as Error });
+            logger.setContext("repository.firstWord.createOrIncrementGreetCount", transactionId).error({ message: "createOrIncrementGreetCount failed", error: error as Error });
             throw error;
         }
     }
 
-    async getGreetCount(chatterId: string, channelId: string): Promise<FirstWordGreetCount | null> {
+    async getGreetCount(chatterId: string, channelId: string, transactionId?: string): Promise<FirstWordGreetCount | null> {
         try {
         return prisma.firstWordGreetCount.findUnique({
             where: {
@@ -347,7 +347,7 @@ export default class FirstWordRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.firstWord.getGreetCount").error({ message: "getGreetCount failed", error: error as Error });
+            logger.setContext("repository.firstWord.getGreetCount", transactionId).error({ message: "getGreetCount failed", error: error as Error });
             throw error;
         }
     }

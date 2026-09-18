@@ -26,7 +26,7 @@ export default class WidgetController {
         }
 
         try {
-            const first = await this.widgetService.getFirstEnabled(user.id);
+            const first = await this.widgetService.getFirstEnabled(user.id, req.id);
             logger.info({ message: "Successfully fetched first enabled widget", data: { userId: user.id } });
             res.send(first);
         } catch (error) {
@@ -56,7 +56,7 @@ export default class WidgetController {
             const limit = parseInt(req.query.limit || "20");
             const enabled = req.query.enabled === "true" ? true : req.query.enabled === "false" ? false : undefined;
 
-            const result = await this.widgetService.list(user.id, { page, limit }, { enabled });
+            const result = await this.widgetService.list(user.id, { page, limit }, { enabled }, req.id);
             logger.info({ message: "Successfully listed widgets", data: { userId: user.id, total: result.pagination.total } });
             res.send(result);
         } catch (error) {
@@ -83,7 +83,7 @@ export default class WidgetController {
             const { id } = req.params as { id: string };
             const request = updateWidgetSchema.parse(req.body);
             // Pass user.id to service update method
-            const updated = await this.widgetService.update(id, user.id, request);
+            const updated = await this.widgetService.update(id, user.id, request, req.id);
             logger.info({ message: "Successfully updated widget", data: { userId: user.id, widgetId: id } });
             res.send(updated);
         } catch (error) {
@@ -113,7 +113,7 @@ export default class WidgetController {
         try {
             const { id } = req.params as { id: string };
             const request = updateWidgetEnableSchema.parse(req.body);
-            const updated = await this.widgetService.updateEnable(id, user.id, request.enabled);
+            const updated = await this.widgetService.updateEnable(id, user.id, request.enabled, req.id);
             logger.info({ message: "Successfully updated widget enable status", data: { userId: user.id, widgetId: id, enabled: request.enabled } });
             res.send(updated);
         } catch (error) {
@@ -142,7 +142,7 @@ export default class WidgetController {
 
         try {
             const { key } = req.params as { key: string };
-            const valid = await this.widgetService.validateOverlayAccess(user.id, key);
+            const valid = await this.widgetService.validateOverlayAccess(user.id, key, req.id);
             logger.info({ message: "Overlay access validation complete", data: { userId: user.id, valid } });
             res.send({ valid });
         } catch (error) {
@@ -168,7 +168,7 @@ export default class WidgetController {
         try {
             const { id } = req.params as { id: string };
             // Pass user.id to service delete method
-            await this.widgetService.delete(id, user.id);
+            await this.widgetService.delete(id, user.id, req.id);
             logger.info({ message: "Successfully deleted widget", data: { userId: user.id, widgetId: id } });
             res.status(204).send();
         } catch (error) {
@@ -191,7 +191,7 @@ export default class WidgetController {
         }
 
         try {
-            const quota = await this.widgetService.getQuota(user.id);
+            const quota = await this.widgetService.getQuota(user.id, req.id);
             logger.info({ message: "Successfully fetched quota", data: { userId: user.id, quota } });
             res.send(quota);
         } catch (error) {

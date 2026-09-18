@@ -87,9 +87,9 @@ export default class UserService {
             || haystack.includes("etimedout")
     }
 
-    async login(request: LoginRequest): Promise<{ accessToken: string, refreshToken: string, user: User }> {
+    async login(request: LoginRequest, transactionId?: string): Promise<{ accessToken: string, refreshToken: string, user: User }> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.login")
+        logger = this.logger.setContext("service.user.login", transactionId)
         const token = await this.callTwitch("exchangeCode", () => exchangeCode(
             this.cfg.twitch.clientId,
             this.cfg.twitch.clientSecret,
@@ -117,22 +117,22 @@ export default class UserService {
         }
         logger.debug({ message: "Creating user request", data: cr });
         
-        const existingUser = await this.userRepository.getByTwitchId(twitchUser.id);
+        const existingUser = await this.userRepository.getByTwitchId(twitchUser.id, transactionId);
         const isNewUser = !existingUser;
         
-        const user = await this.userRepository.upsert(cr)
+        const user = await this.userRepository.upsert(cr, transactionId)
         logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
 
         if (user.consent_version !== CONSENT_VERSION) {
-            await this.userRepository.update(user.id, { consent_accepted_at: new Date(), consent_version: CONSENT_VERSION });
+            await this.userRepository.update(user.id, { consent_accepted_at: new Date(), consent_version: CONSENT_VERSION }, undefined, transactionId);
             user.consent_accepted_at = new Date();
             user.consent_version = CONSENT_VERSION;
         }
 
         if (isNewUser && request.ref && this.referralService) {
-            await this.referralService.handleReferralRegistration(request.ref, user.id);
+            await this.referralService.handleReferralRegistration(request.ref, user.id, transactionId);
             // Refresh user object to get updated quotas from referral
-            const updatedUser = await this.userRepository.get(user.id);
+            const updatedUser = await this.userRepository.get(user.id, transactionId);
             if (updatedUser) {
                 Object.assign(user, updatedUser);
             }
@@ -140,7 +140,7 @@ export default class UserService {
         await this.authRepository.updateTwitchToken(user.id, {
             twitch_refresh_token: token.refreshToken,
             twitch_token_expires_at: token.expiresIn ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
-        })
+        }, transactionId)
 
         // Create access token
         const accessToken = signAccessToken({
@@ -162,15 +162,15 @@ export default class UserService {
         return { accessToken, refreshToken, user };
     }
 
-    async getByTwitchId(twitchId: string): Promise<User> {
+    async getByTwitchId(twitchId: string, transactionId?: string): Promise<User> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.getByTwitchId");
+        logger = this.logger.setContext("service.user.getByTwitchId", transactionId);
         const cacheKey = `user:twitch_id:${twitchId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
             return JSON.parse(cachedUser);
         }
-        const user = await this.userRepository.getByTwitchId(twitchId);
+        const user = await this.userRepository.getByTwitchId(twitchId, transactionId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
@@ -178,16 +178,16 @@ export default class UserService {
         return user;
     }
 
-    async refreshToken(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+    async refreshToken(refreshToken: string, transactionId?: string): Promise<{ accessToken: string, refreshToken: string }> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.refreshToken");
+        logger = this.logger.setContext("service.user.refreshToken", transactionId);
         const userId = await redis.get(`refresh_token:${refreshToken}`);
 
         if (!userId) {
             throw new UnauthorizedError("Invalid refresh token");
         }
 
-        const user = await this.userRepository.get(userId);
+        const user = await this.userRepository.get(userId, transactionId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
@@ -209,15 +209,15 @@ export default class UserService {
         return { accessToken: newAccessToken, refreshToken: newRefreshToken };
     }
 
-    async get(userId: string): Promise<User> {
+    async get(userId: string, transactionId?: string): Promise<User> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.get");
+        logger = this.logger.setContext("service.user.get", transactionId);
         const cacheKey = `user:id:${userId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
             return JSON.parse(cachedUser);
         }
-        const user = await this.userRepository.get(userId);
+        const user = await this.userRepository.get(userId, transactionId);
         if (!user) {
             throw new NotFoundError("User not found");
         }
@@ -225,11 +225,11 @@ export default class UserService {
         return user;
     }
 
-    async update(id: string, request: Partial<User>, tx?: any) {
+    async update(id: string, request: Partial<User>, tx?: any, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.update");
+        logger = this.logger.setContext("service.user.update", transactionId);
         try {
-            const user = await this.userRepository.update(id, request, tx)
+            const user = await this.userRepository.update(id, request, tx, transactionId)
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)
@@ -245,9 +245,9 @@ export default class UserService {
         }
     }
 
-    async getTier(userId: string, options?: GetTierOptions): Promise<number> {
+    async getTier(userId: string, options?: GetTierOptions, transactionId?: string): Promise<number> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.getTier");
+        logger = this.logger.setContext("service.user.getTier", transactionId);
         const cacheKey = `user:tier:${userId}`;
         const cachedTier = await redis.get(cacheKey);
         const forceTwitch = options?.forceTwitch ?? false
@@ -258,27 +258,27 @@ export default class UserService {
         }
 
         // Get tier from repository
-        const user = await this.get(userId);
+        const user = await this.get(userId, transactionId);
         let tier = 0
         if (user.tier_expire_at && !forceTwitch) {
             tier = user.tier
         } else {
-            tier = await this.getTierFromTwitch(user.twitch_id)
+            tier = await this.getTierFromTwitch(user.twitch_id, transactionId)
             const tierExpireDate = generateTierExpireDate()
             if (tier === 0) {
                 await this.update(user.id, {
                     tier: tier,
                     tier_expire_at: null,
-                })
+                }, undefined, transactionId)
             } else if (!user.tier_expire_at || user.tier_expire_at < tierExpireDate) {
                 await this.update(user.id, {
                     tier: tier,
                     tier_expire_at: tierExpireDate,
-                })
+                }, undefined, transactionId)
             } else {
                 await this.update(user.id, {
                     tier: tier,
-                })
+                }, undefined, transactionId)
             }
         }
 
@@ -286,11 +286,11 @@ export default class UserService {
         return tier;
     }
 
-    async getTierFromTwitch(twitchId: string): Promise<number> {
+    async getTierFromTwitch(twitchId: string, transactionId?: string): Promise<number> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.getTierFromTwitch");
+        logger = this.logger.setContext("service.user.getTierFromTwitch", transactionId);
         try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
+            const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId, transactionId)
             const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
             if (!subscription) return 0
             const tier = parseInt(subscription.tier) / 1000
@@ -303,16 +303,16 @@ export default class UserService {
         }
     }
 
-    async hasTwitchGqlToken(userId: string): Promise<boolean> {
+    async hasTwitchGqlToken(userId: string, transactionId?: string): Promise<boolean> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.hasTwitchGqlToken");
-        const auth = await this.authRepository.getByUserId(userId);
+        logger = this.logger.setContext("service.user.hasTwitchGqlToken", transactionId);
+        const auth = await this.authRepository.getByUserId(userId, transactionId);
         return !!auth?.twitch_gql_token;
     }
 
-    createAccessToken(user: User): string {
+    createAccessToken(user: User, transactionId?: string): string {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.createAccessToken");
+        logger = this.logger.setContext("service.user.createAccessToken", transactionId);
         const accessToken = signAccessToken({
             id: user.id,
             username: user.username,
@@ -325,48 +325,48 @@ export default class UserService {
         return accessToken;
     }
 
-    async adjustTierAndWidgets(userId: string) {
+    async adjustTierAndWidgets(userId: string, transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.adjustTierAndWidgets");
+        logger = this.logger.setContext("service.user.adjustTierAndWidgets", transactionId);
         if (!this.widgetService) {
             logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
         }
         try {
-            const user = await this.get(userId)
-            const tier = await this.getTierFromTwitch(user.twitch_id)
+            const user = await this.get(userId, transactionId)
+            const tier = await this.getTierFromTwitch(user.twitch_id, transactionId)
             
             // Update tier first so getQuota uses the new tier
             const tierExpireDate = generateTierExpireDate()
             await this.update(userId, {
                 tier: tier,
                 tier_expire_at: tier === 0 ? null : tierExpireDate
-            })
+            }, transactionId)
 
-            const quotaInfo = await this.widgetService.getQuota(userId)
+            const quotaInfo = await this.widgetService.getQuota(userId, transactionId)
             logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
             
             if (quotaInfo.used_quota > quotaInfo.total_quota) {
                 logger.info({ message: "Quota exceeded after tier adjustment, disabling all widgets", data: { userId, quotaInfo } });
-                await this.widgetService.disableAll(userId)
+                await this.widgetService.disableAll(userId, transactionId)
             }
         } catch (err) {
             if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
                 logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });
-                await this.widgetService.disableAll(userId)
+                await this.widgetService.disableAll(userId, transactionId)
                 await this.update(userId, {
                     tier: 0,
                     tier_expire_at: null
-                })
+                }, undefined, transactionId)
             } else {
                 throw err
             }
         }
     }
 
-    async bulkAdjustTierAndWidgets() {
+    async bulkAdjustTierAndWidgets(transactionId?: string) {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.bulkAdjustTierAndWidgets");
+        logger = this.logger.setContext("service.user.bulkAdjustTierAndWidgets", transactionId);
         // TODO: For very large user bases, consider implementing a queue-based system 
         // or more optimized batching to prevent long-running process issues.
         if (!this.widgetService) {
@@ -384,7 +384,7 @@ export default class UserService {
                 // Since adjusting the tier removes the user from the "expired" list,
                 // we continually query page 1 until no more expired users remain.
                 // We exclude processedIds to avoid infinite loops if some persistent failures occur.
-                const users = await this.userRepository.listExpired({ page: 1, limit }, processedIds);
+                const users = await this.userRepository.listExpired({ page: 1, limit }, processedIds, transactionId);
 
                 if (users.length === 0) {
                     break;
@@ -392,7 +392,7 @@ export default class UserService {
                 await Promise.all(users.map(async (u) => {
                     try {
 
-                        await this.adjustTierAndWidgets(u.id);
+                        await this.adjustTierAndWidgets(u.id, transactionId);
                     } catch (err) {
                         this.logger.error({
                             message: "Failed to adjust tier for user during bulk adjustment",
@@ -410,8 +410,8 @@ export default class UserService {
         }
     }
 
-    async getMaxStorageMB(userId: string) {
-        const user = await this.get(userId)
+    async getMaxStorageMB(userId: string, transactionId?: string) {
+        const user = await this.get(userId, transactionId)
         let maxStorageMb = user.max_storage_mb
         if (user.tier >= UserTier.PRO_TIER) {
             maxStorageMb += 45
@@ -419,15 +419,15 @@ export default class UserService {
         return maxStorageMb
     }
 
-    async listShowcase(): Promise<ListUserShowcaseResponse> {
+    async listShowcase(transactionId?: string): Promise<ListUserShowcaseResponse> {
         let logger: TLogger = this.logger;
-        logger = this.logger.setContext("service.user.listShowcase");
+        logger = this.logger.setContext("service.user.listShowcase", transactionId);
         const cacheKey = `user:showcase`
         const cachedShowcase = await redis.get(cacheKey)
         if (cachedShowcase) {
             return JSON.parse(cachedShowcase)
         }
-        const showcase = await this.userRepository.listShowcase()
+        const showcase = await this.userRepository.listShowcase(transactionId)
         await redis.set(cacheKey, JSON.stringify(showcase), TTL.ONE_DAY)
         return { data: showcase as ListUserShowcaseResponse['data'] }
     }

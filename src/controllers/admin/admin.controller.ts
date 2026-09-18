@@ -33,7 +33,7 @@ export default class AdminController {
 
             const updateData = req.body;
 
-            const updatedUser = await this.userService.update(id, updateData);
+            const updatedUser = await this.userService.update(id, updateData, req.id);
 
             logger.info({ message: "User updated successfully", data: { userId: id, adminId: admin.id } });
             res.send(updatedUser);
@@ -56,7 +56,7 @@ export default class AdminController {
         if (!admin) return; // 401 already sent
 
         try {
-            await this.userService.bulkAdjustTierAndWidgets();
+            await this.userService.bulkAdjustTierAndWidgets(req.id);
 
             logger.info({ message: "Bulk adjustment completed successfully", data: { adminId: admin.id } });
             res.send({ message: "Bulk adjustment completed successfully" });

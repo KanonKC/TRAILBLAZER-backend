@@ -12,7 +12,7 @@ export default class WidgetRepository {
     constructor() {
     }
 
-    async get(id: string): Promise<ExtendedWidget | null> {
+    async get(id: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findUnique({
             where: { id },
@@ -21,12 +21,12 @@ export default class WidgetRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.widget.get").error({ message: "get failed", error: error as Error });
+            logger.setContext("repository.widget.get", transactionId).error({ message: "get failed", error: error as Error });
             throw error;
         }
     }
 
-    async getByOverlayKey(overlayKey: string): Promise<ExtendedWidget | null> {
+    async getByOverlayKey(overlayKey: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findUnique({
             where: { overlay_key: overlayKey },
@@ -35,35 +35,35 @@ export default class WidgetRepository {
             }
         });
     } catch (error) {
-            logger.setContext("repository.widget.getByOverlayKey").error({ message: "getByOverlayKey failed", error: error as Error });
+            logger.setContext("repository.widget.getByOverlayKey", transactionId).error({ message: "getByOverlayKey failed", error: error as Error });
             throw error;
         }
     }
 
-    async update(id: string, request: UpdateWidget): Promise<void> {
+    async update(id: string, request: UpdateWidget, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },
             data: request,
         });
     } catch (error) {
-            logger.setContext("repository.widget.update").error({ message: "update failed", error: error as Error });
+            logger.setContext("repository.widget.update", transactionId).error({ message: "update failed", error: error as Error });
             throw error;
         }
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.delete({
             where: { id },
         });
     } catch (error) {
-            logger.setContext("repository.widget.delete").error({ message: "delete failed", error: error as Error });
+            logger.setContext("repository.widget.delete", transactionId).error({ message: "delete failed", error: error as Error });
             throw error;
         }
     }
 
-    async listByOwnerId(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters): Promise<[ExtendedWidget[], number]> {
+    async listByOwnerId(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters, transactionId?: string): Promise<[ExtendedWidget[], number]> {
         try {
         const where: WidgetWhereInput = {
             owner_id: ownerId,
@@ -92,24 +92,24 @@ export default class WidgetRepository {
         });
         return [res, total];
     } catch (error) {
-            logger.setContext("repository.widget.listByOwnerId").error({ message: "listByOwnerId failed", error: error as Error });
+            logger.setContext("repository.widget.listByOwnerId", transactionId).error({ message: "listByOwnerId failed", error: error as Error });
             throw error;
         }
     }
 
-    async disableAll(ownerId: string): Promise<void> {
+    async disableAll(ownerId: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.updateMany({
             where: { owner_id: ownerId },
             data: { enabled: false },
         });
     } catch (error) {
-            logger.setContext("repository.widget.disableAll").error({ message: "disableAll failed", error: error as Error });
+            logger.setContext("repository.widget.disableAll", transactionId).error({ message: "disableAll failed", error: error as Error });
             throw error;
         }
     }
 
-    async getEnabledQuotaUsed(ownerId: string, excludeIds?: string[]): Promise<number> {
+    async getEnabledQuotaUsed(ownerId: string, excludeIds?: string[], transactionId?: string): Promise<number> {
         try {
         const enabledWidgets = await prisma.widget.findMany({
             where: {
@@ -121,12 +121,12 @@ export default class WidgetRepository {
         });
         return enabledWidgets.reduce((sum, w) => sum + (w.widget_type?.cost ?? 1), 0);
     } catch (error) {
-            logger.setContext("repository.widget.getEnabledQuotaUsed").error({ message: "getEnabledQuotaUsed failed", error: error as Error });
+            logger.setContext("repository.widget.getEnabledQuotaUsed", transactionId).error({ message: "getEnabledQuotaUsed failed", error: error as Error });
             throw error;
         }
     }
 
-    async getFirstEnabled(ownerId: string): Promise<ExtendedWidget | null> {
+    async getFirstEnabled(ownerId: string, transactionId?: string): Promise<ExtendedWidget | null> {
         try {
         return prisma.widget.findFirst({
             where: {
@@ -138,24 +138,24 @@ export default class WidgetRepository {
             }
         })
     } catch (error) {
-            logger.setContext("repository.widget.getFirstEnabled").error({ message: "getFirstEnabled failed", error: error as Error });
+            logger.setContext("repository.widget.getFirstEnabled", transactionId).error({ message: "getFirstEnabled failed", error: error as Error });
             throw error;
         }
     }
 
-    async updateOverlayKey(id: string, overlayKey: string): Promise<void> {
+    async updateOverlayKey(id: string, overlayKey: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },
             data: { overlay_key: overlayKey },
         });
     } catch (error) {
-            logger.setContext("repository.widget.updateOverlayKey").error({ message: "updateOverlayKey failed", error: error as Error });
+            logger.setContext("repository.widget.updateOverlayKey", transactionId).error({ message: "updateOverlayKey failed", error: error as Error });
             throw error;
         }
     }
 
-    async increaseTriggeredCount(id: string): Promise<void> {
+    async increaseTriggeredCount(id: string, transactionId?: string): Promise<void> {
         try {
         await prisma.widget.update({
             where: { id },
@@ -164,7 +164,7 @@ export default class WidgetRepository {
             } }
         })
     } catch (error) {
-            logger.setContext("repository.widget.increaseTriggeredCount").error({ message: "increaseTriggeredCount failed", error: error as Error });
+            logger.setContext("repository.widget.increaseTriggeredCount", transactionId).error({ message: "increaseTriggeredCount failed", error: error as Error });
             throw error;
         }
     }

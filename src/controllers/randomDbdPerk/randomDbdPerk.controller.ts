@@ -25,7 +25,7 @@ export default class RandomDbdPerkController {
         }
 
         try {
-            const result = await this.service.getByUserId(user.id);
+            const result = await this.service.getByUserId(user.id, req.id);
             if (!result) {
                 logger.info({ message: "Random dbd perk config not found", data: { userId: user.id } });
                 return res.status(404).send({ message: "Not found" });
@@ -57,7 +57,7 @@ export default class RandomDbdPerkController {
                 owner_id: user.id,
                 twitch_id: user.twitchId,
                 enabled: request.enabled
-            });
+            }, req.id);
             logger.info({ message: "Successfully created random dbd perk config", data: { userId: user.id } });
             res.status(201).send(result);
         } catch (error) {
@@ -85,14 +85,14 @@ export default class RandomDbdPerkController {
 
         try {
             const request = updateRandomDbdPerkSchema.parse(req.body);
-            const existing = await this.service.getByUserId(user.id);
+            const existing = await this.service.getByUserId(user.id, req.id);
 
             if (!existing) {
                 logger.warn({ message: "Random dbd perk config not found for update", data: { userId: user.id } });
                 return res.status(404).send({ message: "Not found" });
             }
 
-            const result = await this.service.update(existing.id, user.id, request);
+            const result = await this.service.update(existing.id, user.id, request, req.id);
             logger.info({ message: "Successfully updated random dbd perk config", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
@@ -119,7 +119,7 @@ export default class RandomDbdPerkController {
         }
 
         try {
-            await this.service.delete(user.id);
+            await this.service.delete(user.id, req.id);
             logger.info({ message: "Successfully deleted random dbd perk config", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
@@ -142,7 +142,7 @@ export default class RandomDbdPerkController {
         }
 
         try {
-            const result = await this.service.refreshKey(user.id);
+            const result = await this.service.refreshKey(user.id, req.id);
             logger.info({ message: "Successfully refreshed random dbd perk overlay key", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
