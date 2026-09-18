@@ -66,18 +66,63 @@ src/
 
 Every controller, service, and repository file must use `TLogger`. Never use `console.log`.
 
+`TLogger.setContext()` is **immutable** — it never mutates the instance it is
+called on, it always returns a **new** `TLogger`. This matters because a
+`TLogger` field (e.g. `this.logger`) is instantiated once per class and that
+class instance is reused across many concurrent requests; if `setContext()`
+mutated `this` in place, two concurrent requests could stomp on each other's
+`transaction_id`. Always assign the return value to a local variable and use
+that local variable for the rest of the method — never call `.info()` /
+`.warn()` / `.error()` on the original `this.logger` field after calling
+`setContext()`.
+
 ```typescript
 import TLogger, { Layer } from "@/logging/logger";
 
-const logger = new TLogger(Layer.SERVICE); // CONTROLLER | SERVICE | REPOSITORY
+export default class WidgetService {
+    private readonly logger: TLogger;
+    constructor() {
+        this.logger = new TLogger(Layer.SERVICE); // CONTROLLER | SERVICE | REPOSITORY | EVENT | PROVIDER
+    }
 
-async myMethod() {
-    logger.setContext("domain.feature.action"); // Always first line
-    logger.info({ message: "...", data: { ... } });
-    logger.warn({ message: "...", data: { ... }, error: "..." });
-    logger.error({ message: "...", data: { ... }, error: err });
+    async myMethod(transactionId: string) {
+        // Always first line. transactionId is threaded explicitly from the
+        // controller (sourced from Fastify's req.id) down through
+        // service -> repository calls (including fire-and-forget calls),
+        // rather than relying on AsyncLocalStorage.
+        const logger = this.logger.setContext("domain.feature.action", transactionId);
+        logger.info({ message: "...", data: { ... } });
+        logger.warn({ message: "...", data: { ... }, error: "..." });
+        logger.error({ message: "...", data: { ... }, error: err });
+    }
 }
 ```
+
+Fastify is configured with `genReqId: () => randomUUID()` in `src/routes.ts`
+so every request id (`req.id`) used as `transaction_id` is a UUID.
+
+Layer-by-layer responsibilities:
+- **Controller**: log entry (method/path) and exit (status code) for every
+  return path, threading `req.id` into `setContext(...)` and into service
+  calls.
+- **Service**: log immediately before/after every call to an external
+  provider/integration (with its own `duration_ms`), log every return path,
+  and thread `transactionId` down to repositories/providers.
+- **Repository**: log ONLY when a DB operation throws — not on every query.
+- **Provider**: usually no separate logging if the calling service already
+  logs before/after; add provider-level logging only when a provider is
+  called from multiple services and raw-error visibility there adds value.
+
+Never log passwords, API keys, tokens, full card numbers, or raw
+payment/QR payloads. Mask PII (phone/email) unless there's a genuine audit
+need.
+
+Log lines are shipped to **Better Stack** (logtail.com) via a winston
+transport in `src/libs/winston.ts`, gated by `BETTERSTACK_SOURCE_TOKEN` /
+`BETTERSTACK_INGESTING_HOST` (only enabled when a token is configured). New
+Relic (`newrelic.js`, `NEW_RELIC_*` env vars, `-r newrelic` require flags)
+remains in place for APM/monitoring — only log *forwarding* moved to Better
+Stack.
 
 ### Error Handling
 

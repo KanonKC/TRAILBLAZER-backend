@@ -1,4 +1,5 @@
 import fastify from 'fastify';
+import { randomUUID } from 'node:crypto';
 import config from './config';
 import ClipShoutoutController from './controllers/clipShoutout/clipShoutout.controller';
 import FirstWordController from './controllers/firstWord/firstWord.controller';
@@ -267,7 +268,10 @@ const twitchChannelBitsUseEvent = new TwitchChannelBitsUseEvent(endCreditService
 // Cron
 const tbCron = new TbCron(userService, linkedAccountService);
 
-const server = fastify();
+// genReqId is a UUID (not fastify's default incrementing counter) so it can
+// be safely used as the transaction_id threaded through every log line for
+// a single request.
+const server = fastify({ genReqId: () => randomUUID() });
 
 server.register(cors, {
   origin: true, // Allow all origins (overlay SSE endpoints use key-based auth)

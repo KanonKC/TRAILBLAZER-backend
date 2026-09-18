@@ -19,7 +19,8 @@ export default class ReferralService {
      * Generates or retrieves a unique referral code for a user based on their Twitch ID.
      */
     async getOrCreateCode(userId: string, twitchId: string): Promise<string> {
-        this.logger.setContext("service.referral.getOrCreateCode");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.referral.getOrCreateCode");
         const existing = await this.referralRepository.getReferralCodeByUserId(userId);
         if (existing) return existing.code;
 
@@ -39,8 +40,9 @@ export default class ReferralService {
      * Processes a referral when a new user registers using a referral link.
      */
     async handleReferralRegistration(code: string, refereeId: string): Promise<void> {
-        this.logger.setContext("service.referral.handleReferralRegistration");
-        this.logger.info({ message: "Processing referral registration", data: { code, refereeId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.referral.handleReferralRegistration");
+        logger.info({ message: "Processing referral registration", data: { code, refereeId } });
 
         try {
             await prisma.$transaction(async (tx) => {
@@ -101,12 +103,13 @@ export default class ReferralService {
                 }
             });
         } catch (error) {
-            this.logger.error({ message: "Failed to process referral registration", error: error as Error });
+            logger.error({ message: "Failed to process referral registration", error: error as Error });
         }
     }
 
     async getReferralStatus(userId: string) {
-        this.logger.setContext("service.referral.getReferralStatus");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.referral.getReferralStatus");
         const count = await this.referralRepository.countReferralsByReferrerId(userId);
         const referralCode = await this.referralRepository.getReferralCodeByUserId(userId);
 

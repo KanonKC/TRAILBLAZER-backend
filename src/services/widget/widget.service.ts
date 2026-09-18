@@ -30,17 +30,19 @@ export default class WidgetService {
     }
 
     async authorizeOwnership(userId: string, widgetId: string) {
-        this.logger.setContext("service.widget.authorizeOwnership");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.authorizeOwnership");
         const widget = await this.get(widgetId);
         if (widget.owner_id !== userId) {
-            this.logger.warn({ message: "You are not the owner of this widget", data: { userId, widgetId: widget.id } });
+            logger.warn({ message: "You are not the owner of this widget", data: { userId, widgetId: widget.id } });
             throw new ForbiddenError("You are not the owner of this widget");
         }
     }
 
     async authorizeTierUsage(userId: string, widgetId?: string, isEnabling?: boolean) {
+        let logger: TLogger = this.logger;
         try {
-            this.logger.setContext("service.widget.authorizeTierUsage");
+            logger = this.logger.setContext("service.widget.authorizeTierUsage");
 
             if (isEnabling === false) return; // Disabling is always allowed
 
@@ -63,20 +65,21 @@ export default class WidgetService {
             const resultingQuota = usedQuota + currentWidgetCost;
 
             if (resultingQuota > quota) {
-                this.logger.warn({
+                logger.warn({
                     message: `Quota exceeded`,
                     data: { userId, widgetId, usedQuota, currentWidgetCost, quota, extraQuota: user.extra_widget_quota }
                 });
                 throw new WidgetQuotaLimitError();
             }
         } catch (error) {
-            this.logger.error({ message: `Error authorizing tier usage`, error: error as Error });
+            logger.error({ message: `Error authorizing tier usage`, error: error as Error });
             throw error;
         }
     }
 
     async update(id: string, userId: string, request: UpdateWidget) {
-        this.logger.setContext("service.widget.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.update");
         const existing = await this.widgetRepository.get(id);
         if (!existing) {
             throw new NotFoundError("Widget not found");
@@ -89,15 +92,17 @@ export default class WidgetService {
     }
 
     async updateEnable(id: string, userId: string, value: boolean) {
-        this.logger.setContext("service.widget.updateEnable");
-        this.logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.updateEnable");
+        logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
         await this.authorizeTierUsage(userId, id, value);
         return this.update(id, userId, { enabled: value });
     }
 
     async setInitialEnabled(id: string, userId: string) {
-        this.logger.setContext("service.widget.setInitialEnabled");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.setInitialEnabled");
         const widget = await this.get(id);
         const cost = widget.widget_type?.cost ?? 1;
         const user = await this.userService.get(userId);
@@ -105,12 +110,13 @@ export default class WidgetService {
         const quota = baseQuota + user.extra_widget_quota;
         const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id]);
         const isEnabled = usedQuota + cost <= quota;
-        this.logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
+        logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
         await this.update(id, userId, { enabled: isEnabled });
     }
 
     async delete(id: string, userId: string) {
-        this.logger.setContext("service.widget.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.delete");
         const existing = await this.widgetRepository.get(id);
         if (!existing) {
             throw new NotFoundError("Widget not found");
@@ -121,29 +127,31 @@ export default class WidgetService {
     }
 
     async validateOverlayAccess(userId: string, key: string) {
-        this.logger.setContext("service.widget.validateOverlayAccess");
-        this.logger.info({ message: "Validating overlay access", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.validateOverlayAccess");
+        logger.info({ message: "Validating overlay access", data: { userId } });
         try {
             const widget = await this.widgetRepository.getByOverlayKey(key);
             if (!widget) {
-                this.logger.warn({ message: "Widget not found", data: { userId } });
+                logger.warn({ message: "Widget not found", data: { userId } });
                 return false;
             }
             if (widget.owner_id !== userId) {
-                this.logger.warn({ message: "Unauthorized access attempt", data: { userId, widgetId: widget.id } });
+                logger.warn({ message: "Unauthorized access attempt", data: { userId, widgetId: widget.id } });
                 return false;
             }
 
-            this.logger.info({ message: "Validating overlay access", data: { widget, key } });
+            logger.info({ message: "Validating overlay access", data: { widget, key } });
             return widget.overlay_key === key;
         } catch (error) {
-            this.logger.error({ message: "Failed to validate overlay access", error: error as Error, data: { userId } });
+            logger.error({ message: "Failed to validate overlay access", error: error as Error, data: { userId } });
             return false;
         }
     }
 
     async get(widgetId: string): Promise<ExtendedWidget> {
-        this.logger.setContext("service.widget.get");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.get");
         const cacheKey = `widget:${widgetId}`;
         const cachedWidget = await redis.get(cacheKey);
         if (cachedWidget) {
@@ -160,10 +168,11 @@ export default class WidgetService {
     }
 
     async list(ownerId: string, pagination: Pagination, filters?: ListWidgetFilters): Promise<ListResponse<ExtendedWidget>> {
-        this.logger.setContext("service.widget.list");
-        this.logger.info({ message: "Listing widgets by owner ID", data: { ownerId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.list");
+        logger.info({ message: "Listing widgets by owner ID", data: { ownerId } });
         const [widgets, total] = await this.widgetRepository.listByOwnerId(ownerId, pagination, filters);
-        this.logger.info({ message: "Widgets listed successfully", data: { widgets, total } });
+        logger.info({ message: "Widgets listed successfully", data: { widgets, total } });
         return {
             data: widgets,
             pagination: {
@@ -174,7 +183,8 @@ export default class WidgetService {
     }
 
     async getTotalByOwnerId(ownerId: string, filters?: ListWidgetFilters): Promise<number> {
-        this.logger.setContext("service.widget.getTotalByOwnerId");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.getTotalByOwnerId");
         const total = await this.list(ownerId, { page: 1, limit: 1 }, filters);
 
         const res = total.pagination.total || 0;
@@ -182,24 +192,28 @@ export default class WidgetService {
     }
 
     async disableAll(ownerId: string) {
-        this.logger.setContext("service.widget.disableAll");
-        this.logger.info({ message: "Disabling all widgets", data: { ownerId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.disableAll");
+        logger.info({ message: "Disabling all widgets", data: { ownerId } });
         await this.widgetRepository.disableAll(ownerId);
     }
 
     async refreshOverlayKey(widgetId: string): Promise<void> {
-        this.logger.setContext("service.widget.refreshOverlayKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.refreshOverlayKey");
         const newKey = crypto.randomUUID();
         await this.widgetRepository.updateOverlayKey(widgetId, newKey);
     }
 
     async updateOverlayKey(widgetId: string, overlayKey: string): Promise<void> {
-        this.logger.setContext("service.widget.updateOverlayKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.updateOverlayKey");
         await this.widgetRepository.updateOverlayKey(widgetId, overlayKey);
     }
 
     async getFirstEnabled(ownerId: string) {
-        this.logger.setContext("service.widget.getFirstEnabled");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.getFirstEnabled");
         const first = await this.widgetRepository.getFirstEnabled(ownerId)
         if (!first) {
             throw new NotFoundError("Widget not found")
@@ -208,8 +222,9 @@ export default class WidgetService {
     }
 
     async getQuota(userId: string): Promise<{ total_quota: number; used_quota: number; remaining_quota: number }> {
-        this.logger.setContext("service.widget.getQuota");
-        this.logger.info({ message: "Fetching quota info", data: { userId } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.getQuota");
+        logger.info({ message: "Fetching quota info", data: { userId } });
         const user = await this.userService.get(userId);
         const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
         const total_quota = baseQuota + user.extra_widget_quota;
@@ -219,12 +234,13 @@ export default class WidgetService {
     }
 
     async increaseTriggeredCount(id: string): Promise<void> {
-        this.logger.setContext("service.widget.increaseTriggeredCount");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.widget.increaseTriggeredCount");
         try {
             await this.widgetRepository.increaseTriggeredCount(id)
             await redis.del(`widget:${id}`)
         } catch (err) {
-            this.logger.error({ message: "Failed to increase Widget triggered count", data: { widgetId: id }, error: err as Error });
+            logger.error({ message: "Failed to increase Widget triggered count", data: { widgetId: id }, error: err as Error });
         }
     }
 }

@@ -12,29 +12,31 @@ export default class AuthController {
     }
 
     async logout(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.auth.logout");
-        this.logger.info({ message: "User logging out" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.auth.logout", req.id);
+        logger.info({ message: "User logging out" });
         const user = await this.authMiddleware.authenticate(req, res);
         if (!user) return; // 401 already sent
 
         try {
             await this.authService.logout(user.id, req.cookies.refreshToken);
             clearAuthCookies(res);
-            this.logger.info({ message: "Successfully logged out" });
+            logger.info({ message: "Successfully logged out" });
             res.status(200).send({ message: "Logged out" });
         } catch (err) {
             if (err instanceof TError) {
-                this.logger.error({ message: err.message, error: err });
+                logger.error({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
-            this.logger.error({ message: "Logout failed", error: err as string | Error });
+            logger.error({ message: "Logout failed", error: err as string | Error });
             const error = new InternalServerError("Logout failed");
             return res.status(error.status).send(error.toJSON());
         }
     }
 
     async syncTwitchGqlToken(req: FastifyRequest<{ Body: { token: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.auth.syncTwitchGqlToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.auth.syncTwitchGqlToken", req.id);
         const user = await this.authMiddleware.authenticate(req, res);
         if (!user) return; // 401 already sent
 
@@ -46,13 +48,13 @@ export default class AuthController {
 
         try {
             await this.authService.updateTwitchGqlToken(user.id, token);
-            this.logger.info({ message: "Twitch GQL token synced", data: { userId: user.id } });
+            logger.info({ message: "Twitch GQL token synced", data: { userId: user.id } });
             res.status(204).send();
         } catch (err) {
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
-            this.logger.error({ message: "Token sync failed", error: err as string | Error });
+            logger.error({ message: "Token sync failed", error: err as string | Error });
             const error = new InternalServerError();
             return res.status(error.status).send(error.toJSON());
         }

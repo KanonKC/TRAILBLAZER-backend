@@ -88,14 +88,15 @@ export default class UserService {
     }
 
     async login(request: LoginRequest): Promise<{ accessToken: string, refreshToken: string, user: User }> {
-        this.logger.setContext("service.user.login")
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.login")
         const token = await this.callTwitch("exchangeCode", () => exchangeCode(
             this.cfg.twitch.clientId,
             this.cfg.twitch.clientSecret,
             request.code,
             this.cfg.twitch.redirectUrl
         ))
-        this.logger.debug({ message: "Received twitch token" });
+        logger.debug({ message: "Received twitch token" });
 
         const tokenInfo = await this.callTwitch("getTokenInfo", () => getTokenInfo(token.accessToken, this.cfg.twitch.clientId))
 
@@ -114,13 +115,13 @@ export default class UserService {
             display_name: twitchUser.displayName,
             avatar_url: twitchUser.profilePictureUrl
         }
-        this.logger.debug({ message: "Creating user request", data: cr });
+        logger.debug({ message: "Creating user request", data: cr });
         
         const existingUser = await this.userRepository.getByTwitchId(twitchUser.id);
         const isNewUser = !existingUser;
         
         const user = await this.userRepository.upsert(cr)
-        this.logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
+        logger.info({ message: "User logged in/created", data: { userId: user.id, username: user.username, isNewUser } });
 
         if (user.consent_version !== CONSENT_VERSION) {
             await this.userRepository.update(user.id, { consent_accepted_at: new Date(), consent_version: CONSENT_VERSION });
@@ -162,7 +163,8 @@ export default class UserService {
     }
 
     async getByTwitchId(twitchId: string): Promise<User> {
-        this.logger.setContext("service.user.getByTwitchId");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.getByTwitchId");
         const cacheKey = `user:twitch_id:${twitchId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -177,7 +179,8 @@ export default class UserService {
     }
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
-        this.logger.setContext("service.user.refreshToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.refreshToken");
         const userId = await redis.get(`refresh_token:${refreshToken}`);
 
         if (!userId) {
@@ -207,7 +210,8 @@ export default class UserService {
     }
 
     async get(userId: string): Promise<User> {
-        this.logger.setContext("service.user.get");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.get");
         const cacheKey = `user:id:${userId}`;
         const cachedUser = await redis.get(cacheKey);
         if (cachedUser) {
@@ -222,7 +226,8 @@ export default class UserService {
     }
 
     async update(id: string, request: Partial<User>, tx?: any) {
-        this.logger.setContext("service.user.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.update");
         try {
             const user = await this.userRepository.update(id, request, tx)
             await redis.del(`user:id:${id}`)
@@ -241,7 +246,8 @@ export default class UserService {
     }
 
     async getTier(userId: string, options?: GetTierOptions): Promise<number> {
-        this.logger.setContext("service.user.getTier");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.getTier");
         const cacheKey = `user:tier:${userId}`;
         const cachedTier = await redis.get(cacheKey);
         const forceTwitch = options?.forceTwitch ?? false
@@ -281,7 +287,8 @@ export default class UserService {
     }
 
     async getTierFromTwitch(twitchId: string): Promise<number> {
-        this.logger.setContext("service.user.getTierFromTwitch");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.getTierFromTwitch");
         try {
             const twitchUserAPI = await this.authService.createTwitchUserAPI(twitchId)
             const subscription = await twitchUserAPI.subscriptions.checkUserSubscription(twitchId, this.cfg.twitch.paymentChannelId)
@@ -297,13 +304,15 @@ export default class UserService {
     }
 
     async hasTwitchGqlToken(userId: string): Promise<boolean> {
-        this.logger.setContext("service.user.hasTwitchGqlToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.hasTwitchGqlToken");
         const auth = await this.authRepository.getByUserId(userId);
         return !!auth?.twitch_gql_token;
     }
 
     createAccessToken(user: User): string {
-        this.logger.setContext("service.user.createAccessToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.createAccessToken");
         const accessToken = signAccessToken({
             id: user.id,
             username: user.username,
@@ -317,9 +326,10 @@ export default class UserService {
     }
 
     async adjustTierAndWidgets(userId: string) {
-        this.logger.setContext("service.user.adjustTierAndWidgets");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.adjustTierAndWidgets");
         if (!this.widgetService) {
-            this.logger.error({ message: "WidgetService is not initialized" });
+            logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
         }
         try {
@@ -334,15 +344,15 @@ export default class UserService {
             })
 
             const quotaInfo = await this.widgetService.getQuota(userId)
-            this.logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
+            logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
             
             if (quotaInfo.used_quota > quotaInfo.total_quota) {
-                this.logger.info({ message: "Quota exceeded after tier adjustment, disabling all widgets", data: { userId, quotaInfo } });
+                logger.info({ message: "Quota exceeded after tier adjustment, disabling all widgets", data: { userId, quotaInfo } });
                 await this.widgetService.disableAll(userId)
             }
         } catch (err) {
             if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
-                this.logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });
+                logger.error({ message: "Error on adjustTierAndWidgets, disableing all widgets and set tier to 0", data: { userId }, error: err as Error });
                 await this.widgetService.disableAll(userId)
                 await this.update(userId, {
                     tier: 0,
@@ -355,18 +365,19 @@ export default class UserService {
     }
 
     async bulkAdjustTierAndWidgets() {
-        this.logger.setContext("service.user.bulkAdjustTierAndWidgets");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.bulkAdjustTierAndWidgets");
         // TODO: For very large user bases, consider implementing a queue-based system 
         // or more optimized batching to prevent long-running process issues.
         if (!this.widgetService) {
-            this.logger.error({ message: "WidgetService is not initialized" });
+            logger.error({ message: "WidgetService is not initialized" });
             throw new Error("WidgetService is not initialized");
         }
 
         const limit = 10;
 
         try {
-            this.logger.info({ message: "Starting bulk user tier adjustment" });
+            logger.info({ message: "Starting bulk user tier adjustment" });
 
             const processedIds: string[] = [];
             while (true) {
@@ -392,9 +403,9 @@ export default class UserService {
                     }
                 }))
             }
-            this.logger.info({ message: "Completed bulk adjustment" });
+            logger.info({ message: "Completed bulk adjustment" });
         } catch (error) {
-            this.logger.error({ message: "Failed during bulk adjustment", error: error as Error });
+            logger.error({ message: "Failed during bulk adjustment", error: error as Error });
             throw error;
         }
     }
@@ -409,7 +420,8 @@ export default class UserService {
     }
 
     async listShowcase(): Promise<ListUserShowcaseResponse> {
-        this.logger.setContext("service.user.listShowcase");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.user.listShowcase");
         const cacheKey = `user:showcase`
         const cachedShowcase = await redis.get(cacheKey)
         if (cachedShowcase) {

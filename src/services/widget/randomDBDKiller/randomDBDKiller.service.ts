@@ -28,7 +28,8 @@ export default class RandomDBDKillerService {
     }
 
     async create(request: CreateRandomDBDKillerInput): Promise<RandomDBDKillerWidget> {
-        this.logger.setContext("service.randomDBDKiller.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.create");
         const user = await this.userRepository.get(request.owner_id);
         if (!user) {
             throw new NotFoundError("User not found");
@@ -58,7 +59,8 @@ export default class RandomDBDKillerService {
     }
 
     async update(id: string, userId: string, request: UpdateRandomDBDKiller): Promise<RandomDBDKillerWidget> {
-        this.logger.setContext("service.randomDBDKiller.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.update");
 
         const existing = await this.randomDBDKillerRepository.findById(id);
         if (!existing) {
@@ -83,7 +85,8 @@ export default class RandomDBDKillerService {
     }
 
     async delete(userId: string): Promise<void> {
-        this.logger.setContext("service.randomDBDKiller.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.delete");
         const existing = await this.randomDBDKillerRepository.getByOwnerId(userId);
         if (!existing) {
             return;
@@ -98,7 +101,8 @@ export default class RandomDBDKillerService {
     }
 
     async getByUserId(userId: string): Promise<RandomDBDKillerWidget> {
-        this.logger.setContext("service.randomDBDKiller.getByUserId");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.getByUserId");
         const randomDBDKiller = await this.randomDBDKillerRepository.getByOwnerId(userId);
         if (!randomDBDKiller) {
             throw new NotFoundError("Random DBD Killer widget not found");
@@ -108,17 +112,18 @@ export default class RandomDBDKillerService {
     }
 
     async randomizeKiller(event: TwitchChannelRedemptionAddEventRequest): Promise<void> {
-        this.logger.setContext("service.randomDBDKiller.randomizeKiller");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.randomizeKiller");
         const rewardId = event.reward.id;
 
         const config = await this.randomDBDKillerRepository.getByTwitchRewardId(rewardId);
         if (!config) {
-            this.logger.warn({ message: "Random DBD Killer config not found", data: { rewardId } });
+            logger.warn({ message: "Random DBD Killer config not found", data: { rewardId } });
             return;
         }
 
         if (!config.killer_pool || config.killer_pool.length === 0) {
-            this.logger.warn({ message: "Killer pool is empty", data: { widgetId: config.widget_id } });
+            logger.warn({ message: "Killer pool is empty", data: { widgetId: config.widget_id } });
             try {
                 await twitchAppAPI.chat.sendChatMessageAsApp(
                     event.broadcaster_user_id,
@@ -126,7 +131,7 @@ export default class RandomDBDKillerService {
                     "Random DBD Killer pool is not configured yet."
                 );
             } catch (error) {
-                this.logger.error({ message: "Failed to send empty pool notice", data: { error } });
+                logger.error({ message: "Failed to send empty pool notice", data: { error } });
             }
             return;
         }
@@ -134,7 +139,7 @@ export default class RandomDBDKillerService {
         const randomSlug = config.killer_pool[Math.floor(Math.random() * config.killer_pool.length)];
         const killer = await this.dbdKillerMasterRepository.getBySlug(randomSlug);
         if (!killer) {
-            this.logger.warn({ message: "Killer master not found for slug", data: { slug: randomSlug } });
+            logger.warn({ message: "Killer master not found for slug", data: { slug: randomSlug } });
             return;
         }
 
@@ -169,7 +174,8 @@ export default class RandomDBDKillerService {
     }
 
     private async subscribeToRedemptionEvents(twitchId: string, userId: string): Promise<void> {
-        this.logger.setContext("service.randomDBDKiller.subscribeToRedemptionEvents");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.subscribeToRedemptionEvents");
         try {
             const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
             const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled');
@@ -178,20 +184,22 @@ export default class RandomDBDKillerService {
             if (channelRewardRedemptionSub.length === 0) {
                 const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add");
                 await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(twitchId, tsp);
-                this.logger.info({ message: "Subscribed to channel redemption add events", data: { userId, twitchId } });
+                logger.info({ message: "Subscribed to channel redemption add events", data: { userId, twitchId } });
             }
         } catch (error) {
-            this.logger.error({ message: "Failed to subscribe to redemption events", error: error as Error, data: { userId, twitchId } });
+            logger.error({ message: "Failed to subscribe to redemption events", error: error as Error, data: { userId, twitchId } });
         }
     }
 
     async validateOverlayAccess(userId: string, key: string): Promise<boolean> {
-        this.logger.setContext("service.randomDBDKiller.validateOverlayAccess");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.validateOverlayAccess");
         return this.widgetService.validateOverlayAccess(userId, key);
     }
 
     async refreshKey(userId: string): Promise<{ overlay_key: string }> {
-        this.logger.setContext("service.randomDBDKiller.refreshKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDBDKiller.refreshKey");
         const widget = await this.randomDBDKillerRepository.getByOwnerId(userId);
         if (!widget) {
             throw new NotFoundError("Widget not found");

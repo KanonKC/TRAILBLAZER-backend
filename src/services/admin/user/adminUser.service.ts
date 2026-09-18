@@ -29,7 +29,8 @@ export default class AdminUserService {
     tier?: number,
     isShowcase?: boolean
   ): Promise<ListResponse<User & { widget_count: number }>> {
-    this.logger.setContext('service.adminUser.list');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('service.adminUser.list');
     const skip = (pagination.page - 1) * pagination.limit;
     const [users, total] = await Promise.all([
       this.userRepository.findMany(skip, pagination.limit, search, tier, isShowcase),
@@ -40,7 +41,8 @@ export default class AdminUserService {
   }
 
   async get(id: string): Promise<User> {
-    this.logger.setContext('service.adminUser.get');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('service.adminUser.get');
     const user = await this.userRepository.get(id);
     if (!user) {
       throw new NotFoundError('User not found');
@@ -49,13 +51,15 @@ export default class AdminUserService {
   }
 
   async getWidgets(id: string, pagination: Pagination) {
-    this.logger.setContext('service.adminUser.getWidgets');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('service.adminUser.getWidgets');
     await this.get(id);
     return this.widgetService.list(id, pagination);
   }
 
   async getEventSubs(id: string) {
-    this.logger.setContext('service.adminUser.getEventSubs');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('service.adminUser.getEventSubs');
     const user = await this.get(id);
     return this.twitchService.listEventSubs(user.twitch_id);
   }

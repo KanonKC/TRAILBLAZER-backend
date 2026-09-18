@@ -14,17 +14,18 @@ export default class TwitchGqlController {
     }
 
     async exportVideoToYoutube(req: FastifyRequest<{ Body: ExportVideoToYoutubeRequest[] }>, res: FastifyReply) {
-        this.logger.setContext("controller.twitchGql.exportVideoToYoutube");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.twitchGql.exportVideoToYoutube", req.id);
         
         try {
             // const result = await this.twitchGql.exportVideosToYoutube(req.body);
             return res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to export video", error: error as Error });
+            logger.error({ message: "Failed to export video", error: error as Error });
             return res.status(500).send({ message: "Internal Server Error" });
         }
     }

@@ -27,7 +27,8 @@ export default class RandomDbdPerkService {
     }
 
     async extend(rw: RandomDbdPerkWidget): Promise<ExtendedRandomDbdPerk> {
-        this.logger.setContext("service.randomDbdPerk.extend");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.extend");
         const totalKillerPerks = await this.getTotalPerkCount(RandomDbdPerkClassType.KILLER)
         const totalSurvivorPerks = await this.getTotalPerkCount(RandomDbdPerkClassType.SURVIVOR)
         return {
@@ -38,7 +39,8 @@ export default class RandomDbdPerkService {
     }
 
     async create(request: CreateRandomDbdPerk): Promise<ExtendedRandomDbdPerk> {
-        this.logger.setContext("service.randomDbdPerk.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.create");
         const user = await this.userRepository.get(request.owner_id);
         if (!user) {
             throw new NotFoundError("User not found");
@@ -51,7 +53,7 @@ export default class RandomDbdPerkService {
         if (channelRewardRedemptionSub.length === 0) {
             const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add")
             await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(user.twitch_id, tsp)
-            this.logger.info({ message: "Subscribed to channel redemption add events", data: { userId: user.id, twitchId: user.twitch_id } });
+            logger.info({ message: "Subscribed to channel redemption add events", data: { userId: user.id, twitchId: user.twitch_id } });
         }
 
         const res = await this.randomDbdPerkRepository.create(request)
@@ -60,7 +62,8 @@ export default class RandomDbdPerkService {
     }
 
     async update(id: string, userId: string, request: UpdateRandomDbdPerk): Promise<ExtendedRandomDbdPerk> {
-        this.logger.setContext("service.randomDbdPerk.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.update");
 
         const survivorCount = await this.getTotalPerkCount(RandomDbdPerkClassType.SURVIVOR)
         const killerCount = await this.getTotalPerkCount(RandomDbdPerkClassType.KILLER)
@@ -94,7 +97,8 @@ export default class RandomDbdPerkService {
     }
 
     async delete(userId: string): Promise<void> {
-        this.logger.setContext("service.randomDbdPerk.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.delete");
         const existing = await this.randomDbdPerkRepository.getByOwnerId(userId);
         if (!existing) {
             return;
@@ -109,7 +113,8 @@ export default class RandomDbdPerkService {
     }
 
     async getByUserId(userId: string): Promise<ExtendedRandomDbdPerk> {
-        this.logger.setContext("service.randomDbdPerk.getByUserId");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.getByUserId");
         const randomDbdPerk = await this.randomDbdPerkRepository.getByOwnerId(userId);
         if (!randomDbdPerk) {
             throw new NotFoundError("Random Dbd Perk widget not found");
@@ -119,18 +124,19 @@ export default class RandomDbdPerkService {
     }
 
     async randomPerk(event: TwitchChannelRedemptionAddEventRequest): Promise<void> {
-        this.logger.setContext("service.randomDbdPerk.randomPerk");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.randomPerk");
         const rewardId = event.reward.id
 
         const config = await this.randomDbdPerkRepository.getByTwitchId(event.broadcaster_user_id)
         if (!config) {
-            this.logger.warn({ message: "Random Dbd Perk widget not found", data: { twitchId: event.broadcaster_user_id } });
+            logger.warn({ message: "Random Dbd Perk widget not found", data: { twitchId: event.broadcaster_user_id } });
             return;
         }
         const randomClass = await this.randomDbdPerkRepository.getClassByRewardId(rewardId)
 
         if (!randomClass) {
-            this.logger.warn({ message: "Random class not found", data: { rewardId } });
+            logger.warn({ message: "Random class not found", data: { rewardId } });
             return;
         }
 
@@ -154,16 +160,17 @@ export default class RandomDbdPerkService {
 
         const senderId = event.broadcaster_user_id
         try {
-            this.logger.info({ message: "Sending chat message", data: { message } });
+            logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
             await this.widgetService.increaseTriggeredCount(config.widget_id)
         } catch (error) {
-            this.logger.error({ message: "Failed to send chat message", data: { error } });
+            logger.error({ message: "Failed to send chat message", data: { error } });
         }
     }
 
     async getTotalPerkCount(type: string): Promise<number> {
-        this.logger.setContext("service.randomDbdPerk.getTotalPerkCount");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.getTotalPerkCount");
         if (type === RandomDbdPerkClassType.KILLER) {
             return config.randomDbdPerk.totalKillerPerkCount
         } else {
@@ -181,7 +188,8 @@ export default class RandomDbdPerkService {
     }
 
     async validateOverlayAccess(userId: string, key: string): Promise<boolean> {
-        this.logger.setContext("service.randomDbdPerk.validateOverlayAccess");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.validateOverlayAccess");
         const cacheKey = `random_dbd_perk:owner_id:${userId}`;
         let widget: RandomDbdPerkWidget | null = null;
 
@@ -210,7 +218,8 @@ export default class RandomDbdPerkService {
     }
 
     async refreshKey(userId: string): Promise<{ overlay_key: string }> {
-        this.logger.setContext("service.randomDbdPerk.refreshKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.randomDbdPerk.refreshKey");
         const widget = await this.randomDbdPerkRepository.getByOwnerId(userId);
         if (!widget) {
             throw new NotFoundError("Widget not found");

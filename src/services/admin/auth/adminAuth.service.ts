@@ -30,7 +30,8 @@ export default class AdminAuthService {
     }
 
     async buildGoogleAuthUrl(): Promise<string> {
-        this.logger.setContext("service.adminAuth.buildGoogleAuthUrl");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.adminAuth.buildGoogleAuthUrl");
         const state = generateState();
         const codeVerifier = generateCodeVerifier();
 
@@ -42,11 +43,12 @@ export default class AdminAuthService {
     }
 
     async handleGoogleCallback(code: string, state: string): Promise<{ admin: AdminUser, accessToken: string, refreshToken: string }> {
-        this.logger.setContext("service.adminAuth.handleGoogleCallback");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.adminAuth.handleGoogleCallback");
 
         const codeVerifier = await redis.get(`admin_oauth_state:${state}`);
         if (!codeVerifier) {
-            this.logger.warn({ message: "Missing or expired OAuth state" });
+            logger.warn({ message: "Missing or expired OAuth state" });
             throw new UnauthorizedError("Invalid or expired login attempt, please try again");
         }
         await redis.del(`admin_oauth_state:${state}`);
@@ -57,14 +59,14 @@ export default class AdminAuthService {
             claims = decodeIdToken(tokens.idToken()) as GoogleIdTokenClaims;
         } catch (error) {
             if (error instanceof OAuth2RequestError) {
-                this.logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
+                logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
                 throw new UnauthorizedError("Invalid OAuth code, credentials, or redirect URI");
             }
             if (error instanceof ArcticFetchError) {
-                this.logger.error({ message: "Arctic fetch error", error: error as Error });
+                logger.error({ message: "Arctic fetch error", error: error as Error });
                 throw new UnauthorizedError("Failed to communicate with Google");
             }
-            this.logger.error({ message: "Failed to exchange Google OAuth code", error: error as Error });
+            logger.error({ message: "Failed to exchange Google OAuth code", error: error as Error });
             throw new UnauthorizedError("Failed to complete Google login");
         }
 
@@ -72,7 +74,7 @@ export default class AdminAuthService {
         if (!admin) {
             admin = await this.adminAuthRepository.findByEmail(claims.email);
             if (!admin) {
-                this.logger.warn({ message: "Admin account not found", data: { email: claims.email } });
+                logger.warn({ message: "Admin account not found", data: { email: claims.email } });
                 throw new ForbiddenError("Admin account not found — contact an administrator");
             }
             admin = await this.adminAuthRepository.updateGoogleIdAndLastLogin(admin.id, claims.sub);
@@ -81,7 +83,7 @@ export default class AdminAuthService {
         }
 
         if (!admin.is_active) {
-            this.logger.warn({ message: "Admin account disabled", data: { adminId: admin.id } });
+            logger.warn({ message: "Admin account disabled", data: { adminId: admin.id } });
             throw new ForbiddenError("This admin account has been disabled");
         }
 
@@ -90,7 +92,8 @@ export default class AdminAuthService {
     }
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
-        this.logger.setContext("service.adminAuth.refreshToken");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.adminAuth.refreshToken");
         const adminId = await redis.get(`admin_refresh_token:${refreshToken}`);
         if (!adminId) {
             throw new UnauthorizedError("Invalid refresh token");
@@ -106,7 +109,8 @@ export default class AdminAuthService {
     }
 
     async logout(refreshToken?: string): Promise<void> {
-        this.logger.setContext("service.adminAuth.logout");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("service.adminAuth.logout");
         if (refreshToken) {
             await redis.del(`admin_refresh_token:${refreshToken}`);
         }

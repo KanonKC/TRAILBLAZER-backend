@@ -1,8 +1,11 @@
+import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateEndCredit, CreateEndCreditViewerRecord, UpdateEndCredit } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { EndCreditWidget } from "./response";
 import { EndCreditViewerRecord } from "generated/prisma/client";
+
+const logger = new TLogger(Layer.REPOSITORY);
 
 export default class EndCreditRepository {
 
@@ -10,6 +13,7 @@ export default class EndCreditRepository {
     }
 
     async create(request: CreateEndCredit): Promise<EndCreditWidget> {
+        try {
         return prisma.endCredit.create({
             data: {
                 followers_header: request.followers_header,
@@ -43,9 +47,14 @@ export default class EndCreditRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.create").error({ message: "create failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByOwnerId(ownerId: string): Promise<EndCreditWidget | null> {
+        try {
         const widget = await prisma.widget.findUnique({
             where: {
                 owner_id_widget_type_slug: {
@@ -67,9 +76,14 @@ export default class EndCreditRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByTwitchId(twitchId: string): Promise<EndCreditWidget | null> {
+        try {
         const widget = await prisma.widget.findUnique({
             where: {
                 twitch_id_widget_type_slug: {
@@ -91,9 +105,14 @@ export default class EndCreditRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async createViewerRecord(request: CreateEndCreditViewerRecord): Promise<EndCreditViewerRecord> {
+        try {
         return prisma.endCreditViewerRecord.create({
             data: {
                 end_credit_id: request.end_credit_id,
@@ -103,9 +122,14 @@ export default class EndCreditRepository {
                 platform_created_at: request.platform_created_at,
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.createViewerRecord").error({ message: "createViewerRecord failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getById(id: string): Promise<EndCreditWidget | null> {
+        try {
         return prisma.endCredit.findUnique({
             where: { id },
             include: {
@@ -116,9 +140,14 @@ export default class EndCreditRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.getById").error({ message: "getById failed", error: error as Error });
+            throw error;
+        }
     }
 
     async update(id: string, request: UpdateEndCredit): Promise<EndCreditWidget> {
+        try {
         const { overlay_key, ...endCreditData } = request;
 
         const updateData: any = { ...endCreditData };
@@ -141,24 +170,43 @@ export default class EndCreditRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.update").error({ message: "update failed", error: error as Error });
+            throw error;
+        }
     }
 
     async delete(id: string): Promise<void> {
+        try {
         await prisma.endCredit.delete({
             where: { id },
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.delete").error({ message: "delete failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getViewerRecordsByEndCreditId(endCreditId: string): Promise<EndCreditViewerRecord[]> {
+        try {
         return prisma.endCreditViewerRecord.findMany({
             where: { end_credit_id: endCreditId },
             orderBy: { platform_created_at: "asc" },
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.getViewerRecordsByEndCreditId").error({ message: "getViewerRecordsByEndCreditId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async deleteViewerRecordsByEndCreditId(endCreditId: string): Promise<void> {
+        try {
         await prisma.endCreditViewerRecord.deleteMany({
             where: { end_credit_id: endCreditId },
         });
+    } catch (error) {
+            logger.setContext("repository.endCredit.deleteViewerRecordsByEndCreditId").error({ message: "deleteViewerRecordsByEndCreditId failed", error: error as Error });
+            throw error;
+        }
     }
 }
