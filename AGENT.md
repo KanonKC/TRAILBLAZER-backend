@@ -11,7 +11,8 @@ Welcome to the `trailblazer-backend` project! This file serves as the core instr
   - AWS S3 (`@aws-sdk/client-s3`) for file storage.
   - Twitch API (`@twurple/api`, `@twurple/auth`) for Twitch integrations.
   - Zod (`zod`) for schema validation.
-  - New Relic (`newrelic`) for monitoring and APM.
+  - New Relic (`newrelic`) for monitoring and APM (APM only — log forwarding moved to Better Stack).
+  - Better Stack (`@logtail/node`, `@logtail/winston`) for structured log forwarding.
   - Winston (`winston`) for structured logging.
 
 ## 🏗️ Architecture & Structure
@@ -51,9 +52,14 @@ All logging across the backend must use the project's structured logger instead 
 - **Import**: `import TLogger, { Layer } from "@/logging/logger";`
 - **Instantiation**: Instantiate exactly once per file/class, specifying the layer:
   ```typescript
-  const logger = new TLogger(Layer.CONTROLLER); // Use CONTROLLER, SERVICE, or REPOSITORY
+  const logger = new TLogger(Layer.CONTROLLER); // Use CONTROLLER, SERVICE, REPOSITORY, EVENT, PROVIDER
   ```
-- **Context Setting**: Always call `logger.setContext("domain.feature.action");` at the first line of an executing function to establish scope.
+- **Context Setting (immutable)**: `setContext()` never mutates `this` — it always returns a NEW `TLogger`. Always call it as the first line of an executing function and assign the result to a local variable, then use that local variable (not the class field) for the rest of the function:
+  ```typescript
+  const logger = this.logger.setContext("domain.feature.action", transactionId);
+  ```
+  This avoids a race condition where two concurrent requests sharing the same class instance would otherwise overwrite each other's `transaction_id`.
+- **Transaction threading**: `transactionId` is sourced from Fastify's `req.id` (a UUID, via `genReqId` in `src/routes.ts`) at the controller and threaded explicitly as a parameter through service -> repository (and into fire-and-forget calls) rather than relying on AsyncLocalStorage.
 - **Log Levels**:
   - `logger.info({ message: "...", data: ... })` - For successful flows, key events, state changes.
   - `logger.warn({ message: "...", data: ..., error: "..." })` - For expected failures, validation errors, or missing safe data.

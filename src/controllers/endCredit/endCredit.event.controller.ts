@@ -18,16 +18,17 @@ export default class EndCreditEventController {
     private connections: Map<string, Set<FastifyReply>> = new Map();
 
     async sse(req: FastifyRequest<{ Params: { userId: string }, Querystring: { key: string } }>, res: FastifyReply) {
+        let logger: TLogger = this.logger;
         const { userId } = req.params;
         const { key } = req.query;
 
-        this.logger.setContext("controller.endCreditEvent.sse");
-        this.logger.info({ message: "SSE connection attempt", data: { userId } });
+        logger = this.logger.setContext("controller.endCreditEvent.sse", req.id);
+        logger.info({ message: "SSE connection attempt", data: { userId } });
 
         try {
             const isValid = await this.widgetService.validateOverlayAccess(userId, key);
             if (!isValid) {
-                this.logger.warn({ message: "Invalid key for SSE connection", data: { userId } });
+                logger.warn({ message: "Invalid key for SSE connection", data: { userId } });
                 return res.status(401).send({ message: "Invalid overlay key" });
             }
 
@@ -69,19 +70,20 @@ export default class EndCreditEventController {
             });
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send({ message: error.message });
             }
-            this.logger.error({ message: "SSE connection failed", error: error as Error });
+            logger.error({ message: "SSE connection failed", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     public disconnectUser(userId: string) {
+        let logger: TLogger = this.logger;
         const userConns = this.connections.get(userId);
         if (userConns) {
-            this.logger.setContext("controller.endCreditEvent.disconnectUser");
-            this.logger.info({ message: "Disconnecting clients", data: { userId, clientCount: userConns.size } });
+            logger = this.logger.setContext("controller.endCreditEvent.disconnectUser");
+            logger.info({ message: "Disconnecting clients", data: { userId, clientCount: userConns.size } });
             for (const res of userConns) {
                 res.raw.end();
             }

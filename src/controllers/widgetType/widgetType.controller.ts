@@ -21,41 +21,44 @@ export default class WidgetTypeController {
     }
 
     async list(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.widgetType.list");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.widgetType.list", req.id);
         try {
             const data = await this.repository.list();
             res.send({ data });
         } catch (error) {
-            this.logger.error({ message: "Failed to list widget types", error: error as Error });
+            logger.error({ message: "Failed to list widget types", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async create(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.widgetType.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.widgetType.create", req.id);
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
         try {
             const request = createWidgetTypeSchema.parse(req.body);
             const widgetType = await this.widgetTypeService.create(request);
-            this.logger.info({ message: "Widget type created", data: { id: widgetType.id, adminId: admin.id } });
+            logger.info({ message: "Widget type created", data: { id: widgetType.id, adminId: admin.id } });
             res.status(201).send(widgetType);
         } catch (error) {
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to create widget type", error: error as Error });
+            logger.error({ message: "Failed to create widget type", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async update(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.widgetType.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.widgetType.update", req.id);
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
@@ -63,23 +66,24 @@ export default class WidgetTypeController {
             const id = parseInt(req.params.id);
             const request = updateWidgetTypeSchema.parse(req.body);
             const widgetType = await this.widgetTypeService.update(id, request);
-            this.logger.info({ message: "Widget type updated", data: { id, adminId: admin.id } });
+            logger.info({ message: "Widget type updated", data: { id, adminId: admin.id } });
             res.send(widgetType);
         } catch (error) {
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to update widget type", error: error as Error });
+            logger.error({ message: "Failed to update widget type", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async uploadIcon(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.widgetType.uploadIcon");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.widgetType.uploadIcon", req.id);
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
@@ -101,34 +105,35 @@ export default class WidgetTypeController {
 
             const buffer = await file.toBuffer();
             const url = await this.widgetTypeService.uploadIcon(filename, { buffer, mimetype: file.mimetype });
-            this.logger.info({ message: "Widget icon uploaded", data: { filename, adminId: admin.id } });
+            logger.info({ message: "Widget icon uploaded", data: { filename, adminId: admin.id } });
             res.send({ url });
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to upload widget icon", error: error as Error });
+            logger.error({ message: "Failed to upload widget icon", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async delete(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.widgetType.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.widgetType.delete", req.id);
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
 
         try {
             const id = parseInt(req.params.id);
             await this.widgetTypeService.delete(id);
-            this.logger.info({ message: "Widget type deleted", data: { id, adminId: admin.id } });
+            logger.info({ message: "Widget type deleted", data: { id, adminId: admin.id } });
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, error });
+                logger.error({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to delete widget type", error: error as Error });
+            logger.error({ message: "Failed to delete widget type", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

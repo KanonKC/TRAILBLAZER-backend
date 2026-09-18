@@ -18,7 +18,8 @@ export default class AdminUserController {
   }
 
   async list(req: FastifyRequest, res: FastifyReply) {
-    this.logger.setContext('controller.adminUser.list');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('controller.adminUser.list', req.id);
     const admin = await this.adminAuthMiddleware.authenticate(req, res);
     if (!admin) return; // 401 already sent
 
@@ -27,7 +28,8 @@ export default class AdminUserController {
       const result = await this.adminUserService.list(
         { page: query.page, limit: query.limit },
         query.search,
-        query.tier
+        query.tier,
+        query.is_showcase
       );
       res.send(result);
     } catch (error) {
@@ -37,13 +39,14 @@ export default class AdminUserController {
       if (error instanceof TError) {
         return res.status(error.status).send(error.toJSON());
       }
-      this.logger.error({ message: 'Failed to list users', error: error as Error });
+      logger.error({ message: 'Failed to list users', error: error as Error });
       res.status(500).send({ message: 'Internal Server Error' });
     }
   }
 
   async get(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-    this.logger.setContext('controller.adminUser.get');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('controller.adminUser.get', req.id);
     const admin = await this.adminAuthMiddleware.authenticate(req, res);
     if (!admin) return; // 401 already sent
 
@@ -54,13 +57,14 @@ export default class AdminUserController {
       if (error instanceof TError) {
         return res.status(error.status).send(error.toJSON());
       }
-      this.logger.error({ message: 'Failed to get user', error: error as Error });
+      logger.error({ message: 'Failed to get user', error: error as Error });
       res.status(500).send({ message: 'Internal Server Error' });
     }
   }
 
   async getWidgets(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-    this.logger.setContext('controller.adminUser.getWidgets');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('controller.adminUser.getWidgets', req.id);
     const admin = await this.adminAuthMiddleware.authenticate(req, res);
     if (!admin) return; // 401 already sent
 
@@ -78,13 +82,14 @@ export default class AdminUserController {
       if (error instanceof TError) {
         return res.status(error.status).send(error.toJSON());
       }
-      this.logger.error({ message: 'Failed to get user widgets', error: error as Error });
+      logger.error({ message: 'Failed to get user widgets', error: error as Error });
       res.status(500).send({ message: 'Internal Server Error' });
     }
   }
 
   async getEventSubs(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-    this.logger.setContext('controller.adminUser.getEventSubs');
+        let logger: TLogger = this.logger;
+    logger = this.logger.setContext('controller.adminUser.getEventSubs', req.id);
     const admin = await this.adminAuthMiddleware.authenticate(req, res);
     if (!admin) return; // 401 already sent
 
@@ -95,7 +100,7 @@ export default class AdminUserController {
       if (error instanceof TError) {
         return res.status(error.status).send(error.toJSON());
       }
-      this.logger.error({ message: 'Failed to get user event subs', error: error as Error });
+      logger.error({ message: 'Failed to get user event subs', error: error as Error });
       res.status(500).send({ message: 'Internal Server Error' });
     }
   }

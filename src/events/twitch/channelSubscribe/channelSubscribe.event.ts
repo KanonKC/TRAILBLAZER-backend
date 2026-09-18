@@ -13,11 +13,12 @@ export default class TwitchChannelSubscribeEvent {
     }
 
     async handle(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("event.twitch.channelSubscribe.handle");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("event.twitch.channelSubscribe.handle", req.id);
         const body = req.body as any
 
         if (body.subscription.status === "webhook_callback_verification_pending") {
-            this.logger.info({ message: "Verifying webhook callback", data: { challenge: body.challenge } });
+            logger.info({ message: "Verifying webhook callback", data: { challenge: body.challenge } });
             res.status(200).header("Content-Type", "text/plain").send(body.challenge)
             return
         }
@@ -29,12 +30,12 @@ export default class TwitchChannelSubscribeEvent {
             // EndCreditService.handleTwitchChannelChatNotificationEvent). This route/handler
             // is not currently subscribed to in Twitch EventSub — kept as a placeholder for a
             // future direct channel.subscribe integration.
-            this.logger.info({ message: "Handling channel subscribe event", data: event })
+            logger.info({ message: "Handling channel subscribe event", data: event })
             res.status(204).send()
             return
         }
 
-        this.logger.warn({ message: "Invalid subscription status", data: { status: body.subscription.status } });
+        logger.warn({ message: "Invalid subscription status", data: { status: body.subscription.status } });
         res.status(400).send({ message: "Invalid subscription status" })
     }
 }

@@ -1,7 +1,10 @@
+import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateDropImage, UpdateDropImage } from "./request";
 import { WidgetTypeSlug } from "@/services/widget/constant";
 import { DropImageWidget } from "./response";
+
+const logger = new TLogger(Layer.REPOSITORY);
 
 export default class DropImageRepository {
 
@@ -9,6 +12,7 @@ export default class DropImageRepository {
     }
 
     async create(request: CreateDropImage): Promise<DropImageWidget> {
+        try {
         return prisma.dropImage.create({
             data: {
                 twitch_reward_id: request.twitch_reward_id,
@@ -35,9 +39,14 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.create").error({ message: "create failed", error: error as Error });
+            throw error;
+        }
     }
 
     async update(id: string, request: UpdateDropImage): Promise<DropImageWidget> {
+        try {
         const { overlay_key, ...dropImageData } = request;
 
         const updateData: any = { ...dropImageData };
@@ -60,15 +69,25 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.update").error({ message: "update failed", error: error as Error });
+            throw error;
+        }
     }
 
     async delete(id: string): Promise<void> {
+        try {
         await prisma.dropImage.delete({
             where: { id },
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.delete").error({ message: "delete failed", error: error as Error });
+            throw error;
+        }
     }
 
     async findById(id: string): Promise<DropImageWidget | null> {
+        try {
         return prisma.dropImage.findUnique({
             where: { id },
             include: {
@@ -79,9 +98,14 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.findById").error({ message: "findById failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByOwnerId(ownerId: string): Promise<DropImageWidget | null> {
+        try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
                 owner_id_widget_type_slug: {
@@ -100,9 +124,14 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.getByOwnerId").error({ message: "getByOwnerId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByTwitchId(twitchId: string): Promise<DropImageWidget | null> {
+        try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
                 twitch_id_widget_type_slug: {
@@ -121,9 +150,14 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.getByTwitchId").error({ message: "getByTwitchId failed", error: error as Error });
+            throw error;
+        }
     }
 
     async getByTwitchRewardId(twitchRewardId: string): Promise<DropImageWidget | null> {
+        try {
         return prisma.dropImage.findFirst({
             where: { twitch_reward_id: twitchRewardId },
             include: {
@@ -134,5 +168,9 @@ export default class DropImageRepository {
                 },
             }
         });
+    } catch (error) {
+            logger.setContext("repository.dropImage.getByTwitchRewardId").error({ message: "getByTwitchRewardId failed", error: error as Error });
+            throw error;
+        }
     }
 }

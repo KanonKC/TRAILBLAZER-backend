@@ -16,18 +16,19 @@ export default class UploadedFileController {
     }
 
     async create(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.create");
-        this.logger.info({ message: "Uploading file" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.create", req.id);
+        logger.info({ message: "Uploading file" });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             const file = await req.file();
             if (!file) {
-                this.logger.warn({ message: "No file provided", data: { userId: user.id } });
+                logger.warn({ message: "No file provided", data: { userId: user.id } });
                 return res.status(400).send({ message: "File is required" });
             }
             const buffer = await file.toBuffer();
@@ -36,10 +37,10 @@ export default class UploadedFileController {
                 filename: file.filename,
                 mimetype: file.mimetype
             });
-            this.logger.info({ message: "Successfully uploaded file", data: { userId: user.id, filename: file.filename } });
+            logger.info({ message: "Successfully uploaded file", data: { userId: user.id, filename: file.filename } });
             res.status(201).send();
         } catch (error) {
-            this.logger.error({ message: "Failed to upload file", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to upload file", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -48,12 +49,13 @@ export default class UploadedFileController {
     }
 
     async get(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.get");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.get", req.id);
         const { id } = req.params;
-        this.logger.info({ message: "Getting uploaded file", data: { id } });
+        logger.info({ message: "Getting uploaded file", data: { id } });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -67,10 +69,10 @@ export default class UploadedFileController {
             // However, `extend` generates a signed URL, so maybe it's fine if the ID is known. 
             // Actually, usually users only list THEIR files.
 
-            this.logger.info({ message: "Successfully retrieved uploaded file", data: { id } });
+            logger.info({ message: "Successfully retrieved uploaded file", data: { id } });
             res.send(file);
         } catch (error) {
-            this.logger.error({ message: "Failed to get uploaded file", data: { id }, error: error as Error });
+            logger.error({ message: "Failed to get uploaded file", data: { id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -79,12 +81,13 @@ export default class UploadedFileController {
     }
 
     async update(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.update", req.id);
         const { id } = req.params;
-        this.logger.info({ message: "Updating uploaded file", data: { id } });
+        logger.info({ message: "Updating uploaded file", data: { id } });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -94,10 +97,10 @@ export default class UploadedFileController {
             // I should probably add ownership check if not present in service.
             // But for now sticking to exposing service methods.
             const updated = await this.service.update(id, user.id, request);
-            this.logger.info({ message: "Successfully updated uploaded file", data: { id } });
+            logger.info({ message: "Successfully updated uploaded file", data: { id } });
             res.send(updated);
         } catch (error) {
-            this.logger.error({ message: "Failed to update uploaded file", data: { id }, error: error as Error });
+            logger.error({ message: "Failed to update uploaded file", data: { id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -109,21 +112,22 @@ export default class UploadedFileController {
     }
 
     async delete(req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.delete", req.id);
         const { id } = req.params;
-        this.logger.info({ message: "Deleting uploaded file", data: { id } });
+        logger.info({ message: "Deleting uploaded file", data: { id } });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             await this.service.delete(id, user.id);
-            this.logger.info({ message: "Successfully deleted uploaded file", data: { id } });
+            logger.info({ message: "Successfully deleted uploaded file", data: { id } });
             res.status(204).send();
         } catch (error) {
-            this.logger.error({ message: "Failed to delete uploaded file", data: { id }, error: error as Error });
+            logger.error({ message: "Failed to delete uploaded file", data: { id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -132,11 +136,12 @@ export default class UploadedFileController {
     }
 
     async list(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.list");
-        this.logger.info({ message: "Listing uploaded files" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.list", req.id);
+        logger.info({ message: "Listing uploaded files" });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -149,10 +154,10 @@ export default class UploadedFileController {
                 page: query.page,
                 limit: query.limit
             });
-            this.logger.info({ message: "Successfully listed uploaded files" });
+            logger.info({ message: "Successfully listed uploaded files" });
             res.send(result);
         } catch (error) {
-            this.logger.error({ message: "Failed to list uploaded files", error: error as Error });
+            logger.error({ message: "Failed to list uploaded files", error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -161,20 +166,21 @@ export default class UploadedFileController {
     }
 
     async getTotalFileSize(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.uploadedFile.getTotalFileSize");
-        this.logger.info({ message: "Getting total uploaded file size" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.uploadedFile.getTotalFileSize", req.id);
+        logger.info({ message: "Getting total uploaded file size" });
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             const result = await this.service.getTotalFileSize(user.id);
-            this.logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize: result.total_size_kb } });
+            logger.info({ message: "Successfully retrieved total uploaded file size", data: { totalSize: result.total_size_kb } });
             res.send(result);
         } catch (error) {
-            this.logger.error({ message: "Failed to get total uploaded file size", error: error as Error });
+            logger.error({ message: "Failed to get total uploaded file size", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

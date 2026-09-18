@@ -17,8 +17,9 @@ export default class AdminController {
     }
 
     async updateUser(req: FastifyRequest<{ Body: Partial<User> & { id?: string }, Params: { id?: string } }>, res: FastifyReply) {
-        this.logger.setContext("controller.admin.updateUser");
-        this.logger.info({ message: "Update user request received", data: { body: req.body, params: req.params } });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.admin.updateUser", req.id);
+        logger.info({ message: "Update user request received", data: { body: req.body, params: req.params } });
 
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
@@ -26,7 +27,7 @@ export default class AdminController {
         try {
             const id = req.params.id;
             if (!id) {
-                this.logger.warn({ message: "User ID is required" });
+                logger.warn({ message: "User ID is required" });
                 return res.status(400).send({ message: "User ID is required" });
             }
 
@@ -34,21 +35,22 @@ export default class AdminController {
 
             const updatedUser = await this.userService.update(id, updateData);
 
-            this.logger.info({ message: "User updated successfully", data: { userId: id, adminId: admin.id } });
+            logger.info({ message: "User updated successfully", data: { userId: id, adminId: admin.id } });
             res.send(updatedUser);
         } catch (err) {
             if (err instanceof TError) {
-                this.logger.error({ message: "Failed to update user", error: err });
+                logger.error({ message: "Failed to update user", error: err });
                 return res.status(err.status).send({ message: err.message });
             }
-            this.logger.error({ message: "Failed to update user", error: err as Error });
+            logger.error({ message: "Failed to update user", error: err as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async bulkAdjustTierAndWidgets(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.admin.bulkAdjustTierAndWidgets");
-        this.logger.info({ message: "Bulk adjust tier and widgets request received" });
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.admin.bulkAdjustTierAndWidgets", req.id);
+        logger.info({ message: "Bulk adjust tier and widgets request received" });
 
         const admin = await this.adminAuthMiddleware.authenticate(req, res);
         if (!admin) return; // 401 already sent
@@ -56,14 +58,14 @@ export default class AdminController {
         try {
             await this.userService.bulkAdjustTierAndWidgets();
 
-            this.logger.info({ message: "Bulk adjustment completed successfully", data: { adminId: admin.id } });
+            logger.info({ message: "Bulk adjustment completed successfully", data: { adminId: admin.id } });
             res.send({ message: "Bulk adjustment completed successfully" });
         } catch (err) {
             if (err instanceof TError) {
-                this.logger.error({ message: "Failed during bulk adjustment", error: err });
+                logger.error({ message: "Failed during bulk adjustment", error: err });
                 return res.status(err.status).send({ message: err.message });
             }
-            this.logger.error({ message: "Failed during bulk adjustment", error: err as Error });
+            logger.error({ message: "Failed during bulk adjustment", error: err as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

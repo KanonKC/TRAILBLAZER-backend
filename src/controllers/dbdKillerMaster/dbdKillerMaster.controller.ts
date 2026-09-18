@@ -12,12 +12,13 @@ export default class DBDKillerMasterController {
     }
 
     async list(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.dbdKillerMaster.list");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.dbdKillerMaster.list", req.id);
         try {
             const data = await this.repository.list();
             res.send({ data });
         } catch (error) {
-            this.logger.error({ message: "Failed to list DBD killer masters", error: error as Error });
+            logger.error({ message: "Failed to list DBD killer masters", error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }

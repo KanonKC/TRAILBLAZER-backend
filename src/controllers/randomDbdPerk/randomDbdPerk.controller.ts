@@ -16,36 +16,38 @@ export default class RandomDbdPerkController {
     }
 
     async get(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.randomDbdPerk.get");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.randomDbdPerk.get", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             const result = await this.service.getByUserId(user.id);
             if (!result) {
-                this.logger.info({ message: "Random dbd perk config not found", data: { userId: user.id } });
+                logger.info({ message: "Random dbd perk config not found", data: { userId: user.id } });
                 return res.status(404).send({ message: "Not found" });
             }
-            this.logger.info({ message: "Successfully retrieved random dbd perk config", data: { userId: user.id } });
+            logger.info({ message: "Successfully retrieved random dbd perk config", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to get random dbd perk config", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to get random dbd perk config", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async create(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.randomDbdPerk.create");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.randomDbdPerk.create", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -56,27 +58,28 @@ export default class RandomDbdPerkController {
                 twitch_id: user.twitchId,
                 enabled: request.enabled
             });
-            this.logger.info({ message: "Successfully created random dbd perk config", data: { userId: user.id } });
+            logger.info({ message: "Successfully created random dbd perk config", data: { userId: user.id } });
             res.status(201).send(result);
         } catch (error) {
             if (error instanceof z.ZodError) {
-                this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
+                logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to create random dbd perk config", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to create random dbd perk config", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async update(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.randomDbdPerk.update");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.randomDbdPerk.update", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
@@ -85,67 +88,69 @@ export default class RandomDbdPerkController {
             const existing = await this.service.getByUserId(user.id);
 
             if (!existing) {
-                this.logger.warn({ message: "Random dbd perk config not found for update", data: { userId: user.id } });
+                logger.warn({ message: "Random dbd perk config not found for update", data: { userId: user.id } });
                 return res.status(404).send({ message: "Not found" });
             }
 
             const result = await this.service.update(existing.id, user.id, request);
-            this.logger.info({ message: "Successfully updated random dbd perk config", data: { userId: user.id } });
+            logger.info({ message: "Successfully updated random dbd perk config", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
             if (error instanceof z.ZodError) {
-                this.logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
+                logger.warn({ message: "Validation error", error: JSON.stringify(error.issues) });
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to update random dbd perk config", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to update random dbd perk config", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async delete(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.randomDbdPerk.delete");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.randomDbdPerk.delete", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             await this.service.delete(user.id);
-            this.logger.info({ message: "Successfully deleted random dbd perk config", data: { userId: user.id } });
+            logger.info({ message: "Successfully deleted random dbd perk config", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to delete random dbd perk config", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to delete random dbd perk config", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
 
     async refreshKey(req: FastifyRequest, res: FastifyReply) {
-        this.logger.setContext("controller.randomDbdPerk.refreshKey");
+        let logger: TLogger = this.logger;
+        logger = this.logger.setContext("controller.randomDbdPerk.refreshKey", req.id);
         const user = getUserFromRequest(req);
         if (!user) {
-            this.logger.warn({ message: "Unauthorized access attempt" });
+            logger.warn({ message: "Unauthorized access attempt" });
             return res.status(401).send({ message: "Unauthorized" });
         }
 
         try {
             const result = await this.service.refreshKey(user.id);
-            this.logger.info({ message: "Successfully refreshed random dbd perk overlay key", data: { userId: user.id } });
+            logger.info({ message: "Successfully refreshed random dbd perk overlay key", data: { userId: user.id } });
             res.send(result);
         } catch (error) {
             if (error instanceof TError) {
-                this.logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger.error({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
-            this.logger.error({ message: "Failed to refresh random dbd perk overlay key", data: { userId: user.id }, error: error as Error });
+            logger.error({ message: "Failed to refresh random dbd perk overlay key", data: { userId: user.id }, error: error as Error });
             res.status(500).send({ message: "Internal Server Error" });
         }
     }
