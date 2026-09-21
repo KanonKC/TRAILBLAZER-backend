@@ -313,6 +313,18 @@ server.get(
   '/api/v1/admin/users/:id/event-subs',
   adminUserController.getEventSubs.bind(adminUserController)
 );
+server.post(
+  '/api/v1/admin/users/:id/event-subs/:type',
+  adminUserController.subscribeEvent.bind(adminUserController)
+);
+server.delete(
+  '/api/v1/admin/users/:id/event-subs/:type',
+  adminUserController.unsubscribeEvent.bind(adminUserController)
+);
+server.get(
+  '/api/v1/admin/twitch/events',
+  adminUserController.listEventDefinitions.bind(adminUserController)
+);
 
 server.post('/api/v1/admin/widget-types', widgetTypeController.create.bind(widgetTypeController));
 server.put(

@@ -6,12 +6,16 @@ import { NotFoundError, TError } from "@/errors";
 import { HelixErrorResponse } from "./response";
 import { ListChannelRewardsOptions } from "./request";
 import { HelixEventSubSubscriptionData } from "@twurple/api/lib/interfaces/endpoints/eventSub.external";
-import { twitchAppAPI } from "@/libs/twurple";
+import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { TWITCH_EVENT_DEFINITIONS } from "./events";
+import TLogger, { Layer } from "@/logging/logger";
 
 export default class TwitchService {
     private readonly authService: AuthService;
+    private readonly logger: TLogger;
     constructor(authService: AuthService) {
         this.authService = authService;
+        this.logger = new TLogger(Layer.SERVICE);
     }
 
     async convertHelixError(error: unknown): Promise<TError> {
@@ -85,6 +89,43 @@ export default class TwitchService {
             const res = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId)
             return { data: res.data.map(r => r[rawDataSymbol]) }
         } catch (error) {
+            throw await this.convertHelixError(error)
+        }
+    }
+
+    listEventDefinitions(): { data: { type: string; route: string }[] } {
+        return { data: TWITCH_EVENT_DEFINITIONS.map(({ type, route }) => ({ type, route })) }
+    }
+
+    async subscribeEvent(twitchId: string, type: string, transactionId?: string): Promise<void> {
+        const logger = this.logger.setContext("service.twitch.subscribeEvent", transactionId);
+        const definition = TWITCH_EVENT_DEFINITIONS.find(d => d.type === type)
+        if (!definition) {
+            throw new NotFoundError("Twitch event type not found")
+        }
+        try {
+            const existing = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId)
+            if (existing.data.some(sub => sub.type === type && sub.status === "enabled")) {
+                logger.info({ message: "Event already subscribed", data: { twitchId, type } })
+                return
+            }
+            await definition.subscribe(twitchId, createESTransport(definition.route))
+            logger.info({ message: "Subscribed to event", data: { twitchId, type } })
+        } catch (error) {
+            logger.error({ message: "Failed to subscribe to event", data: { twitchId, type }, error: error as Error })
+            throw await this.convertHelixError(error)
+        }
+    }
+
+    async unsubscribeEvent(twitchId: string, type: string, transactionId?: string): Promise<void> {
+        const logger = this.logger.setContext("service.twitch.unsubscribeEvent", transactionId);
+        try {
+            const existing = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId)
+            const targets = existing.data.filter(sub => sub.type === type)
+            await Promise.all(targets.map(sub => twitchAppAPI.eventSub.deleteSubscription(sub.id)))
+            logger.info({ message: "Unsubscribed from event", data: { twitchId, type, count: targets.length } })
+        } catch (error) {
+            logger.error({ message: "Failed to unsubscribe from event", data: { twitchId, type }, error: error as Error })
             throw await this.convertHelixError(error)
         }
     }

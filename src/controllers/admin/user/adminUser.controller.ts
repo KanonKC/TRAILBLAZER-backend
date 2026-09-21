@@ -99,4 +99,44 @@ export default class AdminUserController {
       res.status(500).send({ message: 'Internal Server Error' });
     }
   }
+
+  async listEventDefinitions(req: FastifyRequest, res: FastifyReply) {
+    const admin = await this.adminAuthMiddleware.authenticate(req, res);
+    if (!admin) return; // 401 already sent
+    res.send(this.adminUserService.listEventDefinitions());
+  }
+
+  async subscribeEvent(req: FastifyRequest<{ Params: { id: string; type: string } }>, res: FastifyReply) {
+    const logger = this.logger.setContext('controller.adminUser.subscribeEvent', req.id);
+    const admin = await this.adminAuthMiddleware.authenticate(req, res);
+    if (!admin) return; // 401 already sent
+
+    try {
+      const result = await this.adminUserService.subscribeEvent(req.params.id, req.params.type, req.id);
+      res.send(result);
+    } catch (error) {
+      if (error instanceof TError) {
+        return res.status(error.status).send(error.toJSON());
+      }
+      logger.error({ message: 'Failed to subscribe event', error: error as Error });
+      res.status(500).send({ message: 'Internal Server Error' });
+    }
+  }
+
+  async unsubscribeEvent(req: FastifyRequest<{ Params: { id: string; type: string } }>, res: FastifyReply) {
+    const logger = this.logger.setContext('controller.adminUser.unsubscribeEvent', req.id);
+    const admin = await this.adminAuthMiddleware.authenticate(req, res);
+    if (!admin) return; // 401 already sent
+
+    try {
+      const result = await this.adminUserService.unsubscribeEvent(req.params.id, req.params.type, req.id);
+      res.send(result);
+    } catch (error) {
+      if (error instanceof TError) {
+        return res.status(error.status).send(error.toJSON());
+      }
+      logger.error({ message: 'Failed to unsubscribe event', error: error as Error });
+      res.status(500).send({ message: 'Internal Server Error' });
+    }
+  }
 }

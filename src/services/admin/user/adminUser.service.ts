@@ -58,4 +58,20 @@ export default class AdminUserService {
     const user = await this.get(id, transactionId);
     return this.twitchService.listEventSubs(user.twitch_id);
   }
+
+  listEventDefinitions() {
+    return this.twitchService.listEventDefinitions();
+  }
+
+  async subscribeEvent(id: string, type: string, transactionId?: string) {
+    const user = await this.get(id, transactionId);
+    await this.twitchService.subscribeEvent(user.twitch_id, type, transactionId);
+    return this.twitchService.listEventSubs(user.twitch_id);
+  }
+
+  async unsubscribeEvent(id: string, type: string, transactionId?: string) {
+    const user = await this.get(id, transactionId);
+    await this.twitchService.unsubscribeEvent(user.twitch_id, type, transactionId);
+    return this.twitchService.listEventSubs(user.twitch_id);
+  }
 }
