@@ -3,6 +3,7 @@ import Configurations from "@/config/index";
 import FirstWordRepository from "@/repositories/firstWord/firstWord.repository";
 import UserRepository from "@/repositories/user/user.repository";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher } from "@/libs/redis";
 import s3 from "@/libs/awsS3";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
@@ -59,6 +60,7 @@ describe("FirstWordService", () => {
     let mockFirstWordRepo: jest.Mocked<FirstWordRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockCfg = {
@@ -94,7 +96,12 @@ describe("FirstWordService", () => {
             increaseTriggeredCount: jest.fn(),
         } as any;
 
-        service = new FirstWordService(mockCfg, mockFirstWordRepo, mockUserRepo, mockWidgetService);
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
+        } as any;
+
+        service = new FirstWordService(mockCfg, mockFirstWordRepo, mockUserRepo, mockWidgetService, mockOverlayQueue);
         jest.clearAllMocks();
     });
 
@@ -332,8 +339,20 @@ describe("FirstWordService", () => {
 
             await service.greetNewChatter(event);
 
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("default_bot_id", "broadcaster_1", "Hello Chatter One");
-            expect(publisher.publish).toHaveBeenCalled();
+            // With audio configured the greeting is queued, chat message and all,
+            // so it cannot cut off whoever is still being greeted on the overlay.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                userId: "user_1",
+                payload: expect.objectContaining({ audioKey: "audio_1" }),
+                effects: [expect.objectContaining({
+                    type: "chat",
+                    senderId: "default_bot_id",
+                    broadcasterId: "broadcaster_1",
+                    message: "Hello Chatter One",
+                })],
+            }));
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
 
         it("should not greet if widget is disabled", async () => {
@@ -492,9 +511,10 @@ describe("FirstWordService", () => {
 
             await service.greetNewChatter(event);
 
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("default_bot_id", "broadcaster_1", "Custom Chatter One");
-            expect(publisher.publish).toHaveBeenCalledWith("first-word-audio", expect.stringContaining('"audioUrl":"custom_url"'));
-            expect(publisher.publish).toHaveBeenCalledWith("first-word-audio", expect.stringContaining('"volume":50'));
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                payload: { audioKey: "custom_audio", volume: 50 },
+                effects: [expect.objectContaining({ message: "Custom Chatter One" })],
+            }));
         });
 
         it("should skip chat message if message is empty", async () => {

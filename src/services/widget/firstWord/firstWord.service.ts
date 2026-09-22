@@ -18,19 +18,31 @@ import { ForbiddenError, NotFoundError, TError } from "@/errors";
 import { ListResponse, Pagination } from "../../response";
 
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { WidgetTypeSlug } from "../constant";
+import { FIRST_WORD_FALLBACK_DURATION_MS } from "@/services/overlayQueue/constants";
+
+/** What a queued greeting carries until it is dispatched. */
+interface FirstWordJobPayload {
+    audioKey: string
+    volume: number
+}
 
 export default class FirstWordService {
     private readonly cfg: Configurations
     private readonly firstWordRepository: FirstWordRepository;
     private readonly userRepository: UserRepository;
     private readonly widgetService: WidgetService;
+    private readonly overlayQueue: OverlayQueueService;
     private readonly logger = new TLogger(Layer.SERVICE);
 
-    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService) {
+    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService, overlayQueue: OverlayQueueService) {
         this.cfg = cfg;
         this.firstWordRepository = firstWordRepository;
         this.userRepository = userRepository;
         this.widgetService = widgetService;
+        this.overlayQueue = overlayQueue;
+        this.registerOverlayHandler();
     }
 
     async create(request: CreateFirstWordRequest): Promise<FirstWordWidget> {
@@ -307,7 +319,6 @@ export default class FirstWordService {
 
         let message = customReply?.reply_message || firstWord.reply_message
 
-        // If replay message does not empty -> Send message to Twitch
         if (message) {
             const greetCount = await this.firstWordRepository.getGreetCount(e.chatter_user_id, e.broadcaster_user_id)
             const replaceMap = {
@@ -315,28 +326,58 @@ export default class FirstWordService {
                 "{{greet_count}}": (greetCount?.count || 0).toString()
             }
             message = mapMessageVariables(message, replaceMap)
-            logger.debug({ message: "send chat message", data: { broadcaster_user_id: e.broadcaster_user_id, message } });
+        }
+
+        // With audio configured, the greeting is queued so it cannot cut off the
+        // previous viewer's audio — and the chat message rides along in the same
+        // job so it lands with the sound, not ten seconds before it.
+        if (firstWord.audio_key) {
+            const audioKey = customReply?.audio_key || firstWord.audio_key
+            const audioVolume = customReply?.audio_volume ?? firstWord.audio_volume ?? 100
+            const durationMs = (customReply?.audio_key ? customReply.audio?.duration_ms : firstWord.audio?.duration_ms) ?? undefined
+
+            logger.info({ message: "Queueing first word greeting", data: { audioKey, durationMs } });
+            await this.overlayQueue.enqueue<FirstWordJobPayload>({
+                userId: user.id,
+                widgetSlug: WidgetTypeSlug.FIRST_WORD,
+                widgetId: firstWord.widget.id,
+                payload: { audioKey, volume: audioVolume },
+                effects: message
+                    ? [{ type: "chat", senderId, broadcasterId: e.broadcaster_user_id, message }]
+                    : [],
+                durationMs: durationMs ?? undefined,
+                // The overlay reports the real end via the audio element, which
+                // beats any duration we can record up front.
+                awaitsAck: true,
+            })
+            return
+        }
+
+        // No audio means nothing is drawn on the overlay, so there is nothing to
+        // stay in sync with — the chat greeting goes out immediately.
+        if (message) {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, e.broadcaster_user_id, message)
         }
 
-        // If audio key does not empty -> Send audio to overlay
-        if (firstWord.audio_key) {
-            logger.debug({ message: "audio_key", data: { audio_key: firstWord.audio_key } });
-            const audioKey = customReply?.audio_key || firstWord.audio_key
-            const audioVolume = customReply?.audio_volume ?? firstWord.audio_volume ?? 100
-            const url = await s3.getSignedURL(audioKey, { expiresIn: 3600 });
-            logger.debug({ message: "url", data: { url } });
-            logger.info({ message: "Sending audio to overlay", data: { url } });
-            await publisher.publish("first-word-audio", JSON.stringify({
-                userId: user.id,
-                audioUrl: url,
-                volume: audioVolume
-            }))
-            logger.debug({ message: "published" });
-        }
-
         await this.widgetService.increaseTriggeredCount(firstWord.widget.id)
+    }
+
+    /**
+     * Turns a queued greeting into the payload the overlay receives. The signed
+     * URL is minted here, at dispatch, so a greeting that waited behind a long
+     * queue never arrives with an expired link.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<FirstWordJobPayload>(WidgetTypeSlug.FIRST_WORD, {
+            channel: "first-word-audio",
+            event: "audio",
+            resolve: async (job) => {
+                const url = await s3.getSignedURL(job.payload.audioKey, { expiresIn: 3600 });
+                return { url, audioUrl: url, volume: job.payload.volume }
+            },
+            estimateDurationMs: () => FIRST_WORD_FALLBACK_DURATION_MS,
+        })
     }
 
     async resetChattersOnStartStream(e: TwitchStreamOnlineEventRequest): Promise<void> {

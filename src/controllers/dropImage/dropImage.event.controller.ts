@@ -50,7 +50,7 @@ export default class DropImageEventController {
                 if (payload.userId === userId) {
                     res.sse({
                         event: "image-url",
-                        data: JSON.stringify({ url: payload.url })
+                        data: JSON.stringify({ url: payload.url, jobId: payload.jobId, duration_ms: payload.duration_ms })
                     });
                 }
             });

@@ -5,6 +5,15 @@ import { CreateEndCreditServiceRequest, UpdateEndCreditServiceRequest } from "./
 import UserRepository from "@/repositories/user/user.repository";
 import { NotFoundError, BadRequestError } from "@/errors";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { WidgetTypeSlug } from "../constant";
+import {
+    END_CREDIT_DEFAULT_SCROLL_SPEED,
+    END_CREDIT_ESTIMATE_SLACK,
+    END_CREDIT_HEADER_PX,
+    END_CREDIT_ROW_PX,
+    END_CREDIT_VIEWPORT_PX,
+} from "@/services/overlayQueue/constants";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
 import AuthService from "../../auth/auth.service";
@@ -20,6 +29,36 @@ import { TwitchChannelRaidEventRequest } from "@/events/twitch/channelRaid/reque
 import { TwitchStreamOnlineEventRequest } from "@/events/twitch/streamOnline/request";
 
 export const END_CREDIT_ROLL_CHANNEL = "end-credit:roll";
+
+/** The overlay payload for one roll, also used to estimate its runtime. */
+interface EndCreditJobPayload {
+    records: EnrichedEndCreditViewerRecord[]
+    is_show_viewer_avatars: boolean
+    followers_header: string | null
+    subscribes_header: string | null
+    raids_header: string | null
+    bits_header: string | null
+    viewers_header: string | null
+    scroll_speed: number
+    is_show_sub_months: boolean
+    is_show_raid_count: boolean
+    is_show_bits_amount: boolean
+}
+
+/**
+ * How long the credits take to scroll past, near enough. The real figure needs
+ * the rendered height, which only the browser has; the generous slack makes
+ * this a ceiling rather than a guess that could cut a roll short.
+ */
+function estimateRollDurationMs(payload: EndCreditJobPayload): number {
+    const sections = new Set(payload.records.map(record => record.type)).size
+    const contentPx =
+        payload.records.length * END_CREDIT_ROW_PX +
+        sections * END_CREDIT_HEADER_PX +
+        END_CREDIT_VIEWPORT_PX
+    const speed = Math.max(1, payload.scroll_speed || END_CREDIT_DEFAULT_SCROLL_SPEED)
+    return Math.round((contentPx / speed) * 1000 * END_CREDIT_ESTIMATE_SLACK)
+}
 
 interface EndCreditEventSubscription {
     eventType: string;
@@ -68,9 +107,25 @@ export default class EndCreditService {
         private readonly endCreditRepository: EndCreditRepository,
         private readonly userRepository: UserRepository,
         private readonly widgetService: WidgetService,
-        private readonly authService: AuthService
+        private readonly authService: AuthService,
+        private readonly overlayQueue: OverlayQueueService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
+    }
+
+    /**
+     * A roll's true length depends on how tall the rendered credits are, which
+     * only the browser knows — so the overlay reports the end and this estimate
+     * is just the ceiling that keeps the queue moving if that report is lost.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<EndCreditJobPayload>(WidgetTypeSlug.END_CREDIT, {
+            channel: END_CREDIT_ROLL_CHANNEL,
+            event: "roll",
+            resolve: async (job) => ({ ...job.payload }),
+            estimateDurationMs: (job) => estimateRollDurationMs(job.payload),
+        })
     }
 
     async create(request: CreateEndCreditServiceRequest): Promise<EndCreditWidget> {
@@ -346,8 +401,7 @@ export default class EndCreditService {
     }
 
     private async publishRoll(userId: string, config: EndCreditWidget, records: EnrichedEndCreditViewerRecord[]): Promise<void> {
-        await publisher.publish(END_CREDIT_ROLL_CHANNEL, JSON.stringify({
-            userId,
+        const payload: EndCreditJobPayload = {
             records: this.filterRecordsBySectionToggle(records, config),
             is_show_viewer_avatars: config.is_show_viewer_avatars,
             followers_header: config.followers_header,
@@ -359,8 +413,19 @@ export default class EndCreditService {
             is_show_sub_months: config.is_show_sub_months,
             is_show_raid_count: config.is_show_raid_count,
             is_show_bits_amount: config.is_show_bits_amount,
-        }));
-        this.logger.info({ message: "Published end credit roll", data: { userId, count: records.length } });
+        }
+
+        // Queued rather than published: a second roll used to restart the
+        // credits from the top, cutting the first one short.
+        await this.overlayQueue.enqueue<EndCreditJobPayload>({
+            userId,
+            widgetSlug: WidgetTypeSlug.END_CREDIT,
+            widgetId: config.widget_id,
+            payload,
+            durationMs: estimateRollDurationMs(payload),
+            awaitsAck: true,
+        })
+        this.logger.info({ message: "Queued end credit roll", data: { userId, count: records.length } });
     }
 
     async recordViewerAction(twitchId: string, viewerId: string, type: string, value: string, platformCreatedAt: Date): Promise<void> {

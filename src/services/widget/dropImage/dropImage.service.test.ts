@@ -3,6 +3,7 @@ import DropImageRepository from "@/repositories/dropImage/dropImage.repository";
 import UserRepository from "@/repositories/user/user.repository";
 import Sightengine from "@/providers/sightengine";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import axios from "axios";
@@ -46,6 +47,7 @@ describe("DropImageService", () => {
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockSightengine: jest.Mocked<Sightengine>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockDropImageRepo = {
@@ -69,11 +71,17 @@ describe("DropImageService", () => {
             increaseTriggeredCount: jest.fn(),
         } as any;
 
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
+        } as any;
+
         service = new DropImageService(
             mockDropImageRepo,
             mockUserRepo,
             mockSightengine,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue
         );
         jest.clearAllMocks();
     });
@@ -232,10 +240,11 @@ describe("DropImageService", () => {
 
             await service.handleDropImage(event);
 
-            expect(publisher.publish).toHaveBeenCalledWith(
-                "drop-image:image-url", 
-                expect.stringContaining('"url":"https://example.com/image.png"')
-            );
+            // Queued rather than published directly, so a second redemption
+            // cannot replace an image that is still on screen.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                payload: { url: "https://example.com/image.png" },
+            }));
         });
 
         it("should handle test-message-id branch with invalid URL", async () => {
@@ -295,7 +304,7 @@ describe("DropImageService", () => {
             await service.handleDropImage(event);
 
             expect(mockSightengine.detectMatureContent).not.toHaveBeenCalled();
-            expect(publisher.publish).toHaveBeenCalled();
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalled();
         });
 
         it("should handle mature content but skip message if config missing", async () => {

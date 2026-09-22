@@ -41,7 +41,9 @@ export default class RandomDBDKillerEventController {
                         data: JSON.stringify({
                             killer: payload.killer,
                             pool: payload.pool,
-                            animationStyle: payload.animationStyle
+                            animationStyle: payload.animationStyle,
+                            jobId: payload.jobId,
+                            duration_ms: payload.duration_ms
                         })
                     });
                 }

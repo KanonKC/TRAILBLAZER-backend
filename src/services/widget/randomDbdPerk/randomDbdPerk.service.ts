@@ -159,6 +159,11 @@ export default class RandomDbdPerkService {
         const message = `Random ${capitalize(randomClass.type)} Perks [${randomPerkMessage} ]`
 
         const senderId = event.broadcaster_user_id
+        // TODO(overlay-queue): this widget has no working overlay yet — no SSE
+        // route, nothing published — so a chat message is all it produces and
+        // there is nothing for events to cut each other off over. If an overlay
+        // is added, route this through overlayQueue.enqueue() like the other
+        // widgets so the chat line and the overlay stay together.
         try {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)

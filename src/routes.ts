@@ -29,6 +29,8 @@ import { UploadedFileRepository } from './repositories/uploadedFile/uploadedFile
 import ReferralRepository from './repositories/referral/referral.repository';
 import ClipShoutoutService from './services/widget/clipShoutout/clipShoutout.service';
 import FirstWordService from './services/widget/firstWord/firstWord.service';
+import OverlayQueueService from './services/overlayQueue/overlayQueue.service';
+import OverlayQueueController from './controllers/overlayQueue/overlayQueue.controller';
 import RandomDbdPerkService from './services/widget/randomDbdPerk/randomDbdPerk.service';
 import RandomDBDKillerService from './services/widget/randomDBDKiller/randomDBDKiller.service';
 import UserService from './services/user/user.service';
@@ -130,17 +132,22 @@ const adminAuthRepository = new AdminAuthRepository();
 
 // Service Layer
 const systemService = new SystemService();
+// Paces overlay events so a burst of viewers cannot cut each other off.
+const overlayQueueService = new OverlayQueueService();
 const authService = new AuthService(config, authRepository, userRepository);
 const userService = new UserService(config, userRepository, authRepository, authService);
 const referralService = new ReferralService(referralRepository, userService);
 userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);
 userService.setWidgetService(widgetService);
+overlayQueueService.setWidgetService(widgetService);
+overlayQueueService.setAuthService(authService);
 const firstWordService = new FirstWordService(
   config,
   firstWordRepository,
   userRepository,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 
 const clipShoutoutService = new ClipShoutoutService(
@@ -149,19 +156,22 @@ const clipShoutoutService = new ClipShoutoutService(
   userRepository,
   authService,
   twitchGql,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const dropImageService = new DropImageService(
   dropImageRepository,
   userRepository,
   sightengine,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const endCreditService = new EndCreditService(
   endCreditRepository,
   userRepository,
   widgetService,
-  authService
+  authService,
+  overlayQueueService
 );
 
 const randomDbdPerkService = new RandomDbdPerkService(
@@ -173,7 +183,8 @@ const randomDBDKillerService = new RandomDBDKillerService(
   randomDBDKillerRepository,
   dbdKillerMasterRepository,
   userRepository,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
@@ -237,6 +248,7 @@ const widgetTypeController = new WidgetTypeController(
   adminAuthMiddleware
 );
 const widgetController = new WidgetController(widgetService);
+const overlayQueueController = new OverlayQueueController(overlayQueueService, widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
 const linkedAccountController = new LinkedAccountController(linkedAccountService, authMiddleware);
@@ -339,6 +351,12 @@ server.post(
   authController.syncTwitchGqlToken.bind(authController)
 );
 server.post('/api/v1/refresh-token', userController.refresh.bind(userController));
+
+// Overlays report here when the item they were showing actually finished.
+server.post(
+  '/api/v1/overlay-queue/:userId/:slug/ack',
+  overlayQueueController.ack.bind(overlayQueueController)
+);
 
 server.post('/api/v1/first-word', firstWordController.create.bind(firstWordController));
 server.get('/api/v1/first-word', firstWordController.get.bind(firstWordController));
@@ -603,5 +621,7 @@ server.post(
 );
 
 tbCron.run();
+overlayQueueService.start();
 
+export { overlayQueueService };
 export default server;

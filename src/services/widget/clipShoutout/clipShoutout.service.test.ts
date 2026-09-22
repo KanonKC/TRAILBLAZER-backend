@@ -5,6 +5,7 @@ import UserRepository from "@/repositories/user/user.repository";
 import AuthService from "../../auth/auth.service";
 import TwitchGql from "@/providers/twitchGql";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher, TTL } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import { NotFoundError } from "@/errors";
@@ -54,6 +55,7 @@ describe("ClipShoutoutService", () => {
     let mockAuthService: jest.Mocked<AuthService>;
     let mockTwitchGql: jest.Mocked<TwitchGql>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockCfg = {
@@ -82,6 +84,13 @@ describe("ClipShoutoutService", () => {
             setInitialEnabled: jest.fn(),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
+            increaseTriggeredCount: jest.fn(),
+        } as any;
+
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
+            runJobEffects: jest.fn(),
         } as any;
 
         service = new ClipShoutoutService(
@@ -90,7 +99,8 @@ describe("ClipShoutoutService", () => {
             mockUserRepo,
             mockAuthService,
             mockTwitchGql,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue
         );
         jest.clearAllMocks();
     });
@@ -174,24 +184,39 @@ describe("ClipShoutoutService", () => {
 
             await service.shoutoutRaider(event);
 
-            expect(mockUserAPI.chat.shoutoutUser).toHaveBeenCalledWith("broadcaster_1", "raider_1");
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith("bot_1", "broadcaster_1", "Hello RaiderOne");
-            expect(publisher.publish).toHaveBeenCalledWith("clip-shoutout-clip", expect.stringContaining('"url":"clip_url"'));
+            // The shoutout, the reply and the clip belong to the same raid, so
+            // they travel as one queued job and fire together when it rolls.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                payload: { clipId: "clip_1", durationSeconds: 30 },
+                effects: [
+                    expect.objectContaining({ type: "shoutout", broadcasterId: "broadcaster_1", targetUserId: "raider_1" }),
+                    expect.objectContaining({ type: "chat", message: "Hello RaiderOne" }),
+                ],
+            }));
+            expect(mockUserAPI.chat.shoutoutUser).not.toHaveBeenCalled();
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
 
-        it("should log error but continue if shoutout fails", async () => {
+        it("runs the effects immediately when the raid produces no clip", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
             const mockCsConfig = {
                 id: "cs_1",
                 reply_message: "Hello",
+                enabled_clip: false,
                 widget: { enabled: true, twitch_id: "broadcaster_1" }
             };
             mockClipShoutoutRepo.getByTwitchId.mockResolvedValue(mockCsConfig as any);
-            mockAuthService.createTwitchUserAPI.mockRejectedValue(new Error("Shoutout Error"));
 
             await service.shoutoutRaider(event);
 
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
+            // Nothing reaches the overlay, so there is nothing to wait for.
+            expect(mockOverlayQueue.enqueue).not.toHaveBeenCalled();
+            expect(mockOverlayQueue.runJobEffects).toHaveBeenCalledWith(expect.objectContaining({
+                effects: [
+                    expect.objectContaining({ type: "shoutout" }),
+                    expect.objectContaining({ type: "chat", message: "Hello" }),
+                ],
+            }));
         });
 
         it("should return early if config missing or disabled", async () => {

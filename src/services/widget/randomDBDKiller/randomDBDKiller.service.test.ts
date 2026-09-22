@@ -3,6 +3,7 @@ import RandomDBDKillerRepository from "@/repositories/randomDBDKiller/randomDBDK
 import DBDKillerMasterRepository from "@/repositories/dbdKillerMaster/dbdKillerMaster.repository";
 import UserRepository from "@/repositories/user/user.repository";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import { BadRequestError, NotFoundError } from "@/errors";
@@ -46,6 +47,7 @@ describe("RandomDBDKillerService", () => {
     let mockMasterRepo: jest.Mocked<DBDKillerMasterRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockRepo = {
@@ -72,11 +74,17 @@ describe("RandomDBDKillerService", () => {
             increaseTriggeredCount: jest.fn(),
         } as any;
 
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
+        } as any;
+
         service = new RandomDBDKillerService(
             mockRepo,
             mockMasterRepo,
             mockUserRepo,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue
         );
         jest.clearAllMocks();
     });
@@ -236,7 +244,7 @@ describe("RandomDBDKillerService", () => {
             expect(publisher.publish).not.toHaveBeenCalled();
         });
 
-        it("should publish result and increase triggered count on success", async () => {
+        it("should queue the roll instead of publishing it directly", async () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
@@ -248,17 +256,21 @@ describe("RandomDBDKillerService", () => {
 
             await service.randomizeKiller(event);
 
-            expect(publisher.publish).toHaveBeenCalledWith("random-dbd-killer:result", JSON.stringify({
+            // Queued so a second redemption cannot remount the spinner
+            // mid-animation; the counter now increments when it actually rolls.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
                 userId: "user_1",
-                killer: { slug: "trapper", title: "The Trapper", image_url: "url" },
-                pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
-                animationStyle: "spin"
+                widgetId: "widget_1",
+                payload: {
+                    killer: { slug: "trapper", title: "The Trapper", image_url: "url" },
+                    pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
+                    animationStyle: "spin",
+                },
             }));
-            expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith("widget_1");
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
 
-        it("should send a chat message announcing the result after a 10s delay", async () => {
-            jest.useFakeTimers();
+        it("keeps the chat announcement delayed so it cannot spoil the spinner", async () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
@@ -268,32 +280,16 @@ describe("RandomDBDKillerService", () => {
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
 
             await service.randomizeKiller(event);
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
 
-            await jest.advanceTimersByTimeAsync(10_000);
-
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
-                "broadcaster_1",
-                "broadcaster_1",
-                "Random Killer: The Trapper"
-            );
-            jest.useRealTimers();
-        });
-
-        it("should not throw if sending the chat message fails", async () => {
-            jest.useFakeTimers();
-            mockRepo.getByTwitchRewardId.mockResolvedValue({
-                widget_id: "widget_1",
-                killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" }
-            } as any);
-            mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
-            mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
-            (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockRejectedValue(new Error("Chat Error"));
-
-            await service.randomizeKiller(event);
-            await expect(jest.advanceTimersByTimeAsync(10_000)).resolves.not.toThrow();
-            jest.useRealTimers();
+            // The delay now rides on the queued job, measured from the moment
+            // the roll actually starts rather than from the redemption.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                effects: [expect.objectContaining({
+                    type: "chat",
+                    message: "Random Killer: The Trapper",
+                    delayMs: 10_000,
+                })],
+            }));
         });
     });
 
