@@ -1,5 +1,5 @@
 import "dotenv/config";
-import server from "@/routes";
+import server, { overlayQueueService } from "@/routes";
 import { connectRedis } from "@/libs/redis";
 import TLogger, { Layer } from "@/logging/logger";
 
@@ -14,6 +14,16 @@ async function main() {
       process.exit(1);
     }
     logger.info({ message: `Server listening at ${address}` });
+  });
+}
+
+// Queue state lives in Redis, so a restart keeps the queue; this only stops
+// this instance's local timers so it does not act on a queue it is leaving.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    logger.info({ message: `Received ${signal}, shutting down` });
+    overlayQueueService.stop();
+    server.close().finally(() => process.exit(0));
   });
 }
 
