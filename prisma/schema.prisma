@@ -81,6 +81,7 @@ model UploadedFile {
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   size_kb                   Int                    @default(0)
+  duration_ms               Int?
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
   canvas_elements           CanvasElement[]
