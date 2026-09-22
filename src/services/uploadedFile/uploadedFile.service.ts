@@ -12,6 +12,7 @@ import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
 import Configurations from "@/config/index"
 import path from "path"
+import { parseBuffer } from "music-metadata"
 import UserService from "../user/user.service"
 import { UserTier } from "../user/constant"
 
@@ -91,9 +92,30 @@ export class UploadedFileService {
             type: file.mimetype,
             owner_id: userId,
             key: key,
-            size_kb: fileSizeKb
+            size_kb: fileSizeKb,
+            duration_ms: await this.readAudioDurationMs(file.buffer, file.mimetype)
         })
         await redis.del(`uploadedFile:totalSize:${userId}`)
+    }
+
+    /**
+     * Audio duration is what the overlay queue uses to know how long a sound
+     * occupies the overlay, so the next viewer's greeting waits the right
+     * amount of time. An unreadable file is not worth failing an upload over —
+     * the queue falls back to an estimate and the overlay reports the real end.
+     */
+    private async readAudioDurationMs(buffer: Buffer, mimetype: string): Promise<number | null> {
+        const logger = this.logger.setContext("service.uploadedFile.readAudioDurationMs")
+        if (!mimetype.startsWith("audio/")) return null
+
+        try {
+            const metadata = await parseBuffer(buffer, { mimeType: mimetype })
+            const seconds = metadata.format.duration
+            return seconds ? Math.round(seconds * 1000) : null
+        } catch (error) {
+            logger.warn({ message: "Could not read audio duration", data: { mimetype }, error: error as Error })
+            return null
+        }
     }
 
     async get(id: string, userId: string): Promise<UploadedFileResponse> {

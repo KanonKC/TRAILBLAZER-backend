@@ -15,6 +15,16 @@ import { NotFoundError, ForbiddenError } from "@/errors";
 import { ClipShoutoutWidget } from "@/repositories/clipShoutout/response";
 import Configurations from "@/config/index";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { OverlayEffect, OverlayJob } from "@/services/overlayQueue/overlayQueue.types";
+import { CLIP_TAIL_MS } from "@/services/overlayQueue/constants";
+import { WidgetTypeSlug } from "../constant";
+
+/** What a queued clip shoutout carries until it is dispatched. */
+interface ClipShoutoutJobPayload {
+    clipId: string
+    durationSeconds: number
+}
 
 export default class ClipShoutoutService {
     private readonly cfg: Configurations
@@ -24,15 +34,35 @@ export default class ClipShoutoutService {
     private readonly twitchGql: TwitchGql;
     private readonly logger: TLogger;
     private readonly widgetService: WidgetService;
+    private readonly overlayQueue: OverlayQueueService;
 
-    constructor(cfg: Configurations, clipShoutoutRepository: ClipShoutoutRepository, userRepository: UserRepository, authService: AuthService, twitchGql: TwitchGql, widgetService: WidgetService) {
+    constructor(cfg: Configurations, clipShoutoutRepository: ClipShoutoutRepository, userRepository: UserRepository, authService: AuthService, twitchGql: TwitchGql, widgetService: WidgetService, overlayQueue: OverlayQueueService) {
         this.cfg = cfg;
         this.clipShoutoutRepository = clipShoutoutRepository;
         this.userRepository = userRepository;
         this.authService = authService;
         this.twitchGql = twitchGql;
         this.widgetService = widgetService;
+        this.overlayQueue = overlayQueue;
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
+    }
+
+    /**
+     * The clip's playable URL is fetched at dispatch: a clip that waited behind
+     * a queue would otherwise arrive with a stale link.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<ClipShoutoutJobPayload>(WidgetTypeSlug.CLIP_SHOUTOUT, {
+            channel: "clip-shoutout-clip",
+            event: "clip",
+            resolve: async (job) => {
+                const url = await this.twitchGql.getClipProductionUrl(job.payload.clipId)
+                if (!url) return null
+                return { url, duration: job.payload.durationSeconds }
+            },
+            estimateDurationMs: (job) => job.payload.durationSeconds * 1000 + CLIP_TAIL_MS,
+        })
     }
 
     async create(request: ClipShoutoutCreateRequest) {
@@ -94,24 +124,16 @@ export default class ClipShoutoutService {
 
         await redis.set(cacheKey, JSON.stringify(csConfig), TTL.TWO_HOURS)
 
-        if (csConfig.delay_ms > 0) {
-            logger.debug({ message: "Delaying shoutout", data: { delay_ms: csConfig.delay_ms } });
-            await new Promise(resolve => setTimeout(resolve, csConfig.delay_ms));
+        const senderId = csConfig.twitch_bot_id || this.cfg.twitch.defaultBotId
+
+        const shoutoutEffect: OverlayEffect = {
+            type: "shoutout",
+            senderId,
+            broadcasterId: csConfig.widget.twitch_id,
+            targetUserId: event.raid.user_id,
         }
 
-        const senderId = csConfig.twitch_bot_id || this.cfg.twitch.defaultBotId
-        logger.info({ message: "shouting out", data: { channel: csConfig.widget.twitch_id, raider: event.raid.user_id } });
-        try {
-            const twitchUserAPI = await this.authService.createTwitchUserAPI(senderId)
-            await twitchUserAPI.chat.shoutoutUser(csConfig.widget.twitch_id, event.raid.user_id)
-        } catch (err) {
-            const e = err as Error & { code?: string; cause?: unknown }
-            logger.error({
-                message: "Shoutout failed",
-                data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
-                error: e
-            });
-        }
+        const effects: OverlayEffect[] = [shoutoutEffect]
 
         if (csConfig.reply_message) {
             const replaceMap = {
@@ -119,23 +141,17 @@ export default class ClipShoutoutService {
                 "{{viewer_count}}": event.raid.viewer_count,
                 "{{channel_link}}": `https://twitch.tv/${event.raid.user_login}`,
             }
-            const message = mapMessageVariables(csConfig.reply_message, replaceMap)
-            logger.info({ message: "Sending reply", data: { twitch_bot_id: csConfig.twitch_bot_id, broadcaster_user_id: event.broadcaster_user_id, message } });
-            try {
-                await twitchAppAPI.chat.sendChatMessageAsApp(senderId, event.broadcaster_user_id, message)
-                this.widgetService.increaseTriggeredCount(csConfig.widget_id)
-            } catch (err) {
-                const e = err as Error & { code?: string; cause?: unknown }
-                logger.error({
-                    message: "Send reply failed",
-                    data: { name: e.name, code: e.code, cause: String(e.cause), nodeVersion: process.version },
-                    error: e
-                });
-            }
+            effects.push({
+                type: "chat",
+                senderId,
+                broadcasterId: event.broadcaster_user_id,
+                message: mapMessageVariables(csConfig.reply_message, replaceMap),
+            })
         }
 
-        if (csConfig.enabled_clip) {
+        let clip: { id: string; durationSeconds: number } | null = null
 
+        if (csConfig.enabled_clip) {
             const filters: HelixPaginatedClipFilter = {
                 isFeatured: csConfig.enabled_highlight_only
             }
@@ -157,24 +173,64 @@ export default class ClipShoutoutService {
             }
 
             if (clips && clips.data.length > 0) {
-                logger.info({ message: "Got clips from Twitch", data: { total_clips: clips.data.length } });
-                try {
-                    const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
-                    logger.info({ message: "Get video clip", data: { title: selectedClip.title, id: selectedClip.id } });
-                    const clipProductionUrl = await this.twitchGql.getClipProductionUrl(selectedClip.id)
-                    logger.debug({ message: "Clip production URL generated", data: { url: clipProductionUrl } });
-                    logger.info({ message: "Sending clip", data: { clipProductionUrl, duration: selectedClip.duration, owner_id: csConfig.widget.owner_id } });
-                    await publisher.publish("clip-shoutout-clip", JSON.stringify({
-                        url: clipProductionUrl,
-                        duration: selectedClip.duration,
-                        userId: csConfig.widget.owner_id
-                    }))
-                } catch (err) {
-                    logger.error({ message: "Publish clip shoutout failed", error: String(err) });
-                }
+                const selectedClip = clips.data[Math.floor(Math.random() * clips.data.length)]
+                logger.info({ message: "Selected clip", data: { title: selectedClip.title, id: selectedClip.id } });
+                clip = { id: selectedClip.id, durationSeconds: selectedClip.duration }
             }
         }
 
+        // No clip means nothing reaches the overlay, so there is nothing for the
+        // shoutout and reply to stay in sync with — they go out on their own.
+        if (!clip) {
+            const bare: OverlayJob = {
+                id: "immediate",
+                userId: csConfig.widget.owner_id,
+                widgetSlug: WidgetTypeSlug.CLIP_SHOUTOUT,
+                enqueuedAt: Date.now(),
+                expiresAt: Date.now(),
+                payload: {},
+                effects,
+            }
+            await this.runImmediateEffects(bare, csConfig.delay_ms)
+            this.widgetService.increaseTriggeredCount(csConfig.widget_id)
+            return
+        }
+
+        // delay_ms is the streamer's pause between the raid landing and the
+        // shoutout starting, so it delays joining the queue rather than blocking
+        // this webhook handler.
+        const enqueueJob = () => this.overlayQueue.enqueue<ClipShoutoutJobPayload>({
+            userId: csConfig!.widget.owner_id,
+            widgetSlug: WidgetTypeSlug.CLIP_SHOUTOUT,
+            widgetId: csConfig!.widget_id,
+            payload: { clipId: clip!.id, durationSeconds: clip!.durationSeconds },
+            // The shoutout, the chat reply and the clip all belong to this raid,
+            // so they fire together when the clip actually rolls.
+            effects,
+            durationMs: clip!.durationSeconds * 1000 + CLIP_TAIL_MS,
+            awaitsAck: true,
+        })
+
+        if (csConfig.delay_ms > 0) {
+            logger.info({ message: "Delaying shoutout", data: { delay_ms: csConfig.delay_ms } });
+            setTimeout(() => void enqueueJob(), csConfig.delay_ms)
+            return
+        }
+
+        await enqueueJob()
+    }
+
+    /**
+     * Runs a job's effects without the queue, for the case where the raid
+     * produces no clip and therefore occupies the overlay for no time at all.
+     */
+    private async runImmediateEffects(job: OverlayJob, delayMs: number) {
+        const run = () => this.overlayQueue.runJobEffects(job)
+        if (delayMs > 0) {
+            setTimeout(() => void run(), delayMs)
+            return
+        }
+        await run()
     }
 
     async getByUserId(userId: string): Promise<ClipShoutoutWidget | null> {

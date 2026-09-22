@@ -6,6 +6,8 @@ export interface CreateUploadedFileRequest {
     type: string;
     owner_id: string;
     size_kb: number;
+    /** Playback length for audio files; null when unknown or not audio. */
+    duration_ms?: number | null;
 }
 
 export interface UpdateUploadedFileRequest {

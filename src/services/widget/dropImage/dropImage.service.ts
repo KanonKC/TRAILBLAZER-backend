@@ -13,6 +13,13 @@ import axios from "axios";
 import Sightengine from "@/providers/sightengine";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { WidgetTypeSlug } from "../constant";
+
+/** What a queued image drop carries until it is dispatched. */
+interface DropImageJobPayload {
+    url: string
+}
 
 export default class DropImageService {
     private readonly logger: TLogger;
@@ -21,9 +28,24 @@ export default class DropImageService {
         private readonly dropImageRepository: DropImageRepository,
         private readonly userRepository: UserRepository,
         private readonly sightengine: Sightengine,
-        private readonly widgetService: WidgetService
+        private readonly widgetService: WidgetService,
+        private readonly overlayQueue: OverlayQueueService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
+    }
+
+    /**
+     * The display duration is the streamer's own setting, and it travels with
+     * the event so the overlay and the queue agree on when this image is done.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<DropImageJobPayload>(WidgetTypeSlug.DROP_IMAGE, {
+            channel: "drop-image:image-url",
+            event: "image-url",
+            resolve: async (job) => ({ url: job.payload.url }),
+            estimateDurationMs: (job) => job.durationMs ?? 5_000,
+        })
     }
 
     async getByUserId(userId: string): Promise<DropImageWidget> {
@@ -250,11 +272,15 @@ export default class DropImageService {
             }
         }
 
-        logger.info({ message: "All check passed, triggering DropImage", data: { url, userId: config.widget.owner_id } });
-        await publisher.publish(`drop-image:image-url`, JSON.stringify({
-            url: url,
+        logger.info({ message: "All check passed, queueing DropImage", data: { url, userId: config.widget.owner_id } });
+        // Queued so a second redemption cannot replace an image that is still up.
+        await this.overlayQueue.enqueue<DropImageJobPayload>({
             userId: config.widget.owner_id,
-        }));
-        this.widgetService.increaseTriggeredCount(config.widget_id)
+            widgetSlug: WidgetTypeSlug.DROP_IMAGE,
+            widgetId: config.widget_id,
+            payload: { url },
+            durationMs: (config.display_duration ?? 5) * 1000,
+            awaitsAck: true,
+        })
     }
 }

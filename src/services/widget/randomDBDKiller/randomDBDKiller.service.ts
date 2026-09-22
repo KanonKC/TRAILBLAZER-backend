@@ -12,8 +12,27 @@ import crypto from "crypto";
 import WidgetService from "../widget.service";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import {
+    KILLER_CHAT_DELAY_MS,
+    KILLER_DEFAULT_SPIN_MS,
+    KILLER_HOLD_MS,
+    KILLER_SPIN_MS,
+} from "@/services/overlayQueue/constants";
+import { WidgetTypeSlug } from "../constant";
 
-const CHAT_MESSAGE_DELAY_MS = 10_000;
+interface KillerEntry {
+    slug: string
+    title: string
+    image_url: string
+}
+
+/** What a queued killer roll carries until it is dispatched. */
+interface RandomDBDKillerJobPayload {
+    killer: KillerEntry
+    pool: KillerEntry[]
+    animationStyle: string
+}
 
 export default class RandomDBDKillerService {
     private readonly logger: TLogger;
@@ -22,9 +41,29 @@ export default class RandomDBDKillerService {
         private readonly randomDBDKillerRepository: RandomDBDKillerRepository,
         private readonly dbdKillerMasterRepository: DBDKillerMasterRepository,
         private readonly userRepository: UserRepository,
-        private readonly widgetService: WidgetService
+        private readonly widgetService: WidgetService,
+        private readonly overlayQueue: OverlayQueueService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
+    }
+
+    /**
+     * The spin animation's length lives here rather than in the overlay, so the
+     * queue and the browser cannot drift apart about when a roll is over.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<RandomDBDKillerJobPayload>(WidgetTypeSlug.RANDOM_DBD_KILLER, {
+            channel: "random-dbd-killer:result",
+            event: "killer-result",
+            resolve: async (job) => ({
+                killer: job.payload.killer,
+                pool: job.payload.pool,
+                animationStyle: job.payload.animationStyle,
+            }),
+            estimateDurationMs: (job) =>
+                (KILLER_SPIN_MS[job.payload.animationStyle] ?? KILLER_DEFAULT_SPIN_MS) + KILLER_HOLD_MS,
+        })
     }
 
     async create(request: CreateRandomDBDKillerInput): Promise<RandomDBDKillerWidget> {
@@ -145,32 +184,31 @@ export default class RandomDBDKillerService {
 
         const poolMasters = await this.dbdKillerMasterRepository.getBySlugs(config.killer_pool);
 
-        await publisher.publish("random-dbd-killer:result", JSON.stringify({
-            userId: config.widget.owner_id,
-            killer: {
-                slug: killer.slug,
-                title: killer.title,
-                image_url: killer.image_url
-            },
-            pool: poolMasters.map(k => ({
-                slug: k.slug,
-                title: k.title,
-                image_url: k.image_url
-            })),
-            animationStyle: config.animation_style
-        }));
-        await this.widgetService.increaseTriggeredCount(config.widget_id);
+        const animationStyle = config.animation_style
+        const spinMs = (KILLER_SPIN_MS[animationStyle] ?? KILLER_DEFAULT_SPIN_MS) + KILLER_HOLD_MS
 
-        const message = `Random Killer: ${killer.title}`;
-        const senderId = event.broadcaster_user_id;
-        setTimeout(async () => {
-            try {
-                this.logger.info({ message: "Sending chat message", data: { message } });
-                await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message);
-            } catch (error) {
-                this.logger.error({ message: "Failed to send chat message", data: { error } });
-            }
-        }, CHAT_MESSAGE_DELAY_MS);
+        // Queued so a second redemption cannot remount the spinner mid-animation.
+        // The chat message keeps its deliberate delay, now measured from the
+        // moment this roll actually starts, so it never spoils the result early.
+        await this.overlayQueue.enqueue<RandomDBDKillerJobPayload>({
+            userId: config.widget.owner_id,
+            widgetSlug: WidgetTypeSlug.RANDOM_DBD_KILLER,
+            widgetId: config.widget_id,
+            payload: {
+                killer: { slug: killer.slug, title: killer.title, image_url: killer.image_url },
+                pool: poolMasters.map(k => ({ slug: k.slug, title: k.title, image_url: k.image_url })),
+                animationStyle,
+            },
+            effects: [{
+                type: "chat",
+                senderId: event.broadcaster_user_id,
+                broadcasterId: event.broadcaster_user_id,
+                message: `Random Killer: ${killer.title}`,
+                delayMs: KILLER_CHAT_DELAY_MS,
+            }],
+            durationMs: spinMs,
+            awaitsAck: true,
+        });
     }
 
     private async subscribeToRedemptionEvents(twitchId: string, userId: string): Promise<void> {
