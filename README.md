@@ -17,7 +17,7 @@ The core backend service for **TRAILBLAZER**, providing a robust API for Twitch 
 - **Video Processing**: Automated video export pipelines with S3 storage integration.
 - **Real-time Updates**: SSE (Server-Sent Events) support for live progress tracking.
 - **Scheduled Tasks**: Robust cron job system for background maintenance and automated workflows.
-- **Structured Logging**: Deep observability with New Relic enriched structured logging.
+- **Structured Logging**: Structured JSON logging via Winston.
 
 ---
 
@@ -28,7 +28,7 @@ The core backend service for **TRAILBLAZER**, providing a robust API for Twitch 
 - **Database**: [PostgreSQL](https://www.postgresql.org/) with [Prisma ORM](https://www.prisma.io/)
 - **Caching/Queue**: [Redis](https://redis.io/)
 - **Storage**: [AWS S3](https://aws.amazon.com/s3/) (Compatible storage)
-- **Observability**: [New Relic](https://newrelic.com/) & [Winston](https://github.com/winstonjs/winston)
+- **Observability**: [Winston](https://github.com/winstonjs/winston)
 - **Validation**: [Zod](https://zod.dev/)
 
 ---
@@ -76,7 +76,7 @@ The core backend service for **TRAILBLAZER**, providing a robust API for Twitch 
 | Command | Description |
 | :--- | :--- |
 | `npm run dev` | Start development server with nodemon |
-| `npm run dev:log` | Start dev server with New Relic and logging enabled |
+| `npm run dev:log` | Start dev server with dotenv loaded |
 | `npm run build` | Compile TypeScript to JavaScript |
 | `npm run start` | Run the production build |
 | `npm run test` | Execute Jest test suite |

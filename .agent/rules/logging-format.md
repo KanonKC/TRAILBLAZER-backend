@@ -4,7 +4,7 @@ trigger: always_on
 
 # Logging Rules
 
-When implementing logging in the `trailblazer-backend` project, you must follow the structured logging format using the `TLogger` wrapper. This ensures consistency and makes logs easier to search and filter in monitoring tools like New Relic.
+When implementing logging in the `trailblazer-backend` project, you must follow the structured logging format using the `TLogger` wrapper. This ensures consistency and makes logs easier to search and filter in monitoring tools.
 
 ## Import
 Always import the logger wrapper and Layer enum from the project's logging module:

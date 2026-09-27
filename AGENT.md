@@ -11,7 +11,6 @@ Welcome to the `trailblazer-backend` project! This file serves as the core instr
   - AWS S3 (`@aws-sdk/client-s3`) for file storage.
   - Twitch API (`@twurple/api`, `@twurple/auth`) for Twitch integrations.
   - Zod (`zod`) for schema validation.
-  - New Relic (`newrelic`) for monitoring and APM.
   - Winston (`winston`) for structured logging.
 
 ## 🏗️ Architecture & Structure

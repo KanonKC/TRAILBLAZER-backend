@@ -10,12 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Development
-npm run dev            # Start with nodemon (no APM)
-npm run dev:log        # Start with nodemon + New Relic APM
+npm run dev            # Start with nodemon
+npm run dev:log        # Start with nodemon + dotenv
 
 # Build & Run
 npm run build          # Compile TypeScript (tsc + tsc-alias)
-npm start              # Run compiled build with dotenv + New Relic
+npm start              # Run compiled build with dotenv
 
 # Testing
 npm test               # Run all tests
