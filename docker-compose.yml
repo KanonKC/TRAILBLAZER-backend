@@ -27,7 +27,6 @@ services:
       - CDN_ORIGIN=${CDN_ORIGIN}
       - CDN_S3_BUCKET_NAME=${CDN_S3_BUCKET_NAME}
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME}
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=${NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED}
@@ -54,18 +53,6 @@ services:
       - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
       - SPOTIFY_REDIRECT_URL=${SPOTIFY_REDIRECT_URL}
-    depends_on:
-      - redis
-    networks:
-      - trailblazer-network
-  redis:
-    image: redis:latest
-    restart: always
-    ports:
-      - "127.0.0.1:6379:6379"
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
     networks:
       - trailblazer-network
   tunnel:
@@ -74,9 +61,6 @@ services:
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - trailblazer-network
-volumes:
-  redis_data:
-    driver: local
 networks:
   trailblazer-network:
     driver: bridge
