@@ -1,4 +1,5 @@
 import EndCreditRepository from "@/repositories/endCredit/endCredit.repository";
+import EventSubReconcilerService, { EventSubSubscribeError } from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { EndCreditWidget } from "@/repositories/endCredit/response";
 import TLogger, { Layer } from "@/logging/logger";
 import { CreateEndCreditServiceRequest, UpdateEndCreditServiceRequest } from "./request";
@@ -15,7 +16,7 @@ import {
     END_CREDIT_VIEWPORT_PX,
 } from "@/services/overlayQueue/constants";
 import { randomBytes, randomUUID } from "node:crypto";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import AuthService from "../../auth/auth.service";
 import { EndCreditSubscriptionError } from "./error";
 import { TwitchChannelChatNotificationEventRequest } from "@/events/twitch/channelChatNotification/request";
@@ -59,46 +60,6 @@ function estimateRollDurationMs(payload: EndCreditJobPayload): number {
     const speed = Math.max(1, payload.scroll_speed || END_CREDIT_DEFAULT_SCROLL_SPEED)
     return Math.round((contentPx / speed) * 1000 * END_CREDIT_ESTIMATE_SLACK)
 }
-
-interface EndCreditEventSubscription {
-    eventType: string;
-    route: string;
-    subscribe: (twitchId: string, transport: ReturnType<typeof createESTransport>, authService: AuthService) => Promise<unknown>;
-}
-
-const END_CREDIT_EVENT_SUBSCRIPTIONS: EndCreditEventSubscription[] = [
-    {
-        eventType: "channel.follow",
-        route: "/webhook/v1/twitch/event-sub/channel-follow",
-        subscribe: async (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelFollowEvents(twitchId, transport),
-    },
-    // {
-    //     eventType: "channel.subscribe",
-    //     route: "/webhook/v1/twitch/event-sub/channel-subscribe",
-    //     subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelSubscriptionEvents(twitchId, transport),
-    // },
-    {
-        eventType: "stream.online",
-        route: "/webhook/v1/twitch/event-sub/stream-online",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToStreamOnlineEvents(twitchId, transport),
-    },
-    {
-        // Outgoing raid — the streamer raids someone else, which is what triggers the credit roll.
-        eventType: "channel.raid",
-        route: "/webhook/v1/twitch/event-sub/channel-raid",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRaidEventsFrom(twitchId, transport),
-    },
-    {
-        eventType: "channel.bits.use",
-        route: "/webhook/v1/twitch/event-sub/channel-bits-use",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelBitsUseEvents(twitchId, transport),
-    },
-    {
-        eventType: "channel.chat.notification",
-        route: "/webhook/v1/twitch/event-sub/channel-chat-notification",
-        subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelChatNotificationEvents(twitchId, transport),
-    }
-];
 
 export default class EndCreditService {
     private readonly logger: TLogger;
@@ -474,24 +435,13 @@ export default class EndCreditService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.endCredit.subscribeToEndCreditEvents", transactionId);
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === "enabled");
-
-        for (const { eventType, route, subscribe } of END_CREDIT_EVENT_SUBSCRIPTIONS) {
-            const existingSub = enabledSubs.filter(sub => sub.type === eventType);
-            if (existingSub.length > 0) {
-                logger.info({ message: "Already subscribed to EventSub type, skipping", data: { userId, twitchId, eventType } });
-                continue;
-            }
-
-            try {
-                const transport = createESTransport(route);
-                await subscribe(twitchId, transport, this.authService);
-                logger.info({ message: "Subscribed to EventSub type", data: { userId, twitchId, eventType } });
-            } catch (error) {
-                logger.error({ message: "Failed to subscribe to EventSub type", error: error as Error, data: { userId, twitchId, eventType } });
-                throw new EndCreditSubscriptionError(eventType);
-            }
+        try {
+            const subscribed = await EventSubReconcilerService.ensureEventSubs(twitchId, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.END_CREDIT]));
+            logger.info({ message: "Ensured EndCredit EventSub subscriptions", data: { userId, twitchId, subscribed } });
+        } catch (error) {
+            const eventType = error instanceof EventSubSubscribeError ? error.eventType : "unknown";
+            logger.error({ message: "Failed to subscribe to EventSub type", error: error as Error, data: { userId, twitchId, eventType } });
+            throw new EndCreditSubscriptionError(eventType);
         }
     }
 

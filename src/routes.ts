@@ -79,6 +79,8 @@ import LinkedAccountService from './services/linkedAccount/linkedAccount.service
 import { AuthMiddleware, AdminAuthMiddleware } from './controllers/middleware';
 import { Google, Discord, Spotify } from 'arctic';
 import TbCron from './cron';
+import EventSubReconcilerRepository from "./repositories/eventSubReconciler/eventSubReconciler.repository";
+import EventSubReconcilerService from "./services/twitch/eventSubReconciler/eventSubReconciler.service";
 import AdminAuthRepository from './repositories/adminAuth/adminAuth.repository';
 import AdminAuthService from './services/admin/auth/adminAuth.service';
 import AdminAuthController from './controllers/admin/auth/adminAuth.controller';
@@ -124,6 +126,7 @@ const randomDBDKillerRepository = new RandomDBDKillerRepository();
 const dbdKillerMasterRepository = new DBDKillerMasterRepository();
 const widgetTypeRepository = new WidgetTypeRepository();
 const widgetRepository = new WidgetRepository();
+const eventSubReconcilerRepository = new EventSubReconcilerRepository();
 const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
@@ -278,7 +281,8 @@ const twitchChannelRaidEvent = new TwitchChannelRaidEvent(endCreditService);
 const twitchChannelBitsUseEvent = new TwitchChannelBitsUseEvent(endCreditService);
 
 // Cron
-const tbCron = new TbCron(userService, linkedAccountService);
+const eventSubReconcilerService = new EventSubReconcilerService(eventSubReconcilerRepository, firstWordService, endCreditService);
+const tbCron = new TbCron(userService, linkedAccountService, eventSubReconcilerService);
 
 // genReqId is a UUID (not fastify's default incrementing counter) so it can
 // be safely used as the transaction_id threaded through every log line for

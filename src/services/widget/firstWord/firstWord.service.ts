@@ -1,9 +1,10 @@
 import Configurations from "@/config/index";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { TwitchStreamOnlineEventRequest } from "@/events/twitch/streamOnline/request";
 import s3 from "@/libs/awsS3";
 import redis, { TTL, publisher } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import FirstWordRepository from "@/repositories/firstWord/firstWord.repository";
 import { UpdateFirstWord, ListCustomerReplyRequest, CreateCustomReply, UpdateCustomReply } from "@/repositories/firstWord/request";
@@ -54,26 +55,7 @@ export default class FirstWordService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const userChatMessageSub = enabledSubs.filter(sub => sub.type === 'channel.chat.message')
-        if (userChatMessageSub.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-chat-message")
-            await twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents(user.twitch_id, tsp)
-        }
-
-        const streamOnlineSubs = enabledSubs.filter(sub => sub.type === 'stream.online')
-        if (streamOnlineSubs.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-online")
-            await twitchAppAPI.eventSub.subscribeToStreamOnlineEvents(user.twitch_id, tsp)
-        }
-
-        const streamOfflineSubs = enabledSubs.filter(sub => sub.type === 'stream.offline')
-        if (streamOfflineSubs.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-offline")
-            await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
-        }
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.FIRST_WORD]));
 
         const res = await this.firstWordRepository.create({
             ...request,
