@@ -1,11 +1,13 @@
 import type Configurations from "@/config/index";
 import { configDotenv } from "dotenv";
-import { makeEnvironment } from "./constants/environment";
+import { Environment, makeEnvironment } from "./constants/environment";
 
 configDotenv()
 
+const environment = makeEnvironment(process.env.ENV || "")
+
 const config: Configurations = {
-    env: makeEnvironment(process.env.ENV || ""),
+    env: environment,
     origin: process.env.ORIGIN || "",
     rootDomain: process.env.ROOT_DOMAIN || "",
     cdnOrigin: process.env.CDN_ORIGIN || "",
@@ -18,7 +20,16 @@ const config: Configurations = {
         clientSecret: process.env.TWITCH_CLIENT_SECRET || "",
         redirectUrl: process.env.TWITCH_REDIRECT_URL || "",
         defaultBotId: process.env.TWITCH_DEFAULT_BOT_ID || "",
-        paymentChannelId: process.env.TWITCH_PAYMENT_CHANNEL_ID || ""
+        paymentChannelId: process.env.TWITCH_PAYMENT_CHANNEL_ID || "",
+        eventSubHealthCheck: {
+            // Explicit env var wins; otherwise on only for dev/prod so a local run never touches the shared Twitch app's subscriptions
+            enabled: process.env.EVENTSUB_HEALTHCHECK_ENABLED
+                ? process.env.EVENTSUB_HEALTHCHECK_ENABLED === "true"
+                : environment !== Environment.Local,
+            cron: process.env.EVENTSUB_HEALTHCHECK_CRON || "0 * * * *",
+            // A stream counts as "started while the subscription was down" if it began within this window (interval + buffer)
+            liveLookbackMs: Number(process.env.EVENTSUB_HEALTHCHECK_LIVE_LOOKBACK_MS) || 65 * 60 * 1000
+        }
     },
     twitchGql: {
         clientId: process.env.TWITCH_GQL_CLIENT_ID || "",

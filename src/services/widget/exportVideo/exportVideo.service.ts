@@ -1,6 +1,8 @@
+import { WidgetTypeSlug } from "@/services/constant";
 import { NotFoundError } from "@/errors";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { TwitchStreamOfflineEventRequest } from "@/events/twitch/streamOffline/request";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import TwitchGql from "@/providers/twitchGql";
 import { ExportVideoToYoutubeRequest } from "@/providers/twitchGql/request";
@@ -41,14 +43,7 @@ export default class ExportVideoService {
         logger = this.logger.setContext("service.exportVideo.create");
         const user = await this.userService.get(userId);
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const streamOfflineSubs = enabledSubs.filter(sub => sub.type === 'stream.offline')
-        if (streamOfflineSubs.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-offline")
-            await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
-        }
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.EXPORT_VIDEO]));
 
         const config = await this.exportVideoRepository.create({
             ...request,

@@ -1,7 +1,8 @@
 import { BadRequestError, NotFoundError } from "@/errors";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { publisher } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import DBDKillerMasterRepository from "@/repositories/dbdKillerMaster/dbdKillerMaster.repository";
 import RandomDBDKillerRepository from "@/repositories/randomDBDKiller/randomDBDKiller.repository";
@@ -215,15 +216,7 @@ export default class RandomDBDKillerService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.randomDBDKiller.subscribeToRedemptionEvents");
         try {
-            const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
-            const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled');
-
-            const channelRewardRedemptionSub = enabledSubs.filter(sub => sub.type === 'channel.channel_points_custom_reward_redemption.add');
-            if (channelRewardRedemptionSub.length === 0) {
-                const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add");
-                await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(twitchId, tsp);
-                logger.info({ message: "Subscribed to channel redemption add events", data: { userId, twitchId } });
-            }
+            await EventSubReconcilerService.ensureEventSubs(twitchId, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.RANDOM_DBD_KILLER]));
         } catch (error) {
             logger.error({ message: "Failed to subscribe to redemption events", error: error as Error, data: { userId, twitchId } });
         }
