@@ -2,7 +2,7 @@ import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { FirstWord, FirstWordChatter, FirstWordCustomReply, FirstWordGreetCount } from "generated/prisma/client";
 import { AddChatter, CreateCustomReply, CreateFirstWord, UpdateCustomReply, UpdateFirstWord, ListCustomerReplyRequest } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { CustomReplyWithAudio, FirstWordWidget } from "./response";
 import { Pagination } from "@/services/response";
 

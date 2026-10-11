@@ -4,7 +4,7 @@ import { twitchAppAPI } from "@/libs/twurple"
 import TLogger, { Layer } from "@/logging/logger"
 import AuthService from "@/services/auth/auth.service"
 import WidgetService from "@/services/widget/widget.service"
-import { WidgetTypeSlug } from "@/services/widget/constant"
+import { WidgetTypeSlug } from "@/services/constant"
 import {
     BOOTSTRAP_LOCK_MS,
     GAP_MS,

@@ -1,4 +1,5 @@
 import DropImageRepository from "@/repositories/dropImage/dropImage.repository";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import TLogger, { Layer } from "@/logging/logger";
 import { CreateDropImageServiceRequest, UpdateDropImageServiceRequest } from "./request";
 import UserRepository from "@/repositories/user/user.repository";
@@ -8,13 +9,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DropImageWidget } from "@/repositories/dropImage/response";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { publisher } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import axios from "axios";
 import Sightengine from "@/providers/sightengine";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 /** What a queued image drop carries until it is dispatched. */
 interface DropImageJobPayload {
@@ -167,15 +168,7 @@ export default class DropImageService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.subscribeToRedemptionEvents");
         try {
-            const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
-            const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled');
-
-            const channelRewardRedemptionSub = enabledSubs.filter(sub => sub.type === 'channel.channel_points_custom_reward_redemption.add');
-            if (channelRewardRedemptionSub.length === 0) {
-                const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add");
-                await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(twitchId, tsp);
-                logger.info({ message: "Subscribed to channel redemption add events", data: { userId, twitchId } });
-            }
+            await EventSubReconcilerService.ensureEventSubs(twitchId, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.DROP_IMAGE]));
         } catch (error) {
             logger.error({ message: "Failed to subscribe to redemption events", error: error as Error, data: { userId, twitchId } });
         }

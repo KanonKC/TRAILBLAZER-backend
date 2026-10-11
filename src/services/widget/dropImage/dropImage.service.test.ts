@@ -334,7 +334,10 @@ describe("DropImageService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             mockDropImageRepo.getByOwnerId.mockRejectedValueOnce(null);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ 
-                data: [{ type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' }] 
+                data: [
+                    { type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' },
+                    { type: 'channel.chat.message', status: 'enabled' },
+                ]
             });
             mockDropImageRepo.create.mockResolvedValue({ id: "di_1", widget_id: "widget_1" } as any);
             mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { id: "widget_1" } } as any);

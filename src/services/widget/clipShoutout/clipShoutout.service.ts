@@ -1,8 +1,9 @@
 import ClipShoutoutRepository from "@/repositories/clipShoutout/clipShoutout.repository";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { ClipShoutoutCreateRequest, ClipShoutoutUpdateRequest } from "./request";
 import UserRepository from "@/repositories/user/user.repository";
 import { randomBytes } from "crypto";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import { TwitchChannelChatNotificationEventRequest } from "@/events/twitch/channelChatNotification/request";
 import { HelixClip, HelixPaginatedClipFilter, HelixPaginatedResult } from "@twurple/api";
 import { mapMessageVariables } from "@/utils/message";
@@ -18,7 +19,7 @@ import WidgetService from "../widget.service";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import { OverlayEffect, OverlayJob } from "@/services/overlayQueue/overlayQueue.types";
 import { CLIP_TAIL_MS } from "@/services/overlayQueue/constants";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 /** What a queued clip shoutout carries until it is dispatched. */
 interface ClipShoutoutJobPayload {
@@ -73,14 +74,7 @@ export default class ClipShoutoutService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const userChatNotificationSub = enabledSubs.filter(sub => sub.type === 'channel.chat.notification')
-        if (userChatNotificationSub.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-chat-notification")
-            await twitchAppAPI.eventSub.subscribeToChannelChatNotificationEvents(user.twitch_id, tsp)
-        }
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.CLIP_SHOUTOUT]));
 
         const res = await this.clipShoutoutRepository.create({
             ...request,

@@ -1,7 +1,7 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateRandomDbdPerk, RandomDbdPerkClassType, UpdateRandomDbdPerk } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { RandomDbdPerkWidget } from "./response";
 import { RandomDbdPerkClass } from "generated/prisma/client";
 

@@ -4,7 +4,7 @@ import { TError } from "@/errors";
 import TLogger, { Layer } from "@/logging/logger";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import WidgetService from "@/services/widget/widget.service";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 const paramsSchema = z.object({
     userId: z.string(),

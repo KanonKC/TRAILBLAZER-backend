@@ -1,8 +1,10 @@
+import { WidgetTypeSlug } from "@/services/constant";
 import config from "@/config";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { NotFoundError } from "@/errors";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { TTL } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import RandomDbdPerkRepository from "@/repositories/randomDbdPerk/randomDbdPerk.repository";
 import { CreateRandomDbdPerk, RandomDbdPerkClassType, UpdateRandomDbdPerk } from "@/repositories/randomDbdPerk/request";
@@ -46,15 +48,7 @@ export default class RandomDbdPerkService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const channelRewardRedemptionSub = enabledSubs.filter(sub => sub.type === 'channel.channel_points_custom_reward_redemption.add')
-        if (channelRewardRedemptionSub.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add")
-            await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(user.twitch_id, tsp)
-            logger.info({ message: "Subscribed to channel redemption add events", data: { userId: user.id, twitchId: user.twitch_id } });
-        }
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.RANDOM_DBD_PERK]));
 
         const res = await this.randomDbdPerkRepository.create(request)
         await this.widgetService.setInitialEnabled(res.widget_id, user.id);
