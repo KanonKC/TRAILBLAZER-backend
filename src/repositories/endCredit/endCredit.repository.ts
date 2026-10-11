@@ -1,7 +1,7 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateEndCredit, CreateEndCreditViewerRecord, UpdateEndCredit } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { EndCreditWidget } from "./response";
 import { EndCreditViewerRecord } from "generated/prisma/client";
 

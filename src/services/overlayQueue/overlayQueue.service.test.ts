@@ -1,5 +1,5 @@
 import OverlayQueueService from "./overlayQueue.service";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { GAP_MS } from "./constants";
 import { publisher } from "@/libs/redis";
 import { twitchAppAPI } from "@/libs/twurple";
