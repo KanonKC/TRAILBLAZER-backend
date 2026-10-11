@@ -14,7 +14,7 @@ import Sightengine from "@/providers/sightengine";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 /** What a queued image drop carries until it is dispatched. */
 interface DropImageJobPayload {

@@ -18,7 +18,7 @@ import WidgetService from "../widget.service";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import { OverlayEffect, OverlayJob } from "@/services/overlayQueue/overlayQueue.types";
 import { CLIP_TAIL_MS } from "@/services/overlayQueue/constants";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 /** What a queued clip shoutout carries until it is dispatched. */
 interface ClipShoutoutJobPayload {

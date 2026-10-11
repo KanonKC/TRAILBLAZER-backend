@@ -1,7 +1,7 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateExportVideo, UpdateExportVideo, CreateExportVideoHistory } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { ExportVideoWithWidget, ExportVideoHistoryResponse } from "./response";
 import { Pagination } from "@/services/response";
 

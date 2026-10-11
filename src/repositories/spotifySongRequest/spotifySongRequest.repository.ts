@@ -1,6 +1,6 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { CreateSpotifySongRequest, UpdateSpotifySongRequest } from "./request";
 import { SpotifySongRequestWidget } from "./response";
 

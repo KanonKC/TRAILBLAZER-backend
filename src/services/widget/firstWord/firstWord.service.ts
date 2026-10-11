@@ -19,7 +19,7 @@ import { ListResponse, Pagination } from "../../response";
 
 import WidgetService from "../widget.service";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { FIRST_WORD_FALLBACK_DURATION_MS } from "@/services/overlayQueue/constants";
 
 /** What a queued greeting carries until it is dispatched. */

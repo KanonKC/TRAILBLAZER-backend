@@ -1,4 +1,4 @@
-import { WidgetTypeSlug } from "@/services/widget/constant"
+import { WidgetTypeSlug } from "@/services/constant"
 
 /**
  * A side effect that belongs to an event and therefore must fire at the same

@@ -6,7 +6,7 @@ import UserRepository from "@/repositories/user/user.repository";
 import { NotFoundError, BadRequestError } from "@/errors";
 import WidgetService from "../widget.service";
 import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import {
     END_CREDIT_DEFAULT_SCROLL_SPEED,
     END_CREDIT_ESTIMATE_SLACK,

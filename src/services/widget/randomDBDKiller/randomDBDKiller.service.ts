@@ -19,7 +19,7 @@ import {
     KILLER_HOLD_MS,
     KILLER_SPIN_MS,
 } from "@/services/overlayQueue/constants";
-import { WidgetTypeSlug } from "../constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 interface KillerEntry {
     slug: string
