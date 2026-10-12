@@ -16,6 +16,12 @@ import { parseBuffer } from "music-metadata"
 import UserService from "../user/user.service"
 import { UserTier } from "../user/constant"
 
+const MIME_TYPES_BY_FILTER: Record<string, string[] | undefined> = {
+    audio: ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"],
+    image: ["image/png", "image/jpeg", "image/gif", "image/webp"],
+    video: ["video/mp4", "video/webm"],
+}
+
 export class UploadedFileService {
     private ufr: UploadedFileRepository
     private logger: TLogger;
@@ -93,27 +99,27 @@ export class UploadedFileService {
             owner_id: userId,
             key: key,
             size_kb: fileSizeKb,
-            duration_ms: await this.readAudioDurationMs(file.buffer, file.mimetype)
+            duration_ms: await this.readMediaDurationMs(file.buffer, file.mimetype)
         })
         await redis.del(`uploadedFile:totalSize:${userId}`)
     }
 
     /**
-     * Audio duration is what the overlay queue uses to know how long a sound
-     * occupies the overlay, so the next viewer's greeting waits the right
-     * amount of time. An unreadable file is not worth failing an upload over —
+     * Audio/video duration is what the overlay queue uses to know how long a
+     * sound or clip occupies the overlay, so the next viewer's event waits the
+     * right amount of time. An unreadable file is not worth failing an upload over —
      * the queue falls back to an estimate and the overlay reports the real end.
      */
-    private async readAudioDurationMs(buffer: Buffer, mimetype: string): Promise<number | null> {
-        const logger = this.logger.setContext("service.uploadedFile.readAudioDurationMs")
-        if (!mimetype.startsWith("audio/")) return null
+    private async readMediaDurationMs(buffer: Buffer, mimetype: string): Promise<number | null> {
+        const logger = this.logger.setContext("service.uploadedFile.readMediaDurationMs")
+        if (!mimetype.startsWith("audio/") && !mimetype.startsWith("video/")) return null
 
         try {
             const metadata = await parseBuffer(buffer, { mimeType: mimetype })
             const seconds = metadata.format.duration
             return seconds ? Math.round(seconds * 1000) : null
         } catch (error) {
-            logger.warn({ message: "Could not read audio duration", data: { mimetype }, error: error as Error })
+            logger.warn({ message: "Could not read media duration", data: { mimetype }, error: error as Error })
             return null
         }
     }
@@ -149,7 +155,7 @@ export class UploadedFileService {
 
         const req: ListUploadedFileRequest = {
             search: filters.search,
-            types: filters.type === "audio" ? ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"] : undefined,
+            types: filters.type ? MIME_TYPES_BY_FILTER[filters.type] : undefined,
             ownerId: userId
         }
 

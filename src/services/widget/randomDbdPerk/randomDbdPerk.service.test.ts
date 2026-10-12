@@ -6,6 +6,9 @@ import redis, { TTL } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import { NotFoundError } from "@/errors";
 import { RandomDbdPerkClassType } from "@/repositories/randomDbdPerk/request";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import CanvasService from "@/services/canvas/canvas.service";
+import { WidgetTypeSlug } from "../constant";
 
 jest.mock("@/libs/redis", () => ({
     get: jest.fn(),
@@ -38,6 +41,8 @@ describe("RandomDbdPerkService", () => {
     let mockRandomDbdPerkRepo: jest.Mocked<RandomDbdPerkRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
+    let mockCanvasService: jest.Mocked<CanvasService>;
 
     beforeEach(() => {
         mockRandomDbdPerkRepo = {
@@ -57,12 +62,23 @@ describe("RandomDbdPerkService", () => {
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
             updateOverlayKey: jest.fn(),
+            increaseTriggeredCount: jest.fn(),
+        } as any;
+        mockOverlayQueue = {
+            register: jest.fn(),
+            enqueue: jest.fn(),
+        } as any;
+        mockCanvasService = {
+            getByWidgetId: jest.fn().mockResolvedValue(null),
+            resolvePlayback: jest.fn(),
         } as any;
 
         service = new RandomDbdPerkService(
             mockRandomDbdPerkRepo,
             mockUserRepo,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue,
+            mockCanvasService
         );
         jest.clearAllMocks();
     });
@@ -175,7 +191,49 @@ describe("RandomDbdPerkService", () => {
         } as any;
 
         beforeEach(() => {
-            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue({ id: "rw_1", widget_id: "widget_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue({ id: "rw_1", widget_id: "widget_1", widget: { id: "widget_1", owner_id: "user_1" } } as any);
+            mockCanvasService.getByWidgetId.mockResolvedValue(null);
+        });
+
+        it("should send chat immediately when no canvas is linked", async () => {
+            mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue({ type: RandomDbdPerkClassType.SURVIVOR, maximum_random_size: 100 } as any);
+            (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockResolvedValue(undefined);
+
+            await service.randomPerk(event);
+
+            expect(mockCanvasService.getByWidgetId).toHaveBeenCalledWith("widget_1");
+            expect(mockOverlayQueue.enqueue).not.toHaveBeenCalled();
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
+            expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith("widget_1");
+        });
+
+        it("should queue the canvas with the chat message when a canvas is linked", async () => {
+            mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue({ type: RandomDbdPerkClassType.KILLER, maximum_random_size: 100 } as any);
+            mockCanvasService.getByWidgetId.mockResolvedValue({ id: "canvas_1", enabled: true, duration_ms: 7000 } as any);
+
+            await service.randomPerk(event);
+
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                userId: "user_1",
+                widgetSlug: WidgetTypeSlug.RANDOM_DBD_PERK,
+                widgetId: "widget_1",
+                payload: expect.objectContaining({ canvasId: "canvas_1", type: RandomDbdPerkClassType.KILLER }),
+                effects: [expect.objectContaining({ type: "chat", broadcasterId: "broadcaster_1" })],
+                durationMs: 7000,
+                awaitsAck: true,
+            }));
+        });
+
+        it("should skip a disabled canvas and send chat directly", async () => {
+            mockRandomDbdPerkRepo.getClassByRewardId.mockResolvedValue({ type: RandomDbdPerkClassType.KILLER, maximum_random_size: 100 } as any);
+            mockCanvasService.getByWidgetId.mockResolvedValue({ id: "canvas_1", enabled: false, duration_ms: 7000 } as any);
+            (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockResolvedValue(undefined);
+
+            await service.randomPerk(event);
+
+            expect(mockOverlayQueue.enqueue).not.toHaveBeenCalled();
+            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalled();
         });
 
         it("should return early if widget not found", async () => {

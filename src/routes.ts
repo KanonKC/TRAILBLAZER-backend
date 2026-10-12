@@ -46,6 +46,10 @@ import SpotifyProvider from './providers/spotify/index';
 import EndCreditRepository from './repositories/endCredit/endCredit.repository';
 import EndCreditService from './services/widget/endCredit/endCredit.service';
 import EndCreditController from './controllers/endCredit/endCredit.controller';
+import CanvasRepository from './repositories/canvas/canvas.repository';
+import CanvasService from './services/canvas/canvas.service';
+import CanvasController from './controllers/canvas/canvas.controller';
+import RandomDbdPerkEventController from './controllers/randomDbdPerk/randomDbdPerk.event.controller';
 
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -132,6 +136,7 @@ const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
 const referralRepository = new ReferralRepository();
 const adminAuthRepository = new AdminAuthRepository();
+const canvasRepository = new CanvasRepository();
 
 // Service Layer
 const systemService = new SystemService();
@@ -177,10 +182,13 @@ const endCreditService = new EndCreditService(
   overlayQueueService
 );
 
+const canvasService = new CanvasService(canvasRepository, widgetService);
 const randomDbdPerkService = new RandomDbdPerkService(
   randomDbdPerkRepository,
   userRepository,
-  widgetService
+  widgetService,
+  overlayQueueService,
+  canvasService
 );
 const randomDBDKillerService = new RandomDBDKillerService(
   randomDBDKillerRepository,
@@ -242,6 +250,8 @@ const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
 const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
+const randomDbdPerkEventController = new RandomDbdPerkEventController(widgetService);
+const canvasController = new CanvasController(canvasService);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
@@ -522,6 +532,16 @@ server.get(
 );
 server.put('/api/v1/widgets/:id', widgetController.update.bind(widgetController));
 server.patch('/api/v1/widgets/:id/enable', widgetController.updateEnable.bind(widgetController));
+server.put(
+  '/api/v1/widgets/:widgetId/canvas',
+  canvasController.setWidgetCanvas.bind(canvasController)
+);
+
+server.get('/api/v1/canvases', canvasController.list.bind(canvasController));
+server.post('/api/v1/canvases', canvasController.create.bind(canvasController));
+server.get('/api/v1/canvases/:id', canvasController.get.bind(canvasController));
+server.put('/api/v1/canvases/:id', canvasController.update.bind(canvasController));
+server.delete('/api/v1/canvases/:id', canvasController.delete.bind(canvasController));
 server.delete('/api/v1/widgets/:id', widgetController.delete.bind(widgetController));
 
 server.get(
@@ -573,6 +593,10 @@ server.get(
 server.get(
   '/api/v1/events/drop-image/:userId',
   dropImageEventController.sse.bind(dropImageEventController)
+);
+server.get(
+  '/api/v1/events/random-dbd-perk/:userId',
+  randomDbdPerkEventController.sse.bind(randomDbdPerkEventController)
 );
 server.get(
   '/api/v1/events/random-dbd-killer/:userId',

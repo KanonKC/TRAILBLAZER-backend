@@ -12,3 +12,9 @@ export interface ExtendedRandomDbdPerk extends RandomDbdPerkWidget {
     totalSurvivorPerks: number;
     widget: Widget;
 }
+/** Stable references only — the canvas media is signed at dispatch. */
+export interface RandomDbdPerkJobPayload {
+    canvasId: string;
+    perks: DbdPerkPagination[];
+    type: string;
+}

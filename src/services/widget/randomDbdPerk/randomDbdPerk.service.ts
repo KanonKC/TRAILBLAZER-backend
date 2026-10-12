@@ -12,20 +12,37 @@ import { RandomDbdPerkWidget } from "@/repositories/randomDbdPerk/response";
 import UserRepository from "@/repositories/user/user.repository";
 import { capitalize } from "@/utils/message";
 import crypto from "crypto";
+import CanvasService from "@/services/canvas/canvas.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import WidgetService from "../widget.service";
-import { DbdPerkPagination, ExtendedRandomDbdPerk } from "./response";
+import { WidgetTypeSlug } from "../constant";
+import { DbdPerkPagination, ExtendedRandomDbdPerk, RandomDbdPerkJobPayload } from "./response";
+
+export const RANDOM_DBD_PERK_CANVAS_CHANNEL = "random-dbd-perk-canvas";
+const RANDOM_DBD_PERK_FALLBACK_DURATION_MS = 5_000;
 
 export default class RandomDbdPerkService {
     private readonly randomDbdPerkRepository: RandomDbdPerkRepository;
     private readonly userRepository: UserRepository;
     private readonly widgetService: WidgetService;
+    private readonly overlayQueue: OverlayQueueService;
+    private readonly canvasService: CanvasService;
     private readonly logger: TLogger;
 
-    constructor(randomDbdPerkRepository: RandomDbdPerkRepository, userRepository: UserRepository, widgetService: WidgetService) {
+    constructor(
+        randomDbdPerkRepository: RandomDbdPerkRepository,
+        userRepository: UserRepository,
+        widgetService: WidgetService,
+        overlayQueue: OverlayQueueService,
+        canvasService: CanvasService
+    ) {
         this.randomDbdPerkRepository = randomDbdPerkRepository;
         this.userRepository = userRepository;
         this.widgetService = widgetService;
+        this.overlayQueue = overlayQueue;
+        this.canvasService = canvasService;
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
     }
 
     async extend(rw: RandomDbdPerkWidget): Promise<ExtendedRandomDbdPerk> {
@@ -153,11 +170,25 @@ export default class RandomDbdPerkService {
         const message = `Random ${capitalize(randomClass.type)} Perks [${randomPerkMessage} ]`
 
         const senderId = event.broadcaster_user_id
-        // TODO(overlay-queue): this widget has no working overlay yet — no SSE
-        // route, nothing published — so a chat message is all it produces and
-        // there is nothing for events to cut each other off over. If an overlay
-        // is added, route this through overlayQueue.enqueue() like the other
-        // widgets so the chat line and the overlay stay together.
+
+        // A linked canvas gives this widget something to show, so the chat line
+        // is queued with it and lands when the canvas starts playing.
+        const canvas = await this.canvasService.getByWidgetId(config.widget_id)
+        if (canvas?.enabled) {
+            logger.info({ message: "Queueing canvas for random perks", data: { canvasId: canvas.id } });
+            await this.overlayQueue.enqueue<RandomDbdPerkJobPayload>({
+                userId: config.widget.owner_id,
+                widgetSlug: WidgetTypeSlug.RANDOM_DBD_PERK,
+                widgetId: config.widget_id,
+                payload: { canvasId: canvas.id, perks: pagination, type: randomClass.type },
+                effects: [{ type: "chat", senderId, broadcasterId: senderId, message }],
+                durationMs: canvas.duration_ms,
+                awaitsAck: true,
+            })
+            return
+        }
+
+        // No canvas means nothing is drawn on the overlay — send straight away.
         try {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
@@ -165,6 +196,23 @@ export default class RandomDbdPerkService {
         } catch (error) {
             logger.error({ message: "Failed to send chat message", data: { error } });
         }
+    }
+
+    /**
+     * Signs the canvas media at dispatch, so a job that waited in the queue
+     * never reaches the overlay with an expired link. A canvas deleted in the
+     * meantime still sends the perks — the overlay just has nothing to play.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<RandomDbdPerkJobPayload>(WidgetTypeSlug.RANDOM_DBD_PERK, {
+            channel: RANDOM_DBD_PERK_CANVAS_CHANNEL,
+            event: "canvas",
+            resolve: async (job) => {
+                const canvas = await this.canvasService.resolvePlayback(job.payload.canvasId, job.transactionId)
+                return { canvas, perks: job.payload.perks, type: job.payload.type }
+            },
+            estimateDurationMs: (job) => job.durationMs ?? RANDOM_DBD_PERK_FALLBACK_DURATION_MS,
+        })
     }
 
     async getTotalPerkCount(type: string): Promise<number> {
