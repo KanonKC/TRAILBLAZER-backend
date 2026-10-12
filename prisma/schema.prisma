@@ -387,6 +387,7 @@ model RandomDBDKiller {
 model Canvas {
   id              String             @id @default(uuid())
   name            String
+  template_type   String             @default("image_audio") // "image_audio" | "video"
   enabled         Boolean            @default(true)
   duration_ms     Int                @default(5000)
   owner_id        String
@@ -445,6 +446,7 @@ model CanvasWidgetLink {
   widget     Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at DateTime @default(now())
 
-  @@unique([canvas_id, widget_id])
-  @@index([widget_id])
+  // A widget plays at most one canvas; a canvas can serve many widgets.
+  @@unique([widget_id])
+  @@index([canvas_id])
 }
