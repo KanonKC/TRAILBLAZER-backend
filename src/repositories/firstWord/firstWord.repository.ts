@@ -64,7 +64,8 @@ export default class FirstWordRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.FIRST_WORD
                 }
@@ -91,7 +92,8 @@ export default class FirstWordRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.FIRST_WORD
                 }

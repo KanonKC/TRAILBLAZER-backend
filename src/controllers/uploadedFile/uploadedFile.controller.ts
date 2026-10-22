@@ -32,13 +32,13 @@ export default class UploadedFileController {
                 return res.status(400).send({ message: "File is required" });
             }
             const buffer = await file.toBuffer();
-            await this.service.create(user.id, {
+            const created = await this.service.create(user.id, {
                 buffer,
                 filename: file.filename,
                 mimetype: file.mimetype
             }, req.id);
             logger.info({ message: "Successfully uploaded file", data: { userId: user.id, filename: file.filename } });
-            res.status(201).send();
+            res.status(201).send(created);
         } catch (error) {
             logger.error({ message: "Failed to upload file", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {

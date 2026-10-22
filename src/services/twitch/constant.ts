@@ -18,6 +18,7 @@ export enum TwitchEventType {
  * Widgets without a Twitch event dependency map to an empty list.
  */
 export const WIDGET_EVENT_TYPES: Record<WidgetTypeSlug, readonly TwitchEventType[]> = {
+    [WidgetTypeSlug.RANDOM_POOL]: [TwitchEventType.CHANNEL_REDEMPTION_ADD],
     [WidgetTypeSlug.FIRST_WORD]: [
         TwitchEventType.CHANNEL_CHAT_MESSAGE,
         TwitchEventType.STREAM_ONLINE,

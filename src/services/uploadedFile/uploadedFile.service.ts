@@ -50,7 +50,7 @@ export class UploadedFileService {
         logger.info({ message: "Creating new uploaded file", data: { userId, filename: file.filename, mimetype: file.mimetype } });
 
         const currentTotalSize = await this.getTotalFileSize(userId, transactionId);
-        const fileSizeKb = Math.round(file.buffer.length / 1024);
+        const fileSizeKb = Math.ceil(file.buffer.length / 1024);
         const maxStorageMb = await this.userService.getMaxStorageMB(userId, transactionId)
         const limitKb = maxStorageMb * 1024;
 
@@ -87,7 +87,7 @@ export class UploadedFileService {
             filename = `${base} (${maxCounter + 1})${ext}`;
         }
 
-        await this.ufr.create({
+        const created = await this.ufr.create({
             name: filename,
             type: file.mimetype,
             owner_id: userId,
@@ -96,6 +96,7 @@ export class UploadedFileService {
             duration_ms: await this.readAudioDurationMs(file.buffer, file.mimetype, transactionId)
         }, transactionId)
         await redis.del(`uploadedFile:totalSize:${userId}`)
+        return this.extend(created, transactionId)
     }
 
     /**
@@ -106,7 +107,7 @@ export class UploadedFileService {
      */
     private async readAudioDurationMs(buffer: Buffer, mimetype: string, transactionId?: string): Promise<number | null> {
         const logger = this.logger.setContext("service.uploadedFile.readAudioDurationMs", transactionId)
-        if (!mimetype.startsWith("audio/")) return null
+        if (!mimetype.startsWith("audio/") && mimetype !== "application/ogg") return null
 
         try {
             const metadata = await parseBuffer(buffer, { mimeType: mimetype })

@@ -94,5 +94,6 @@ export interface WidgetHandler<P = unknown> {
      */
     resolve(job: OverlayJob<P>): Promise<Record<string, unknown> | null>
     /** Fallback when the job carries no duration. */
+    onAck?(job: OverlayJob<P>): Promise<void>
     estimateDurationMs(job: OverlayJob<P>): number
 }

@@ -96,8 +96,12 @@ export default class WidgetService {
         logger = this.logger.setContext("service.widget.updateEnable", transactionId);
         logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
-        await this.authorizeTierUsage(userId, id, value, transactionId);
-        return this.update(id, userId, { enabled: value }, transactionId);
+        await this.authorizeOwnership(userId, id, transactionId);
+        const user = await this.userService.get(userId, transactionId);
+        const quota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER] + user.extra_widget_quota;
+        await this.widgetRepository.updateEnabledWithinQuota(id, userId, value, quota, transactionId);
+        await redis.del(`widget:${id}`);
+        await redis.del(`widget:total:owner:${userId}`);
     }
 
     async setInitialEnabled(id: string, userId: string, transactionId?: string) {

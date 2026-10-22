@@ -57,7 +57,8 @@ export default class EndCreditRepository {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.END_CREDIT
                 }
@@ -86,7 +87,8 @@ export default class EndCreditRepository {
         try {
         const widget = await prisma.widget.findUnique({
             where: {
-                twitch_id_widget_type_slug: {
+                twitch_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     twitch_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.END_CREDIT
                 }

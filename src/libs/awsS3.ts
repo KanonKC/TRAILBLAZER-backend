@@ -80,6 +80,8 @@ async function healthCheck() {
 }
 
 const s3 = {
+    getUploadURL: async (key: string, contentType: string, contentLength: number) => getSignedUrl(s3Client,
+        new PutObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key, ContentType: contentType, ContentLength: contentLength }), { expiresIn: 300 }),
     uploadFile,
     getFile,
     deleteFile,

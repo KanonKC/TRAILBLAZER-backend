@@ -1,4 +1,5 @@
 export enum WidgetTypeSlug {
+    RANDOM_POOL = "random-pool",
     FIRST_WORD = "first-word",
     CLIP_SHOUTOUT = "clip-shoutout",
     RANDOM_DBD_PERK = "random-dbd-perk",

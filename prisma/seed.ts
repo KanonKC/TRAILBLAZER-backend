@@ -59,6 +59,7 @@ const killers = killerImageNames.map((imageName) => ({
 }));
 
 const widgetTypes = [
+  { slug: "random-pool", display_name: "Random Pool", description: "สุ่มของจาก Pool ผ่าน Channel Points", cost: 1, href: "/dashboard/widgets/random-pool", theme_color: "#f97316", is_active: true },
   {
     slug: "first-word",
     display_name: "Greeting Message",
