@@ -6,6 +6,7 @@ export const listAdminUserSchema = z.object({
     search: z.string().optional(),
     tier: z.preprocess(emptyToUndefined, z.coerce.number().int().optional()),
     is_showcase: z.preprocess(emptyToUndefined, z.coerce.boolean().optional()),
+    is_whitelisted: z.enum(["true", "false"]).transform(value => value === "true").optional(),
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().default(20)
 });

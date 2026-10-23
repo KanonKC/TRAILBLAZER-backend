@@ -7,6 +7,7 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
 import Configurations from "@/config/index";
 import s3 from "@/libs/awsS3";
+import redis from "@/libs/redis";
 
 const WIDGET_ICONS_PREFIX = "widget-icons/";
 
@@ -39,7 +40,7 @@ export default class WidgetTypeService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widgetType.create", transactionId);
         try {
-            return await this.widgetTypeRepository.create(request, transactionId);
+            return await this.widgetTypeRepository.create({ ...request, is_active: request.availability === undefined || request.availability === "active" || request.availability === "whitelist_only", is_display: request.availability !== "hide" }, transactionId);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);
@@ -53,7 +54,14 @@ export default class WidgetTypeService {
         logger = this.logger.setContext("service.widgetType.update", transactionId);
         await this.get(id, transactionId);
         try {
-            return await this.widgetTypeRepository.update(id, request, transactionId);
+            const availability = request.availability;
+            const updatedRequest = { ...request, ...(availability ? { is_active: availability === "active" || availability === "whitelist_only", is_display: availability !== "hide" } : {}) };
+            if (availability && availability !== "active") {
+                const { widgetType, affectedWidgets } = await this.widgetTypeRepository.updateAndDisableUnavailable(id, updatedRequest, transactionId);
+                await Promise.all(affectedWidgets.flatMap(widget => [redis.del(`widget:${widget.id}`), redis.del(`widget:total:owner:${widget.owner_id}`)]));
+                return widgetType;
+            }
+            return await this.widgetTypeRepository.update(id, updatedRequest, transactionId);
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 throw convertPrismaError(error);

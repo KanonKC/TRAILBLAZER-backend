@@ -83,6 +83,9 @@ describe("ClipShoutoutService", () => {
         } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
+            authorizeWidgetType: jest.fn(),
+            isEnabledAndAvailable: jest.fn().mockResolvedValue(true),
+            validateOverlayAccess: jest.fn().mockResolvedValue(true),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
             increaseTriggeredCount: jest.fn(),

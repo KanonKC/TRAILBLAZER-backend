@@ -55,6 +55,7 @@ export default class FirstWordService {
             throw new NotFoundError("User not found");
         }
 
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.FIRST_WORD, transactionId);
         await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.FIRST_WORD]));
 
         const res = await this.firstWordRepository.create({
@@ -185,7 +186,7 @@ export default class FirstWordService {
         logger.debug({ message: "firstWord validate passed", data: { overlay_key: firstWord.widget.overlay_key, key } });
         // Use constant time comparison if possible, but for UUIDs/strings here standard checks are okay 
         // as long as we handle missing keys.
-        return firstWord.widget.overlay_key === key;
+        return firstWord.widget.overlay_key === key && await this.widgetService.validateOverlayAccess(userId, key, transactionId);
     }
 
     async greetNewChatter(e: TwitchChannelChatMessageEventRequest, transactionId?: string): Promise<void> {
@@ -233,7 +234,7 @@ export default class FirstWordService {
         logger.info({ message: "First word config found", data: { firstWord } });
 
         // Check if first word is enabled
-        if (!firstWord.widget.enabled) {
+        if (!firstWord.widget.enabled || !await this.widgetService.isEnabledAndAvailable(firstWord.widget_id, transactionId)) {
             logger.info({ message: "First word is not enabled", data: { firstWord } });
             return
         }

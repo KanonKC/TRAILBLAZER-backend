@@ -44,7 +44,8 @@ describe("WidgetService", () => {
             getTier: jest.fn(),
             get: jest.fn(),
         } as any;
-        mockUserRepo = {} as any;
+        mockUserRepo = { get: jest.fn().mockResolvedValue({ id: "u_1", is_whitelisted: false }) } as any;
+        mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "active", cost: 1 } } as any);
 
         service = new WidgetService(
             mockWidgetRepo,
@@ -56,7 +57,7 @@ describe("WidgetService", () => {
 
     describe("authorizeOwnership", () => {
         it("should not throw if owner matches", async () => {
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "active" } } as any);
             await expect(service.authorizeOwnership("u_1", "w_1", transactionId)).resolves.not.toThrow();
         });
 
@@ -110,12 +111,12 @@ describe("WidgetService", () => {
 
     describe("update", () => {
         it("should update successfully", async () => {
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
-            mockWidgetRepo.update.mockResolvedValue({ id: "w_1" } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "active" } } as any);
+            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
 
             await service.update("w_1", "u_1", { enabled: true }, transactionId);
 
-            expect(mockWidgetRepo.update).toHaveBeenCalled();
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", true, 1, transactionId);
             expect(redis.del).toHaveBeenCalledWith("widget:w_1");
         });
 
@@ -127,7 +128,7 @@ describe("WidgetService", () => {
 
     describe("updateEnable", () => {
         beforeEach(() => {
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "active" } } as any);
             mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
         });
         it("delegates quota checking and enabling to one database transaction", async () => {
@@ -149,27 +150,38 @@ describe("WidgetService", () => {
             await service.updateEnable("w_1", "u_1", false, transactionId);
             expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", false, 12, transactionId);
         });
+        it("rejects a non-whitelisted streamer for a whitelist-only widget", async () => {
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "whitelist_only" } } as any);
+            await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow(ForbiddenError);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).not.toHaveBeenCalled();
+        });
+        it("allows a whitelisted streamer for a whitelist-only widget", async () => {
+            mockUserRepo.get.mockResolvedValue({ id: "u_1", is_whitelisted: true } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { availability: "whitelist_only" } } as any);
+            await service.updateEnable("w_1", "u_1", true, transactionId);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalled();
+        });
     });
 
     describe("setInitialEnabled", () => {
         it("should enable if free tier and no active widgets", async () => {
             mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(0);
             mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1 } } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1, availability: "active" } } as any);
 
             await service.setInitialEnabled("w_1", "u_1", transactionId);
 
-            expect(mockWidgetRepo.update).toHaveBeenCalledWith("w_1", expect.objectContaining({ enabled: true }), transactionId);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", true, 1, transactionId);
         });
 
         it("should disable if free tier and already 1 active widget", async () => {
             mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1);
             mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1 } } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type: { cost: 1, availability: "active" } } as any);
 
             await service.setInitialEnabled("w_1", "u_1", transactionId);
 
-            expect(mockWidgetRepo.update).toHaveBeenCalledWith("w_1", expect.objectContaining({ enabled: false }), transactionId);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", false, 1, transactionId);
         });
     });
 
@@ -195,7 +207,7 @@ describe("WidgetService", () => {
 
     describe("validateOverlayAccess", () => {
         it("should return true if owner matches and key matches", async () => {
-            mockWidgetRepo.getByOverlayKey.mockResolvedValue({ id: "w_1", owner_id: "u_1", overlay_key: "key_1" } as any);
+            mockWidgetRepo.getByOverlayKey.mockResolvedValue({ id: "w_1", owner_id: "u_1", overlay_key: "key_1", enabled: true } as any);
             const result = await service.validateOverlayAccess("u_1", "key_1", transactionId);
             expect(result).toBe(true);
         });
@@ -204,6 +216,11 @@ describe("WidgetService", () => {
             mockWidgetRepo.getByOverlayKey.mockResolvedValue({ id: "w_1", owner_id: "u_2", overlay_key: "key_1" } as any);
             const result = await service.validateOverlayAccess("u_1", "key_1", transactionId);
             expect(result).toBe(false);
+        });
+        it("rejects an existing widget after its type becomes inactive", async () => {
+            mockWidgetRepo.getByOverlayKey.mockResolvedValue({ id: "w_1", owner_id: "u_1", overlay_key: "key_1", enabled: true } as any);
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", widget_type: { availability: "inactive" } } as any);
+            await expect(service.validateOverlayAccess("u_1", "key_1", transactionId)).resolves.toBe(false);
         });
 
         it("should return false if widget not found", async () => {

@@ -8,8 +8,7 @@ export const createWidgetTypeSchema = z.object({
     icon_url: z.string().nullable().optional(),
     theme_color: z.string().nullable().optional(),
     href: z.string().nullable().optional(),
-    is_active: z.boolean().optional(),
-    is_display: z.boolean().optional()
+    availability: z.enum(["hide", "inactive", "whitelist_only", "active"]).optional()
 });
 
 export const updateWidgetTypeSchema = createWidgetTypeSchema.partial();

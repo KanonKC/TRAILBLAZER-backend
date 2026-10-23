@@ -77,6 +77,7 @@ export default class DropImageService {
                 throw new NotFoundError("User not found");
             }
 
+            await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.DROP_IMAGE, transactionId);
             const existing = await this.dropImageRepository.getByOwnerId(user.id, transactionId).catch(() => null);
             if (existing) {
                 logger.warn({ message: "Drop image config already exists", data: request });
@@ -190,6 +191,7 @@ export default class DropImageService {
             logger.warn({ message: "Drop image config not found", data: { event } });
             return;
         }
+        if (!config.widget.enabled || !await this.widgetService.isAvailable(config.widget.owner_id, config.widget_id, transactionId)) return;
 
         logger.info({ message: "Drop image config found", data: { config } });
 
