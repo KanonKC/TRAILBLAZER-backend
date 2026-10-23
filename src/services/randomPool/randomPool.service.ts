@@ -257,6 +257,11 @@ export default class RandomPoolService {
     await this.publishState(config.pool_id, ownerId, transactionId);
     return this.getConfig(ownerId, id, transactionId);
   }
+  async refreshOverlayKey(ownerId: string, id: string, transactionId?: string) {
+    const config = await this.ownedConfig(ownerId, id, transactionId);
+    await this.widgets.refreshOverlayKey(config.widget_id, transactionId);
+    return this.getConfig(ownerId, id, transactionId);
+  }
   async deleteConfig(ownerId: string, id: string, transactionId?: string) {
     const config = await this.ownedConfig(ownerId, id, transactionId);
     await this.repository.deleteConfig(config.widget_id, transactionId);
@@ -284,6 +289,42 @@ export default class RandomPoolService {
   async logs(ownerId: string, id: string, transactionId?: string) {
     await this.ownedConfig(ownerId, id, transactionId);
     return { data: await this.repository.logs(id, transactionId) };
+  }
+  /** Queues a spin on the real overlay from the saved config; no Twitch chat message or history log. */
+  async testSpin(ownerId: string, id: string, transactionId?: string) {
+    const logger = this.logger.setContext('service.randomPool.testSpin', transactionId);
+    const config = await this.ownedConfig(ownerId, id, transactionId);
+    if (!config.widget.enabled) throw new BadRequestError('Enable this config before testing');
+    if (poolState(config.pool) !== 'READY') throw new BadRequestError('Pool is not ready');
+    const item = drawItem(config.pool.items, config.mode, config.items);
+    const setting = config.items.find((setting) => setting.item_id === item.id);
+    const result = await this.queue.enqueue<SpinPayload>({
+      userId: config.id,
+      widgetSlug: WidgetTypeSlug.RANDOM_POOL,
+      widgetId: config.widget_id,
+      awaitsAck: true,
+      transactionId,
+      payload: {
+        config_id: config.id,
+        pool_id: config.pool_id,
+        item: { id: item.id, name: item.name, image_key: item.image_key },
+        pool: config.pool.items.map((poolItem) => ({
+          id: poolItem.id,
+          name: poolItem.name,
+          image_key: poolItem.image_key,
+          weight: config.items.find((entry) => entry.item_id === poolItem.id)?.weight ?? 1,
+        })),
+        visualization: config.visualization,
+        spin_sound_key: config.spin_sound_key,
+        result_sound_key: setting?.result_sound_key || config.default_result_sound_key,
+        message: '',
+        broadcaster_id: config.widget.twitch_id,
+        redemption_id: `test-${Date.now()}`,
+        redeemed_by: ownerId,
+      },
+    });
+    logger.info({ message: 'Random pool test spin queued', data: result });
+    return result;
   }
   async redeem(event: TwitchChannelRedemptionAddEventRequest, transactionId?: string) {
     const logger = this.logger.setContext('service.randomPool.redeem', transactionId);

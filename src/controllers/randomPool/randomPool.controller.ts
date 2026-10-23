@@ -31,7 +31,9 @@ export default class RandomPoolController {
       ['PUT', '/configs/:id', 'saveConfig'],
       ['DELETE', '/configs/:id', 'deleteConfig'],
       ['PUT', '/configs/:id/enabled', 'enable'],
+      ['POST', '/configs/:id/refresh-key', 'refreshKey'],
       ['GET', '/configs/:id/logs', 'logs'],
+      ['POST', '/configs/:id/test', 'testSpin'],
     ] as const;
     for (const [method, path, action] of routes)
       server.route({
@@ -98,9 +100,15 @@ export default class RandomPoolController {
             request.id
           );
           break;
+        case 'refreshKey':
+          result = await this.service.refreshOverlayKey(user.id, id!, request.id);
+          break;
         case 'deleteConfig':
           await this.service.deleteConfig(user.id, id!, request.id);
           result = { deleted: true };
+          break;
+        case 'testSpin':
+          result = await this.service.testSpin(user.id, id!, request.id);
           break;
         case 'logs':
           result = await this.service.logs(user.id, id!, request.id);
