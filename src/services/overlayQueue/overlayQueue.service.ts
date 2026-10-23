@@ -12,9 +12,10 @@ import {
     LOCK_SLACK_MS,
     MAX_EXPIRED_SKIP,
     MAX_QUEUE_ITEMS,
+    RESOLVE_TIMEOUT_MS,
     SWEEP_INTERVAL_MS,
 } from "./constants"
-import { ENQUEUE_SCRIPT, FINISH_SCRIPT, TRY_DISPATCH_SCRIPT, runScript } from "./overlayQueue.scripts"
+import { ENQUEUE_SCRIPT, EXTEND_LOCK_SCRIPT, FINISH_SCRIPT, PROMOTE_SCRIPT, TRY_DISPATCH_SCRIPT, runScript } from "./overlayQueue.scripts"
 import {
     EnqueueInput,
     EnqueueResult,
@@ -25,6 +26,7 @@ import {
 
 const KEY_PREFIX = "oq"
 const DUE_KEY = `${KEY_PREFIX}:due`
+const DELAYED_KEY = `${KEY_PREFIX}:delayed`
 
 /**
  * Paces overlay events so one viewer's moment finishes before the next begins.
@@ -107,7 +109,7 @@ export default class OverlayQueueService {
             widgetSlug: input.widgetSlug,
             widgetId: input.widgetId,
             enqueuedAt: now,
-            expiresAt: now + JOB_TTL_MS,
+            expiresAt: Math.max(now, input.notBefore ?? 0) + JOB_TTL_MS,
             transactionId: input.transactionId,
             payload: input.payload,
             effects: input.effects ?? [],
@@ -124,16 +126,18 @@ export default class OverlayQueueService {
                     this.jobKey(member, job.id),
                     this.dedupeKey(member, input.dedupeKey ?? "none"),
                     DUE_KEY,
+                    DELAYED_KEY,
                 ],
                 [
                     job.id,
                     JSON.stringify(job),
-                    String(JOB_TTL_MS),
+                    String(JOB_TTL_MS + Math.max(0, (input.notBefore ?? 0) - now)),
                     String(MAX_QUEUE_ITEMS),
                     String(input.dedupeKey ? input.dedupeTtlMs ?? 10_000 : 0),
                     String(now),
                     member,
                     input.priority === "front" ? "front" : "back",
+                    String(input.notBefore ?? 0),
                 ]
             )) as [number, string]
 
@@ -146,12 +150,12 @@ export default class OverlayQueueService {
             }
         } catch (error) {
             logger.error({ message: "Failed to enqueue overlay job", data: { member }, error: error as Error })
-            return { enqueued: false, reason: "queue_full" }
+            return { enqueued: false, reason: "error" }
         }
 
         logger.info({ message: "Overlay job enqueued", data: { member, jobId: job.id } })
         // Start an idle queue immediately instead of waiting for the sweeper.
-        setImmediate(() => this.pump(member))
+        if ((input.notBefore ?? 0) <= now) setImmediate(() => this.pump(member))
         return { enqueued: true, jobId: job.id }
     }
 
@@ -160,6 +164,7 @@ export default class OverlayQueueService {
     // -----------------------------------------------------------------------
 
     private async sweep() {
+        await runScript(PROMOTE_SCRIPT, [DELAYED_KEY, DUE_KEY], [String(Date.now()), "200", `${KEY_PREFIX}:q:`])
         const members = await redis.zRangeByScore(DUE_KEY, "-inf", Date.now(), {
             LIMIT: { offset: 0, count: 200 },
         })
@@ -235,7 +240,7 @@ export default class OverlayQueueService {
 
         let payload: Record<string, unknown> | null
         try {
-            payload = await (handler as WidgetHandler<unknown>).resolve(job)
+            payload = await this.withTimeout((handler as WidgetHandler<unknown>).resolve(job), RESOLVE_TIMEOUT_MS)
         } catch (error) {
             logger.error({ message: "Failed to resolve overlay job", data: { jobId: job.id }, error: error as Error })
             payload = null
@@ -251,7 +256,15 @@ export default class OverlayQueueService {
 
         const durationMs = job.durationMs ?? (handler as WidgetHandler<unknown>).estimateDurationMs(job)
         const holdMs = durationMs + GAP_MS + LOCK_SLACK_MS
-        await redis.pExpire(this.busyKey(member), holdMs).catch(() => undefined)
+        // Only extend while we still own the lock. If it was lost the sweeper
+        // may already be playing another item, so this one must not publish.
+        const stillOwned = await runScript(EXTEND_LOCK_SCRIPT, [this.busyKey(member)], [token, String(holdMs)])
+            .then((v) => v === 1)
+            .catch(() => false)
+        if (!stillOwned) {
+            logger.warn({ message: "Lost overlay lock before dispatch, dropping job", data: { jobId: job.id, member } })
+            return
+        }
         // Recorded so a late ack for an item that already ended cannot cut the
         // next one short.
         await redis.set(this.currentKey(member), job.id, { PX: holdMs }).catch(() => undefined)
@@ -288,6 +301,14 @@ export default class OverlayQueueService {
             )
         }, durationMs)
         this.timers.set(member, timer)
+    }
+
+    private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+        let timer: NodeJS.Timeout
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`resolve timed out after ${ms}ms`)), ms)
+        })
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
     }
 
     /**

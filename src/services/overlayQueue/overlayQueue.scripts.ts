@@ -13,11 +13,20 @@ import redis from "@/libs/redis"
  */
 
 /**
- * KEYS: list, job, dedupe, due
- * ARGV: jobId, jobJson, ttlMs, maxItems, dedupeTtlMs, nowMs, queueMember, priority
+ * KEYS: list, job, dedupe, due, delayed
+ * ARGV: jobId, jobJson, ttlMs, maxItems, dedupeTtlMs, nowMs, queueMember, priority, notBeforeMs
  * Returns: { 1, jobId } | { 0, reason }
+ *
+ * The capacity check runs before the dedupe key is set, so a job rejected for
+ * a full queue does not leave a dedupe key behind that blocks its own retry.
+ * A job with a future notBefore waits in the delayed set (in Redis, so a
+ * restart does not lose it) and is promoted into the list by PROMOTE_SCRIPT.
  */
 export const ENQUEUE_SCRIPT = `
+if redis.call("LLEN", KEYS[1]) >= tonumber(ARGV[4]) then
+  return {0, "queue_full"}
+end
+
 local dedupeTtl = tonumber(ARGV[5])
 if dedupeTtl > 0 then
   if redis.call("SET", KEYS[3], "1", "NX", "PX", dedupeTtl) == false then
@@ -25,11 +34,13 @@ if dedupeTtl > 0 then
   end
 end
 
-if redis.call("LLEN", KEYS[1]) >= tonumber(ARGV[4]) then
-  return {0, "queue_full"}
-end
-
 redis.call("SET", KEYS[2], ARGV[2], "PX", tonumber(ARGV[3]))
+
+local notBefore = tonumber(ARGV[9])
+if notBefore > tonumber(ARGV[6]) then
+  redis.call("ZADD", KEYS[5], notBefore, ARGV[7] .. "|" .. ARGV[1])
+  return {1, ARGV[1]}
+end
 
 if ARGV[8] == "front" then
   redis.call("LPUSH", KEYS[1], ARGV[1])
@@ -40,6 +51,37 @@ end
 -- NX so an enqueue never drags a cooling-down queue forward past its gap.
 redis.call("ZADD", KEYS[4], "NX", tonumber(ARGV[6]), ARGV[7])
 return {1, ARGV[1]}
+`
+
+/**
+ * KEYS: delayed, due
+ * ARGV: nowMs, limit, listKeyPrefix
+ * Moves delayed jobs whose time has come into their queue. Returns the count.
+ */
+export const PROMOTE_SCRIPT = `
+local items = redis.call("ZRANGEBYSCORE", KEYS[1], "-inf", ARGV[1], "LIMIT", 0, tonumber(ARGV[2]))
+for _, entry in ipairs(items) do
+  local sep = string.find(entry, "|", 1, true)
+  local member = string.sub(entry, 1, sep - 1)
+  local jobId = string.sub(entry, sep + 1)
+  redis.call("RPUSH", ARGV[3] .. member, jobId)
+  redis.call("ZADD", KEYS[2], "NX", tonumber(ARGV[1]), member)
+  redis.call("ZREM", KEYS[1], entry)
+end
+return #items
+`
+
+/**
+ * KEYS: busy
+ * ARGV: lockToken, ttlMs
+ * Extends the lock only while the caller still owns it. Returns 1 or 0.
+ */
+export const EXTEND_LOCK_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  redis.call("PEXPIRE", KEYS[1], tonumber(ARGV[2]))
+  return 1
+end
+return 0
 `
 
 /**

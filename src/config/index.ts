@@ -19,6 +19,7 @@ export default interface Configurations {
             enabled: boolean;
             cron: string;
             liveLookbackMs: number;
+            deleteEnabled: boolean;
         };
     }
     twitchGql: {

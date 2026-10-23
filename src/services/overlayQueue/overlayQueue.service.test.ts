@@ -3,7 +3,7 @@ import { WidgetTypeSlug } from "@/services/constant";
 import { GAP_MS } from "./constants";
 import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI } from "@/libs/twurple";
-import { ENQUEUE_SCRIPT, FINISH_SCRIPT, TRY_DISPATCH_SCRIPT, runScript } from "./overlayQueue.scripts";
+import { ENQUEUE_SCRIPT, EXTEND_LOCK_SCRIPT, FINISH_SCRIPT, PROMOTE_SCRIPT, TRY_DISPATCH_SCRIPT, runScript } from "./overlayQueue.scripts";
 
 jest.mock("@/libs/redis", () => ({
     __esModule: true,
@@ -47,6 +47,8 @@ class FakeRedisQueue {
         if (script === ENQUEUE_SCRIPT) return this.enqueue(keys, args)
         if (script === TRY_DISPATCH_SCRIPT) return this.tryDispatch(keys, args)
         if (script === FINISH_SCRIPT) return this.finish(keys, args)
+        if (script === EXTEND_LOCK_SCRIPT) return this.busy.get(keys[0]) === args[0] ? 1 : 0
+        if (script === PROMOTE_SCRIPT) return 0
         throw new Error("unknown script")
     }
 
@@ -54,15 +56,15 @@ class FakeRedisQueue {
         const [listKey, jobKey, dedupeKey] = keys
         const [jobId, jobJson, ttlMs, maxItems, dedupeTtlMs] = args
 
+        const list = this.lists.get(listKey) ?? []
+        if (list.length >= Math.min(Number(maxItems), this.maxItems)) return [0, "queue_full"]
+
         if (Number(dedupeTtlMs) > 0 && this.jobs.has(`dedupe:${dedupeKey}`)) {
             return [0, "duplicate"]
         }
         if (Number(dedupeTtlMs) > 0) {
             this.jobs.set(`dedupe:${dedupeKey}`, { json: "1", expiresAt: Date.now() + Number(dedupeTtlMs) })
         }
-
-        const list = this.lists.get(listKey) ?? []
-        if (list.length >= Math.min(Number(maxItems), this.maxItems)) return [0, "queue_full"]
 
         this.jobs.set(jobKey, { json: jobJson, expiresAt: Date.now() + Number(ttlMs) })
         if (args[7] === "front") list.unshift(jobId)
@@ -146,7 +148,7 @@ describe("OverlayQueueService", () => {
 
     /** Lets the setImmediate/await chain inside enqueue and dispatch settle. */
     const flush = async () => {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 30; i++) {
             jest.advanceTimersByTime(0)
             await Promise.resolve()
         }
@@ -359,6 +361,30 @@ describe("OverlayQueueService", () => {
         await flush()
 
         expect(publishedNames()).toEqual(["first"])
+    })
+
+    it("does not leave a dedupe key behind when the queue is full", async () => {
+        fake.maxItems = 1
+        await enqueueGreeting("first")
+        const rejected = await enqueueGreeting("second", { dedupeKey: "k" })
+        expect(rejected).toEqual({ enqueued: false, reason: "queue_full" })
+
+        fake.maxItems = 100
+        const retried = await enqueueGreeting("second", { dedupeKey: "k" })
+        expect(retried.enqueued).toBe(true)
+    })
+
+    it("drops a job whose lock was lost while it was resolving", async () => {
+        fake.busy.clear()
+        const original = fake.run
+        fake.run = (script, keys, args) =>
+            script === EXTEND_LOCK_SCRIPT ? 0 : original(script, keys, args)
+        ;(runScript as jest.Mock).mockImplementation(async (script, keys, args) => fake.run(script, keys, args))
+
+        await enqueueGreeting("first")
+        await flush()
+
+        expect(publishedNames()).toEqual([])
     })
 })
 

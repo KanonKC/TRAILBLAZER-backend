@@ -29,6 +29,12 @@ export const SWEEP_INTERVAL_MS = 1_000
  */
 export const BOOTSTRAP_LOCK_MS = 15_000
 
+/**
+ * Longest a handler may take to resolve a job. Kept well under
+ * BOOTSTRAP_LOCK_MS so the lock cannot expire while resolving.
+ */
+export const RESOLVE_TIMEOUT_MS = 8_000
+
 /** Extra lock time beyond duration + gap, to absorb dispatch overhead. */
 export const LOCK_SLACK_MS = 5_000
 

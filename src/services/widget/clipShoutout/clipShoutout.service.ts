@@ -193,28 +193,25 @@ export default class ClipShoutoutService {
         }
 
         // delay_ms is the streamer's pause between the raid landing and the
-        // shoutout starting, so it delays joining the queue rather than blocking
-        // this webhook handler.
-        const enqueueJob = () => this.overlayQueue.enqueue<ClipShoutoutJobPayload>({
-            userId: csConfig!.widget.owner_id,
+        // shoutout starting. It travels with the job (notBefore) so Redis holds
+        // it and a restart inside the window does not drop the shoutout.
+        if (csConfig.delay_ms > 0) {
+            logger.info({ message: "Delaying shoutout", data: { delay_ms: csConfig.delay_ms } });
+        }
+
+        await this.overlayQueue.enqueue<ClipShoutoutJobPayload>({
+            userId: csConfig.widget.owner_id,
             widgetSlug: WidgetTypeSlug.CLIP_SHOUTOUT,
-            widgetId: csConfig!.widget_id,
-            payload: { clipId: clip!.id, durationSeconds: clip!.durationSeconds },
+            widgetId: csConfig.widget_id,
+            payload: { clipId: clip.id, durationSeconds: clip.durationSeconds },
             // The shoutout, the chat reply and the clip all belong to this raid,
             // so they fire together when the clip actually rolls.
             effects,
-            durationMs: clip!.durationSeconds * 1000 + CLIP_TAIL_MS,
+            durationMs: clip.durationSeconds * 1000 + CLIP_TAIL_MS,
             awaitsAck: true,
             transactionId,
+            notBefore: csConfig.delay_ms > 0 ? Date.now() + csConfig.delay_ms : undefined,
         })
-
-        if (csConfig.delay_ms > 0) {
-            logger.info({ message: "Delaying shoutout", data: { delay_ms: csConfig.delay_ms } });
-            setTimeout(() => void enqueueJob(), csConfig.delay_ms)
-            return
-        }
-
-        await enqueueJob()
     }
 
     /**

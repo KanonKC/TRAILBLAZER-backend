@@ -28,6 +28,8 @@ const config: Configurations = {
                 : environment !== Environment.Local,
             cron: process.env.EVENTSUB_HEALTHCHECK_CRON || "0 * * * *",
             // A stream counts as "started while the subscription was down" if it began within this window (interval + buffer)
+            // Deleting subscriptions is opt-in: a wrong 'desired' set would otherwise unsubscribe live users
+            deleteEnabled: process.env.EVENTSUB_HEALTHCHECK_DELETE_ENABLED === "true",
             liveLookbackMs: Number(process.env.EVENTSUB_HEALTHCHECK_LIVE_LOOKBACK_MS) || 65 * 60 * 1000
         }
     },

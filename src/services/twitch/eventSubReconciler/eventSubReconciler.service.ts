@@ -19,6 +19,8 @@ const FRESH_PENDING_VERIFICATION_MS = 10 * 60 * 1000;
 const USER_CONCURRENCY = 5;
 const STREAMS_BATCH_SIZE = 100;
 const MISSING_STATUS = "missing";
+const MAX_DELETE_RATIO = 0.3;
+const MIN_MANAGED_FOR_RATIO_CHECK = 20;
 
 export class EventSubSubscribeError extends Error {
     constructor(public readonly eventType: string, public readonly cause: unknown) {
@@ -147,6 +149,7 @@ export default class EventSubReconcilerService {
         });
 
         const actionsByUser = this.diff(desired, managed);
+        this.guardDeletes(actionsByUser, desired, managed.length, transactionId);
 
         const resubscribedOnline: string[] = [];
         let rateLimited = false;
@@ -251,6 +254,32 @@ export default class EventSubReconcilerService {
             }
         }
         return actionsByUser;
+    }
+
+    /**
+     * Removes delete actions unless they are enabled and plausible. A wrong
+     * "desired" set (partial widget list, unmapped slug) would otherwise
+     * unsubscribe live users, and nothing re-creates the subscriptions until
+     * the next round. Creates are never affected.
+     */
+    private guardDeletes(actionsByUser: Map<string, ReconcileAction[]>, desired: Map<string, Set<string>>, managedCount: number, transactionId: string) {
+        const logger = this.logger.setContext("service.twitch.eventSubReconciler.guardDeletes", transactionId);
+        let deletes = 0;
+        for (const actions of actionsByUser.values()) deletes += actions.filter(a => a.kind === "delete").length;
+        if (deletes === 0) return;
+
+        let reason: string | null = null;
+        if (!config.twitch.eventSubHealthCheck.deleteEnabled) reason = "deletes disabled";
+        else if (desired.size === 0 && managedCount > 0) reason = "no desired subscriptions but managed ones exist";
+        else if (managedCount >= MIN_MANAGED_FOR_RATIO_CHECK && deletes / managedCount > MAX_DELETE_RATIO) reason = "delete ratio too high";
+        if (!reason) return;
+
+        logger.warn({ message: "Skipping EventSub deletes", data: { reason, deletes, managed: managedCount } });
+        for (const [twitchId, actions] of actionsByUser) {
+            const kept = actions.filter(a => a.kind !== "delete");
+            if (kept.length > 0) actionsByUser.set(twitchId, kept);
+            else actionsByUser.delete(twitchId);
+        }
     }
 
     private async execute(action: ReconcileAction, transactionId: string): Promise<"ok" | "failed" | "rate_limited"> {

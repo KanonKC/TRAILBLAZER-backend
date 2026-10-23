@@ -72,12 +72,14 @@ export interface EnqueueInput<P = unknown> {
     dedupeTtlMs?: number
     /** Jump the queue. Only for streamer-initiated test triggers. */
     priority?: "front" | "back"
+    /** Earliest time (epoch ms) the job may start. Held in Redis until then. */
+    notBefore?: number
     transactionId?: string
 }
 
 export type EnqueueResult =
     | { enqueued: true; jobId: string }
-    | { enqueued: false; reason: "duplicate" | "queue_full" }
+    | { enqueued: false; reason: "duplicate" | "queue_full" | "error" }
 
 /**
  * Per-widget behaviour. `resolve` runs at dispatch, which is where late-bound

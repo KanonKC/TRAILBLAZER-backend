@@ -10,6 +10,9 @@ import Configurations from "@/config/index";
 import TLogger, { Layer } from "@/logging/logger";
 import { setAuthCookies, clearAuthCookies } from "@/libs/cookies";
 import { TError } from "@/errors";
+import { Environment } from "@/constants/environment";
+
+const OAUTH_STATE_COOKIE = "tb_oauth_state";
 
 export default class UserController {
 
@@ -33,6 +36,19 @@ export default class UserController {
         logger.info({ message: "Login attempt initiated" });
         try {
             const query = loginSchema.parse(req.query);
+
+            // The frontend stores the state nonce in a cookie before redirecting to
+            // Twitch; a callback whose state does not match was not started here.
+            // Skipped locally, where the frontend and API do not share a cookie domain.
+            if (this.cfg.env !== Environment.Local) {
+                const expectedNonce = req.cookies?.[OAUTH_STATE_COOKIE];
+                const receivedNonce = query.state.split(":")[0];
+                res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", domain: this.cfg.rootDomain });
+                if (!expectedNonce || expectedNonce !== receivedNonce) {
+                    logger.warn({ message: "OAuth state mismatch" });
+                    return res.status(400).send({ message: "Invalid login state, please try again" });
+                }
+            }
 
             // Extract ref from state if present (format: nonce:ref)
             let ref: string | undefined = undefined;

@@ -5,7 +5,7 @@ import { twitchAppAPI } from "@/libs/twurple";
 
 jest.mock("@/config", () => ({
     __esModule: true,
-    default: { origin: "https://api.test", twitch: { eventSubHealthCheck: { liveLookbackMs: 65 * 60 * 1000 } } },
+    default: { origin: "https://api.test", twitch: { eventSubHealthCheck: { deleteEnabled: true, liveLookbackMs: 65 * 60 * 1000 } } },
 }));
 jest.mock("@/libs/prisma", () => ({ pool: { connect: jest.fn() } }));
 jest.mock("@/libs/twurple", () => ({
@@ -140,10 +140,31 @@ describe("EventSubReconcilerService", () => {
     });
 
     it("deletes subscriptions no enabled widget needs", async () => {
+        eventSubReconcilerRepository.listEnabledWidgets.mockResolvedValue([{ twitch_id: "2", widget_type_slug: "export-video" }]);
+        mockSubs([makeSub("a", "stream.offline", "enabled", "1"), makeSub("b", "stream.offline", "enabled", "2")]);
+        await service.run("tx");
+        expect(eventSub.deleteSubscription).toHaveBeenCalledWith("a");
+        expect(eventSub.deleteSubscription).not.toHaveBeenCalledWith("b");
+    });
+
+    it("refuses to delete when no widget needs any subscription at all", async () => {
         eventSubReconcilerRepository.listEnabledWidgets.mockResolvedValue([]);
         mockSubs([makeSub("a", "stream.offline", "enabled", "1")]);
         await service.run("tx");
-        expect(eventSub.deleteSubscription).toHaveBeenCalledWith("a");
+        expect(eventSub.deleteSubscription).not.toHaveBeenCalled();
+    });
+
+    it("does not delete anything while deletes are disabled", async () => {
+        const cfg = jest.requireMock("@/config").default;
+        cfg.twitch.eventSubHealthCheck.deleteEnabled = false;
+        try {
+            eventSubReconcilerRepository.listEnabledWidgets.mockResolvedValue([{ twitch_id: "2", widget_type_slug: "export-video" }]);
+            mockSubs([makeSub("a", "stream.offline", "enabled", "1"), makeSub("b", "stream.offline", "enabled", "2")]);
+            await service.run("tx");
+            expect(eventSub.deleteSubscription).not.toHaveBeenCalled();
+        } finally {
+            cfg.twitch.eventSubHealthCheck.deleteEnabled = true;
+        }
     });
 
     it("keeps an event type while at least one widget still uses it", async () => {
