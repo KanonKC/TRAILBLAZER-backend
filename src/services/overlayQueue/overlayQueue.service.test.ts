@@ -1,7 +1,7 @@
 import OverlayQueueService from "./overlayQueue.service";
 import { WidgetTypeSlug } from "@/services/constant";
 import { GAP_MS } from "./constants";
-import { publisher } from "@/libs/redis";
+import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI } from "@/libs/twurple";
 import { ENQUEUE_SCRIPT, FINISH_SCRIPT, TRY_DISPATCH_SCRIPT, runScript } from "./overlayQueue.scripts";
 
@@ -11,6 +11,7 @@ jest.mock("@/libs/redis", () => ({
         pExpire: jest.fn().mockResolvedValue(1),
         set: jest.fn().mockResolvedValue("OK"),
         get: jest.fn().mockResolvedValue(null),
+        getDel: jest.fn().mockResolvedValue(null),
         del: jest.fn().mockResolvedValue(1),
         zRangeByScore: jest.fn().mockResolvedValue([]),
     },
@@ -352,3 +353,21 @@ describe("OverlayQueueService", () => {
         expect(publishedNames()).toEqual(["first"])
     })
 })
+
+
+describe("Overlay ACK completion", () => {
+    beforeEach(() => { jest.useFakeTimers(); jest.clearAllMocks(); });
+    afterEach(() => { jest.clearAllTimers(); jest.useRealTimers(); });
+    it("claims completion once across concurrent ACKs and finishes after callback", async () => {
+        const queue = new OverlayQueueService();
+        const onAck = jest.fn().mockResolvedValue(undefined);
+        queue.register(WidgetTypeSlug.RANDOM_POOL, { channel: "test", event: "result", resolve: async () => ({}), estimateDurationMs: () => 100, onAck });
+        (redis.get as jest.Mock).mockImplementation(async key => key.includes(":cur:") ? "job" : "lock");
+        (redis.getDel as jest.Mock).mockResolvedValueOnce(JSON.stringify({ id: "job", widgetSlug: "random-pool", payload: {} })).mockResolvedValueOnce(null);
+        (runScript as jest.Mock).mockResolvedValue(1);
+        await Promise.all([queue.ack("config", WidgetTypeSlug.RANDOM_POOL, "job"), queue.ack("config", WidgetTypeSlug.RANDOM_POOL, "job")]);
+        expect(onAck).toHaveBeenCalledTimes(1);
+        expect(runScript).toHaveBeenCalledTimes(1);
+        queue.stop();
+    });
+});

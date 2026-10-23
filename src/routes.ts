@@ -1,3 +1,7 @@
+import RandomPoolUploadService from "./services/randomPool/randomPoolUpload.service";
+import RandomPoolRepository from "./repositories/randomPool/randomPool.repository";
+import RandomPoolService from "./services/randomPool/randomPool.service";
+import RandomPoolController from "./controllers/randomPool/randomPool.controller";
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import config from './config';
@@ -242,6 +246,8 @@ const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
 const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
+const randomPoolService = new RandomPoolService(new RandomPoolRepository(), widgetService, overlayQueueService, twitchService);
+const randomPoolController = new RandomPoolController(randomPoolService, new RandomPoolUploadService(uploadedFileService));
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
@@ -273,7 +279,8 @@ const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEven
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(
   randomDbdPerkService,
   dropImageService,
-  randomDBDKillerService
+  randomDBDKillerService,
+  randomPoolService
 );
 const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
 const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
@@ -637,6 +644,7 @@ server.post(
 );
 
 tbCron.run();
+randomPoolController.register(server);
 overlayQueueService.start();
 
 export { overlayQueueService };

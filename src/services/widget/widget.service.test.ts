@@ -38,6 +38,7 @@ describe("WidgetService", () => {
             updateOverlayKey: jest.fn(),
             getFirstEnabled: jest.fn(),
             getEnabledQuotaUsed: jest.fn(),
+            updateEnabledWithinQuota: jest.fn(),
         } as any;
         mockUserService = {
             getTier: jest.fn(),
@@ -125,28 +126,28 @@ describe("WidgetService", () => {
     });
 
     describe("updateEnable", () => {
-        it("should update enable status successfully", async () => {
+        beforeEach(() => {
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1" } as any);
             mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false, owner_id: "u_1", widget_type: { cost: 1 } } as any);
-            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(0);
-            mockWidgetRepo.update.mockResolvedValue({ id: "w_1" } as any);
-
-            await service.updateEnable("w_1", "u_1", true, transactionId);
-
-            expect(mockWidgetRepo.update).toHaveBeenCalledWith("w_1", { enabled: true }, transactionId);
         });
-
-        it("should throw WidgetQuotaLimitError if authorizeTierUsage throws WidgetQuotaLimitError", async () => {
-            mockUserService.get.mockResolvedValue({ tier: UserTier.FREE_TIER, extra_widget_quota: 0 } as any);
-            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", enabled: false, owner_id: "u_1", widget_type: { cost: 1 } } as any);
-            mockWidgetRepo.getEnabledQuotaUsed.mockResolvedValue(1);
-
+        it("delegates quota checking and enabling to one database transaction", async () => {
+            await service.updateEnable("w_1", "u_1", true, transactionId);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", true, 1, transactionId);
+            expect(redis.del).toHaveBeenCalledWith("widget:w_1");
+        });
+        it("propagates quota exhaustion from the transaction", async () => {
+            mockWidgetRepo.updateEnabledWithinQuota.mockRejectedValue(new WidgetQuotaLimitError());
             await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow(WidgetQuotaLimitError);
         });
-
-        it("should rethrow other errors from authorizeTierUsage", async () => {
-            mockUserService.get.mockRejectedValue(new Error("Generic error"));
-            await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow("Generic error");
+        it("does not update widgets belonging to another owner", async () => {
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "other" } as any);
+            await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow(ForbiddenError);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).not.toHaveBeenCalled();
+        });
+        it("includes extra widget points in the quota", async () => {
+            mockUserService.get.mockResolvedValue({ tier: UserTier.PRO_TIER, extra_widget_quota: 2 } as any);
+            await service.updateEnable("w_1", "u_1", false, transactionId);
+            expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", false, 12, transactionId);
         });
     });
 

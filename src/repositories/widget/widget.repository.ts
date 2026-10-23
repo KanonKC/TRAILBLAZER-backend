@@ -4,6 +4,8 @@ import { ListWidgetFilters, UpdateWidget } from "./request";
 import { prisma } from "@/libs/prisma";
 import { ExtendedWidget } from "./response";
 import { Pagination } from "@/services/response";
+import { WidgetQuotaLimitError } from "@/services/widget/error";
+import { NotFoundError } from "@/errors";
 import { WidgetWhereInput } from "generated/prisma/models";
 
 const logger = new TLogger(Layer.REPOSITORY);
@@ -153,6 +155,24 @@ export default class WidgetRepository {
             logger.setContext("repository.widget.updateOverlayKey", transactionId).error({ message: "updateOverlayKey failed", error: error as Error });
             throw error;
         }
+    }
+
+    async updateEnabledWithinQuota(id: string, ownerId: string, enabled: boolean, quota: number, transactionId?: string): Promise<void> {
+        const contextLogger = logger.setContext("repository.widget.updateEnabledWithinQuota", transactionId);
+        try {
+            await prisma.$transaction(async transaction => {
+                // The same lock serializes enables of every widget type for this owner.
+                await transaction.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+                const widget = await transaction.widget.findFirst({ where: { id, owner_id: ownerId }, include: { widget_type: true } });
+                if (!widget) throw new NotFoundError("Widget not found");
+                if (enabled) {
+                    const others = await transaction.widget.findMany({ where: { owner_id: ownerId, enabled: true, id: { not: id } }, include: { widget_type: true } });
+                    const used = others.reduce((sum, other) => sum + (other.widget_type?.cost ?? 1), 0);
+                    if (used + (widget.widget_type?.cost ?? 1) > quota) throw new WidgetQuotaLimitError();
+                }
+                await transaction.widget.update({ where: { id }, data: { enabled } });
+            });
+        } catch (error) { contextLogger.error({ message: "Widget enable transaction failed", error: error as Error }); throw error; }
     }
 
     async increaseTriggeredCount(id: string, transactionId?: string): Promise<void> {

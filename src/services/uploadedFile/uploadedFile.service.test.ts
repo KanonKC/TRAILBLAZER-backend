@@ -35,7 +35,7 @@ describe("UploadedFileService", () => {
 
     beforeEach(() => {
         mockUploadedFileRepo = {
-            create: jest.fn(),
+            create: jest.fn().mockImplementation(async data => ({ id: "upload-id", created_at: new Date(), updated_at: new Date(), ...data })),
             get: jest.fn(),
             list: jest.fn(),
             update: jest.fn(),

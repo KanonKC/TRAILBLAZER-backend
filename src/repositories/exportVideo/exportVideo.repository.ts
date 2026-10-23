@@ -119,7 +119,8 @@ export default class ExportVideoRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
                 }
@@ -145,7 +146,8 @@ export default class ExportVideoRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                twitch_id_widget_type_slug: {
+                twitch_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     twitch_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
                 }

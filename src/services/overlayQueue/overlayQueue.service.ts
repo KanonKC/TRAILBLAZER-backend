@@ -242,6 +242,7 @@ export default class OverlayQueueService {
         // next one short.
         await redis.set(this.currentKey(member), job.id, { PX: holdMs }).catch(() => undefined)
 
+        if (handler.onAck) await redis.set(`${KEY_PREFIX}:ack:${member}:${job.id}`, JSON.stringify(job), { PX: holdMs });
         try {
             await publisher.publish(
                 handler.channel,
@@ -350,6 +351,14 @@ export default class OverlayQueueService {
         const token = await redis.get(this.busyKey(member))
         if (!token) return
 
+        // GETDEL gives at-most-once completion even with duplicate ACKs or multiple overlays.
+        const handler = this.handlers.get(widgetSlug);
+        if (handler?.onAck) {
+            const raw = await redis.getDel(`${KEY_PREFIX}:ack:${member}:${jobId}`);
+            if (!raw) return;
+            try { await (handler as WidgetHandler<unknown>).onAck!(JSON.parse(raw)); }
+            catch (error) { logger.error({ message: "Overlay completion failed", error: error as Error }); }
+        }
         const timer = this.timers.get(member)
         if (timer) {
             clearTimeout(timer)
