@@ -220,6 +220,7 @@ export default class RandomPoolService {
     transactionId?: string
   ) {
     const logger = this.logger.setContext('service.randomPool.saveConfig', transactionId);
+    await this.widgets.authorizeWidgetType(ownerId, WidgetTypeSlug.RANDOM_POOL, transactionId);
     const data = configSchema.parse(input);
     if (id) await this.ownedConfig(ownerId, id, transactionId);
     const pool = await this.ownedPool(ownerId, data.pool_id, transactionId);
@@ -333,6 +334,7 @@ export default class RandomPoolService {
       !config ||
       config.widget.twitch_id !== event.broadcaster_user_id ||
       !config.widget.enabled ||
+      !await this.widgets.isEnabledAndAvailable(config.widget_id, transactionId) ||
       poolState(config.pool) !== 'READY'
     )
       return;

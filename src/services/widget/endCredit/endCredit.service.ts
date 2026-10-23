@@ -100,6 +100,7 @@ export default class EndCreditService {
                 throw new NotFoundError("User not found");
             }
 
+            await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.END_CREDIT, transactionId);
             const existing = await this.endCreditRepository.getByOwnerId(user.id, transactionId);
             if (existing) {
                 logger.warn({ message: "End credit config already exists", data: request });
@@ -346,7 +347,7 @@ export default class EndCreditService {
                 logger.info({ message: "No end credit config for raider, skipping", data: { twitchId: event.from_broadcaster_user_id } });
                 return;
             }
-            if (!endCredit.widget.enabled) {
+            if (!endCredit.widget.enabled || !await this.widgetService.isEnabledAndAvailable(endCredit.widget_id, transactionId)) {
                 logger.info({ message: "End credit widget disabled, skipping", data: { widgetId: endCredit.widget.id } });
                 return;
             }

@@ -75,6 +75,7 @@ export default class RandomDBDKillerService {
             throw new NotFoundError("User not found");
         }
 
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.RANDOM_DBD_KILLER, transactionId);
         const existing = await this.randomDBDKillerRepository.getByOwnerId(request.owner_id, transactionId);
         if (existing) {
             throw new BadRequestError("Random DBD Killer widget already exists for this user");
@@ -161,6 +162,7 @@ export default class RandomDBDKillerService {
             logger.warn({ message: "Random DBD Killer config not found", data: { rewardId } });
             return;
         }
+        if (!config.widget.enabled || !await this.widgetService.isAvailable(config.widget.owner_id, config.widget_id, transactionId)) return;
 
         if (!config.killer_pool || config.killer_pool.length === 0) {
             logger.warn({ message: "Killer pool is empty", data: { widgetId: config.widget_id } });

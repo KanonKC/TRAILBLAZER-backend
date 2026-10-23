@@ -219,6 +219,20 @@ export default class OverlayQueueService {
             return
         }
 
+        if (job.widgetId && this.widgetService) {
+            let canDispatch = false
+            try {
+                canDispatch = await this.widgetService.isEnabledAndAvailable(job.widgetId, job.transactionId)
+            } catch (error) {
+                logger.error({ message: "Failed to check widget availability", data: { jobId: job.id }, error: error as Error })
+            }
+            if (!canDispatch) {
+                logger.info({ message: "Overlay job dropped because widget is unavailable", data: { jobId: job.id } })
+                await this.finish(member, token, 0)
+                return
+            }
+        }
+
         let payload: Record<string, unknown> | null
         try {
             payload = await (handler as WidgetHandler<unknown>).resolve(job)
@@ -300,6 +314,7 @@ export default class OverlayQueueService {
     private async runEffect(effect: OverlayEffect, job: OverlayJob) {
         const logger = this.logger.setContext("service.overlayQueue.runEffect", job.transactionId)
         try {
+            if (job.widgetId && this.widgetService && !await this.widgetService.isEnabledAndAvailable(job.widgetId, job.transactionId)) return
             switch (effect.type) {
                 case "chat":
                     await twitchAppAPI.chat.sendChatMessageAsApp(

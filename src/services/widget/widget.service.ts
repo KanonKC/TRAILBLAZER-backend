@@ -10,6 +10,7 @@ import { ExtendedWidget } from "@/repositories/widget/response";
 import UserRepository from "@/repositories/user/user.repository";
 import { UserTier, PLAN_QUOTA } from "../user/constant";
 import { WidgetQuotaLimitError } from "./error";
+import { prisma } from "@/libs/prisma";
 
 
 export default class WidgetService {
@@ -36,6 +37,40 @@ export default class WidgetService {
         if (widget.owner_id !== userId) {
             logger.warn({ message: "You are not the owner of this widget", data: { userId, widgetId: widget.id } });
             throw new ForbiddenError("You are not the owner of this widget");
+        }
+    }
+
+    async isAvailable(userId: string, widgetId: string, transactionId?: string): Promise<boolean> {
+        const [user, widget] = await Promise.all([
+            this.userRepository.get(userId, transactionId),
+            this.widgetRepository.get(widgetId, transactionId),
+        ]);
+        const availability = widget?.widget_type?.availability;
+        return widget?.owner_id === userId && (availability === "active" || (availability === "whitelist_only" && user?.is_whitelisted === true));
+    }
+
+    async isEnabledAndAvailable(widgetId: string, transactionId?: string): Promise<boolean> {
+        const widget = await prisma.widget.findUnique({
+            where: { id: widgetId },
+            include: { owner: true, widget_type: true },
+        });
+        const availability = widget?.widget_type?.availability;
+        return widget?.enabled === true && (availability === "active" || (availability === "whitelist_only" && widget.owner.is_whitelisted));
+    }
+
+    async authorizeAvailability(userId: string, widgetId: string, transactionId?: string): Promise<void> {
+        if (!await this.isAvailable(userId, widgetId, transactionId)) {
+            throw new ForbiddenError("Widget type is unavailable for this streamer");
+        }
+    }
+
+    async authorizeWidgetType(userId: string, slug: string, transactionId?: string): Promise<void> {
+        const [user, widgetType] = await Promise.all([
+            this.userRepository.get(userId, transactionId),
+            prisma.widgetType.findUnique({ where: { slug } }),
+        ]);
+        if (!widgetType || !user || (widgetType.availability !== "active" && !(widgetType.availability === "whitelist_only" && user.is_whitelisted))) {
+            throw new ForbiddenError("Widget type is unavailable for this streamer");
         }
     }
 
@@ -85,7 +120,10 @@ export default class WidgetService {
             throw new NotFoundError("Widget not found");
         }
         await this.authorizeOwnership(userId, existing.id, transactionId);
-        const res = await this.widgetRepository.update(id, request, transactionId);
+        if (request.enabled !== undefined) await this.updateEnable(id, userId, request.enabled, transactionId);
+        const res = request.overlay_key !== undefined
+            ? await this.widgetRepository.update(id, { overlay_key: request.overlay_key }, transactionId)
+            : undefined;
         await redis.del(`widget:${id}`)
         await redis.del(`widget:total:owner:${userId}`)
         return res
@@ -97,6 +135,7 @@ export default class WidgetService {
         logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
         await this.authorizeOwnership(userId, id, transactionId);
+        if (value) await this.authorizeAvailability(userId, id, transactionId);
         const user = await this.userService.get(userId, transactionId);
         const quota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER] + user.extra_widget_quota;
         await this.widgetRepository.updateEnabledWithinQuota(id, userId, value, quota, transactionId);
@@ -113,7 +152,7 @@ export default class WidgetService {
         const baseQuota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER];
         const quota = baseQuota + user.extra_widget_quota;
         const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id], transactionId);
-        const isEnabled = usedQuota + cost <= quota;
+        const isEnabled = usedQuota + cost <= quota && await this.isAvailable(userId, id, transactionId);
         logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
         await this.update(id, userId, { enabled: isEnabled }, transactionId);
     }
@@ -146,7 +185,7 @@ export default class WidgetService {
             }
 
             logger.info({ message: "Validating overlay access", data: { widget, key } });
-            return widget.overlay_key === key;
+            return widget.enabled && widget.overlay_key === key && await this.isAvailable(userId, widget.id, transactionId);
         } catch (error) {
             logger.error({ message: "Failed to validate overlay access", error: error as Error, data: { userId } });
             return false;

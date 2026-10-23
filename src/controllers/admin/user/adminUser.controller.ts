@@ -25,7 +25,7 @@ export default class AdminUserController {
 
     try {
       const query = listAdminUserSchema.parse(req.query);
-      const result = await this.adminUserService.list({ page: query.page, limit: query.limit }, query.search, query.tier, query.is_showcase, req.id);
+      const result = await this.adminUserService.list({ page: query.page, limit: query.limit }, query.search, query.tier, query.is_showcase, req.id, query.is_whitelisted);
       res.send(result);
     } catch (error) {
       if (error instanceof z.ZodError) {

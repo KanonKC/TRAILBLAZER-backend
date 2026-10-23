@@ -82,7 +82,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
       deletePool: jest.fn(),
       log: jest.fn(),
     } as unknown as jest.Mocked<RandomPoolRepository>;
-    widgets = { updateEnable: jest.fn() } as unknown as jest.Mocked<WidgetService>;
+    widgets = { updateEnable: jest.fn(), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
     queue = {
       register: jest.fn((slug, registered) => {
         handler = registered;

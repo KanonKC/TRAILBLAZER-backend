@@ -11,7 +11,7 @@ export default class EventSubReconcilerRepository {
     async listEnabledWidgets(transactionId?: string): Promise<EnabledWidgetEventSource[]> {
         try {
             return await prisma.widget.findMany({
-                where: { enabled: true, widget_type: { is_active: true } },
+                where: { enabled: true, OR: [{ widget_type: { availability: "active" } }, { widget_type: { availability: "whitelist_only" }, owner: { is_whitelisted: true } }] },
                 select: { twitch_id: true, widget_type_slug: true },
             });
         } catch (error) {

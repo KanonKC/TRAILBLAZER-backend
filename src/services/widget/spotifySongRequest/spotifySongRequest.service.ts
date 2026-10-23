@@ -63,6 +63,7 @@ export default class SpotifySongRequestService {
             throw new NotFoundError("User not found");
         }
 
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.SPOTIFY_SONG_REQUEST, transactionId);
         await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.SPOTIFY_SONG_REQUEST]));
 
         const res = await this.spotifyRepository.create({
@@ -220,7 +221,7 @@ export default class SpotifySongRequestService {
             return;
         }
 
-        if (!config.widget.enabled) {
+        if (!config.widget.enabled || !await this.widgetService.isEnabledAndAvailable(config.widget_id, transactionId)) {
             this.logger.warn({ message: "Widget is disabled", data: { twitchId: e.broadcaster_user_id } });
             return;
         }

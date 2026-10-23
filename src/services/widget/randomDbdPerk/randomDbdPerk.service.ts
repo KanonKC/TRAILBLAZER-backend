@@ -48,6 +48,7 @@ export default class RandomDbdPerkService {
             throw new NotFoundError("User not found");
         }
 
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.RANDOM_DBD_PERK, transactionId);
         await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.RANDOM_DBD_PERK]));
 
         const res = await this.randomDbdPerkRepository.create(request, transactionId)
@@ -127,6 +128,7 @@ export default class RandomDbdPerkService {
             logger.warn({ message: "Random Dbd Perk widget not found", data: { twitchId: event.broadcaster_user_id } });
             return;
         }
+        if (!config.widget.enabled || !await this.widgetService.isAvailable(config.widget.owner_id, config.widget_id, transactionId)) return;
         const randomClass = await this.randomDbdPerkRepository.getClassByRewardId(rewardId, transactionId)
 
         if (!randomClass) {
@@ -204,7 +206,7 @@ export default class RandomDbdPerkService {
 
         if (!widget) return false;
 
-        return widget.widget.overlay_key === key;
+        return widget.widget.overlay_key === key && await this.widgetService.validateOverlayAccess(userId, key, transactionId);
     }
 
 

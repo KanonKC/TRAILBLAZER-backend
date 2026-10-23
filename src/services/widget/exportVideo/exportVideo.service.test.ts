@@ -60,6 +60,8 @@ describe("ExportVideoService", () => {
         } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
+            authorizeWidgetType: jest.fn(),
+            isEnabledAndAvailable: jest.fn().mockResolvedValue(true),
             authorizeOwnership: jest.fn(),
             delete: jest.fn(),
         } as any;

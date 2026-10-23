@@ -306,6 +306,14 @@ describe("OverlayQueueService", () => {
         expect(publishedNames()).toEqual(["kept"])
     })
 
+    it("drops a queued job after the widget becomes unavailable", async () => {
+        queue.setWidgetService({ isEnabledAndAvailable: jest.fn().mockResolvedValue(false) } as never)
+        await enqueueGreeting("blocked", { widgetId: "widget_1" })
+        await flush()
+        expect(publishedNames()).toEqual([])
+        expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled()
+    })
+
     it("still waits out the gap when a sweeper pumps the moment the lock frees", async () => {
         await enqueueGreeting("first")
         await flush()

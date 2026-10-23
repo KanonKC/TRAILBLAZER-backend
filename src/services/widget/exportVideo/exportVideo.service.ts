@@ -43,6 +43,7 @@ export default class ExportVideoService {
         logger = this.logger.setContext("service.exportVideo.create", transactionId);
         const user = await this.userService.get(userId, transactionId);
 
+        await this.widgetService.authorizeWidgetType(userId, WidgetTypeSlug.EXPORT_VIDEO, transactionId);
         await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.EXPORT_VIDEO]));
 
         const config = await this.exportVideoRepository.create({
@@ -155,7 +156,7 @@ export default class ExportVideoService {
             throw new NotFoundError("Export video config not found");
         }
 
-        if (!config.widget.enabled) {
+        if (!config.widget.enabled || !await this.widgetService.isEnabledAndAvailable(config.widget_id, transactionId)) {
             return
         }
 

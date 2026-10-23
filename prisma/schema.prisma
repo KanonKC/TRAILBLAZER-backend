@@ -21,6 +21,7 @@ model User {
   max_storage_mb      Int             @default(5)
   extra_widget_quota  Int             @default(0)
   is_showcase         Boolean         @default(false)
+  is_whitelisted      Boolean         @default(false)
   canvas_overlay_key  String?         @unique
   consent_accepted_at DateTime?
   consent_version     String?
@@ -91,7 +92,7 @@ model UploadedFile {
 model Widget {
   id                 String              @id @default(uuid())
   twitch_id          String
-  enabled            Boolean             @default(true)
+  enabled            Boolean             @default(false)
   overlay_key        String?             @unique
   owner_id           String
   owner              User                @relation(fields: [owner_id], references: [id])
@@ -145,6 +146,7 @@ model WidgetType {
   href         String?
   is_active    Boolean  @default(true)
   is_display   Boolean  @default(true)
+  availability String   @default("active")
   widgets      Widget[]
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt

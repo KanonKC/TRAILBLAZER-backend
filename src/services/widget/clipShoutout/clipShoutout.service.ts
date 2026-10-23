@@ -74,6 +74,7 @@ export default class ClipShoutoutService {
             throw new NotFoundError("User not found");
         }
 
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.CLIP_SHOUTOUT, transactionId);
         await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.CLIP_SHOUTOUT]));
 
         const res = await this.clipShoutoutRepository.create({
@@ -112,7 +113,7 @@ export default class ClipShoutoutService {
             csConfig = await this.clipShoutoutRepository.getByTwitchId(event.broadcaster_user_id, transactionId)
         }
         logger.info({ message: "csConfig", data: csConfig });
-        if (!csConfig || !csConfig.widget.enabled) {
+        if (!csConfig || !csConfig.widget.enabled || !await this.widgetService.isEnabledAndAvailable(csConfig.widget_id, transactionId)) {
             return
         }
 
@@ -324,6 +325,6 @@ export default class ClipShoutoutService {
         logger.debug({ message: "Validating overlay access", data: { configFound: !!config } });
 
         if (!config) return false;
-        return config.widget.overlay_key === key;
+        return config.widget.overlay_key === key && await this.widgetService.validateOverlayAccess(userId, key, transactionId);
     }
 }

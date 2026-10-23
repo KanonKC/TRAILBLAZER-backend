@@ -79,6 +79,7 @@ export default class UserController {
             const user = await this.userService.get(decoded.id, req.id);
             info.tier = await this.userService.getTier(user.id, undefined, req.id);
             info.extraWidgetQuota = user.extra_widget_quota;
+            info.is_whitelisted = user.is_whitelisted;
             info.hasTwitchGqlToken = await this.userService.hasTwitchGqlToken(user.id, req.id);
             logger.info({ message: "Successfully retrieved user info", data: info });
             res.send(info);
