@@ -355,7 +355,7 @@ export default class UserService {
             await this.update(userId, {
                 tier: tier,
                 tier_expire_at: tier === 0 ? null : tierExpireDate
-            }, transactionId)
+            }, undefined, transactionId)
 
             const quotaInfo = await this.widgetService.getQuota(userId, transactionId)
             logger.info({ message: "Adjusting tier and widgets", data: { userId, tier, quotaInfo } });
