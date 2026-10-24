@@ -1,9 +1,11 @@
 pipeline {
     parameters {
         choice(name: 'Environment', choices: ['prod', 'dev'], description: 'Deploy in development environment')
-        string(name: 'Version', defaultValue: '', description: 'Version to deploy')
-        booleanParam(name: 'BuildApp', defaultValue: false, description: 'Rebuild the application container')
-        booleanParam(name: 'MigrateDB', defaultValue: false, description: 'Run Prisma migrations')
+        booleanParam(name: 'BuildApp', defaultValue: true, description: 'Rebuild the application container')
+        booleanParam(name: 'MigrateDB', defaultValue: true, description: 'Run Prisma migrations')
+    }
+    triggers {
+        githubPush()
     }
     tools {
         git "Default"
@@ -19,24 +21,21 @@ pipeline {
             steps {
                 script {
                     if (params.Environment == 'prod') {
-                        if (params.Version) {
-                            echo "🏷️ Checking out tag: ${params.Version}"
-                            checkout([
-                                $class: 'GitSCM', 
-                                branches: [[name: "refs/tags/${params.Version}"]], 
-                                userRemoteConfigs: scm.userRemoteConfigs
-                            ])
-                        } else {
-                            echo "🚨 Missing version"
-                            error "Missing version"
-                        }
-                    } else if (params.Environment == 'dev') {
-                        echo "🏷️ Checking out branch: develop"
-                        checkout([
-                            $class: 'GitSCM', 
-                            branches: [[name: '*/develop']], 
+                        echo "🏷️ Checking out branch: main"
+                        def scmVars = checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: '*/main']],
                             userRemoteConfigs: scm.userRemoteConfigs
                         ])
+                        env.BUILD_VERSION = scmVars.GIT_COMMIT.take(7)
+                    } else if (params.Environment == 'dev') {
+                        echo "🏷️ Checking out branch: develop"
+                        def scmVars = checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: '*/develop']],
+                            userRemoteConfigs: scm.userRemoteConfigs
+                        ])
+                        env.BUILD_VERSION = scmVars.GIT_COMMIT.take(7)
                     } else {
                         echo "🚨 Invalid environment: ${params.Environment}"
                         error "Invalid environment: ${params.Environment}"
@@ -55,7 +54,7 @@ pipeline {
                 script {
                     def buildOption = params.BuildApp ? "--build" : ""
                     echo "🐳 Starting Docker container (Build: ${params.BuildApp})..."
-                    sh "BUILD_VERSION=${params.Version} docker compose up -d ${buildOption} || docker-compose up -d ${buildOption}"
+                    sh "BUILD_VERSION=${env.BUILD_VERSION} docker compose up -d ${buildOption} || docker-compose up -d ${buildOption}"
                 }
             }
         }
