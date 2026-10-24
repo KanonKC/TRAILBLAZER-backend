@@ -2,6 +2,8 @@ import "dotenv/config";
 import server, { overlayQueueService } from "@/routes";
 import { connectRedis } from "@/libs/redis";
 import TLogger, { Layer } from "@/logging/logger";
+import config from "@/config";
+import { maskConfig } from "@/utils/maskConfig";
 
 const logger = new TLogger(Layer.OTHER, "index.main");
 
@@ -13,7 +15,9 @@ async function main() {
       logger.error({ message: "Server failed to start", error: err });
       process.exit(1);
     }
+    console.log(`Server listening at ${address}`)
     logger.info({ message: `Server listening at ${address}` });
+    console.log("Config:", JSON.stringify(maskConfig(config), null, 4));
   });
 }
 
