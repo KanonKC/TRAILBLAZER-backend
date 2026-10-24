@@ -33,7 +33,7 @@ export default class AdminController {
 
             const updateData = req.body;
 
-            const updatedUser = await this.userService.update(id, updateData, req.id);
+            const updatedUser = await this.userService.update(id, updateData, undefined, req.id);
 
             logger.info({ message: "User updated successfully", data: { userId: id, adminId: admin.id } });
             res.send(updatedUser);
