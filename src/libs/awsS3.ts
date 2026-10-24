@@ -11,13 +11,14 @@ const s3Client = new S3Client({
     forcePathStyle: true
 });
 
-async function uploadFile(buffer: Buffer, key: string, contentType: string, bucket?: string): Promise<string> {
+async function uploadFile(buffer: Buffer, key: string, contentType: string, bucket?: string, cacheControl?: string): Promise<string> {
     await s3Client.send(
         new PutObjectCommand({
             Bucket: bucket || process.env.S3_BUCKET_NAME!,
             Key: key,
             Body: buffer,
-            ContentType: contentType
+            ContentType: contentType,
+            ...(cacheControl && { CacheControl: cacheControl })
         })
     );
 

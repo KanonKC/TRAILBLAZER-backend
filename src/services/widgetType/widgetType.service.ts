@@ -94,7 +94,9 @@ export default class WidgetTypeService {
         const key = `${WIDGET_ICONS_PREFIX}${filename}`;
         // Icons must land in the CDN's own bucket (cdnBucketName) — the default
         // S3_BUCKET_NAME is a separate, non-public bucket used for user uploads.
-        await s3.uploadFile(file.buffer, key, file.mimetype, this.cfg.cdnBucketName);
+        // Filenames are reused on re-upload, so force revalidation (ETag) or the
+        // CDN/browser keeps serving the previous image under the same URL.
+        await s3.uploadFile(file.buffer, key, file.mimetype, this.cfg.cdnBucketName, "no-cache");
         logger.info({ message: "Widget icon uploaded", data: { key, bucket: this.cfg.cdnBucketName } });
 
         return `${this.cfg.cdnOrigin}/${key}`;
