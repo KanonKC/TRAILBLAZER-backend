@@ -6,6 +6,7 @@ export interface CreateWidgetType {
     icon_url?: string | null;
     theme_color?: string | null;
     href?: string | null;
+    availability?: "hide" | "inactive" | "whitelist_only" | "active";
     is_active?: boolean;
     is_display?: boolean;
 }

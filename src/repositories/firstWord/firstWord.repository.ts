@@ -2,8 +2,8 @@ import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { FirstWord, FirstWordChatter, FirstWordCustomReply, FirstWordGreetCount } from "generated/prisma/client";
 import { AddChatter, CreateCustomReply, CreateFirstWord, UpdateCustomReply, UpdateFirstWord, ListCustomerReplyRequest } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
-import { FirstWordWidget } from "./response";
+import { WidgetTypeSlug } from "@/services/constant";
+import { CustomReplyWithAudio, FirstWordWidget } from "./response";
 import { Pagination } from "@/services/response";
 
 const logger = new TLogger(Layer.REPOSITORY);
@@ -64,7 +64,8 @@ export default class FirstWordRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.FIRST_WORD
                 }
@@ -91,7 +92,8 @@ export default class FirstWordRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.FIRST_WORD
                 }
@@ -229,15 +231,18 @@ export default class FirstWordRepository {
         }
     }
 
-    async getCustomReplyByTwitchId(firstWordId: string, twitchId: string, transactionId?: string): Promise<FirstWordCustomReply | null> {
+    async getCustomReplyByTwitchId(firstWordId: string, twitchId: string, transactionId?: string): Promise<CustomReplyWithAudio | null> {
         try {
+        // audio is included for its duration_ms, which the overlay queue uses to
+        // know how long this greeting occupies the overlay.
         return prisma.firstWordCustomReply.findUnique({
             where: {
                 twitch_chatter_id_first_word_id: {
                     first_word_id: firstWordId,
                     twitch_chatter_id: twitchId
                 }
-            }
+            },
+            include: { audio: true }
         });
     } catch (error) {
             logger.setContext("repository.firstWord.getCustomReplyByTwitchId", transactionId).error({ message: "getCustomReplyByTwitchId failed", error: error as Error });

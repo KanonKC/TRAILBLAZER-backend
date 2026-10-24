@@ -57,6 +57,23 @@ export default class WidgetTypeRepository {
         }
     }
 
+    async updateAndDisableUnavailable(id: number, request: UpdateWidgetType, transactionId?: string): Promise<{ widgetType: WidgetType; affectedWidgets: { id: string; owner_id: string }[] }> {
+        try {
+            return await prisma.$transaction(async transaction => {
+                const widgetType = await transaction.widgetType.update({ where: { id }, data: request });
+                const affectedWidgets = await transaction.widget.findMany({
+                    where: { widget_type_slug: widgetType.slug, enabled: true, ...(request.availability === "whitelist_only" ? { owner: { is_whitelisted: false } } : {}) },
+                    select: { id: true, owner_id: true },
+                });
+                await transaction.widget.updateMany({ where: { id: { in: affectedWidgets.map(widget => widget.id) } }, data: { enabled: false } });
+                return { widgetType, affectedWidgets };
+            });
+        } catch (error) {
+            logger.setContext("repository.widgetType.updateAndDisableUnavailable", transactionId).error({ message: "update failed", error: error as Error });
+            throw error;
+        }
+    }
+
     async delete(id: number, transactionId?: string): Promise<void> {
         try {
         await prisma.widgetType.delete({ where: { id } });

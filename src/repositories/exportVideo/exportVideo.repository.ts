@@ -1,7 +1,7 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateExportVideo, UpdateExportVideo, CreateExportVideoHistory } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { ExportVideoWithWidget, ExportVideoHistoryResponse } from "./response";
 import { Pagination } from "@/services/response";
 
@@ -119,7 +119,8 @@ export default class ExportVideoRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
                 }
@@ -145,7 +146,8 @@ export default class ExportVideoRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                twitch_id_widget_type_slug: {
+                twitch_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     twitch_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.EXPORT_VIDEO
                 }

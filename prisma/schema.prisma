@@ -21,6 +21,7 @@ model User {
   max_storage_mb      Int             @default(5)
   extra_widget_quota  Int             @default(0)
   is_showcase         Boolean         @default(false)
+  is_whitelisted      Boolean         @default(false)
   canvas_overlay_key  String?         @unique
   consent_accepted_at DateTime?
   consent_version     String?
@@ -36,6 +37,7 @@ model User {
   referred_by         Referral?       @relation("Referee")
   referral_code       ReferralCode?
   canvases            Canvas[]
+  random_pools        RandomPool[]
 }
 
 model Auth {
@@ -81,6 +83,7 @@ model UploadedFile {
   created_at                DateTime               @default(now())
   updated_at                DateTime               @updatedAt
   size_kb                   Int                    @default(0)
+  duration_ms               Int?
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
   canvas_elements           CanvasElement[]
@@ -89,7 +92,7 @@ model UploadedFile {
 model Widget {
   id                 String              @id @default(uuid())
   twitch_id          String
-  enabled            Boolean             @default(true)
+  enabled            Boolean             @default(false)
   overlay_key        String?             @unique
   owner_id           String
   owner              User                @relation(fields: [owner_id], references: [id])
@@ -107,22 +110,24 @@ model Widget {
   endCredit          EndCredit?
   randomDBDKiller    RandomDBDKiller?
   canvas_links       CanvasWidgetLink[]
+  instance_key       String              @default("")
+  random_pool_config RandomPoolConfig?
 
-  @@unique([twitch_id, widget_type_slug])
-  @@unique([owner_id, widget_type_slug])
+  @@unique([twitch_id, widget_type_slug, instance_key])
+  @@unique([owner_id, widget_type_slug, instance_key])
 }
 
 model AdminUser {
-  id            String     @id @default(uuid())
-  google_id     String?    @unique
-  email         String     @unique
+  id            String    @id @default(uuid())
+  google_id     String?   @unique
+  email         String    @unique
   name          String
   avatar_url    String?
-  role          AdminRole  @default(ADMIN)
-  is_active     Boolean    @default(true)
+  role          AdminRole @default(ADMIN)
+  is_active     Boolean   @default(true)
   last_login_at DateTime?
-  created_at    DateTime   @default(now())
-  updated_at    DateTime   @updatedAt
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
 }
 
 enum AdminRole {
@@ -141,6 +146,7 @@ model WidgetType {
   href         String?
   is_active    Boolean  @default(true)
   is_display   Boolean  @default(true)
+  availability String   @default("active")
   widgets      Widget[]
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
@@ -386,6 +392,7 @@ model RandomDBDKiller {
 model Canvas {
   id              String             @id @default(uuid())
   name            String
+  template_type   String             @default("image_audio") // "image_audio" | "video"
   enabled         Boolean            @default(true)
   duration_ms     Int                @default(5000)
   owner_id        String
@@ -444,6 +451,83 @@ model CanvasWidgetLink {
   widget     Widget   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
   created_at DateTime @default(now())
 
-  @@unique([canvas_id, widget_id])
-  @@index([widget_id])
+  // A widget plays at most one canvas; a canvas can serve many widgets.
+  @@unique([widget_id])
+  @@index([canvas_id])
+}
+
+// Pools only contain reusable content. All draw behaviour belongs to a config.
+model RandomPool {
+  id                String             @id @default(uuid())
+  owner_id          String
+  owner             User               @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  name              String
+  cover_key         String?
+  visibility        String             @default("PRIVATE")
+  moderation_status String             @default("VISIBLE")
+  deleted_at        DateTime?
+  items             RandomPoolItem[]
+  configs           RandomPoolConfig[]
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+
+  @@index([owner_id, deleted_at])
+}
+
+model RandomPoolItem {
+  id         String                 @id @default(uuid())
+  pool_id    String
+  pool       RandomPool             @relation(fields: [pool_id], references: [id], onDelete: Cascade)
+  name       String?
+  image_key  String?
+  sort_order Int                    @default(0)
+  settings   RandomPoolConfigItem[]
+
+  @@index([pool_id])
+}
+
+model RandomPoolConfig {
+  id                       String                 @id @default(uuid())
+  widget_id                String                 @unique
+  widget                   Widget                 @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  name                     String
+  pool_id                  String
+  pool                     RandomPool             @relation(fields: [pool_id], references: [id])
+  twitch_reward_id         String                 @unique
+  mode                     String                 @default("UNIFORM")
+  visualization            String                 @default("SHUFFLE")
+  default_chat_message     String?
+  spin_sound_key           String?
+  default_result_sound_key String?
+  items                    RandomPoolConfigItem[]
+  spin_logs                RandomPoolSpinLog[]
+  created_at               DateTime               @default(now())
+  updated_at               DateTime               @updatedAt
+
+  @@index([pool_id])
+}
+
+model RandomPoolConfigItem {
+  config_id        String
+  config           RandomPoolConfig @relation(fields: [config_id], references: [id], onDelete: Cascade)
+  item_id          String
+  item             RandomPoolItem   @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  weight           Float            @default(1)
+  chat_message     String?
+  result_sound_key String?
+
+  @@id([config_id, item_id])
+}
+
+model RandomPoolSpinLog {
+  id            String           @id @default(uuid())
+  config_id     String
+  config        RandomPoolConfig @relation(fields: [config_id], references: [id], onDelete: Cascade)
+  pool_id       String
+  redemption_id String           @unique
+  redeemed_by   String
+  item_snapshot Json
+  created_at    DateTime         @default(now())
+
+  @@index([config_id, created_at])
 }

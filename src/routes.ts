@@ -1,3 +1,7 @@
+import RandomPoolUploadService from "./services/randomPool/randomPoolUpload.service";
+import RandomPoolRepository from "./repositories/randomPool/randomPool.repository";
+import RandomPoolService from "./services/randomPool/randomPool.service";
+import RandomPoolController from "./controllers/randomPool/randomPool.controller";
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import config from './config';
@@ -29,6 +33,8 @@ import { UploadedFileRepository } from './repositories/uploadedFile/uploadedFile
 import ReferralRepository from './repositories/referral/referral.repository';
 import ClipShoutoutService from './services/widget/clipShoutout/clipShoutout.service';
 import FirstWordService from './services/widget/firstWord/firstWord.service';
+import OverlayQueueService from './services/overlayQueue/overlayQueue.service';
+import OverlayQueueController from './controllers/overlayQueue/overlayQueue.controller';
 import RandomDbdPerkService from './services/widget/randomDbdPerk/randomDbdPerk.service';
 import RandomDBDKillerService from './services/widget/randomDBDKiller/randomDBDKiller.service';
 import UserService from './services/user/user.service';
@@ -77,6 +83,8 @@ import LinkedAccountService from './services/linkedAccount/linkedAccount.service
 import { AuthMiddleware, AdminAuthMiddleware } from './controllers/middleware';
 import { Google, Discord, Spotify } from 'arctic';
 import TbCron from './cron';
+import EventSubReconcilerRepository from "./repositories/eventSubReconciler/eventSubReconciler.repository";
+import EventSubReconcilerService from "./services/twitch/eventSubReconciler/eventSubReconciler.service";
 import AdminAuthRepository from './repositories/adminAuth/adminAuth.repository';
 import AdminAuthService from './services/admin/auth/adminAuth.service';
 import AdminAuthController from './controllers/admin/auth/adminAuth.controller';
@@ -122,6 +130,7 @@ const randomDBDKillerRepository = new RandomDBDKillerRepository();
 const dbdKillerMasterRepository = new DBDKillerMasterRepository();
 const widgetTypeRepository = new WidgetTypeRepository();
 const widgetRepository = new WidgetRepository();
+const eventSubReconcilerRepository = new EventSubReconcilerRepository();
 const uploadedFileRepository = new UploadedFileRepository();
 const linkedAccountRepository = new LinkedAccountRepository();
 const exportVideoRepository = new ExportVideoRepository();
@@ -130,17 +139,22 @@ const adminAuthRepository = new AdminAuthRepository();
 
 // Service Layer
 const systemService = new SystemService();
+// Paces overlay events so a burst of viewers cannot cut each other off.
+const overlayQueueService = new OverlayQueueService();
 const authService = new AuthService(config, authRepository, userRepository);
 const userService = new UserService(config, userRepository, authRepository, authService);
 const referralService = new ReferralService(referralRepository, userService);
 userService.setReferralService(referralService);
 const widgetService = new WidgetService(widgetRepository, userService, userRepository);
 userService.setWidgetService(widgetService);
+overlayQueueService.setWidgetService(widgetService);
+overlayQueueService.setAuthService(authService);
 const firstWordService = new FirstWordService(
   config,
   firstWordRepository,
   userRepository,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 
 const clipShoutoutService = new ClipShoutoutService(
@@ -149,19 +163,22 @@ const clipShoutoutService = new ClipShoutoutService(
   userRepository,
   authService,
   twitchGql,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const dropImageService = new DropImageService(
   dropImageRepository,
   userRepository,
   sightengine,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const endCreditService = new EndCreditService(
   endCreditRepository,
   userRepository,
   widgetService,
-  authService
+  authService,
+  overlayQueueService
 );
 
 const randomDbdPerkService = new RandomDbdPerkService(
@@ -173,7 +190,8 @@ const randomDBDKillerService = new RandomDBDKillerService(
   randomDBDKillerRepository,
   dbdKillerMasterRepository,
   userRepository,
-  widgetService
+  widgetService,
+  overlayQueueService
 );
 const uploadedFileService = new UploadedFileService(config, uploadedFileRepository, userService);
 const twitchService = new TwitchService(authService);
@@ -228,6 +246,8 @@ const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
 const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
+const randomPoolService = new RandomPoolService(new RandomPoolRepository(), widgetService, overlayQueueService, twitchService);
+const randomPoolController = new RandomPoolController(randomPoolService, new RandomPoolUploadService(uploadedFileService));
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
@@ -237,6 +257,7 @@ const widgetTypeController = new WidgetTypeController(
   adminAuthMiddleware
 );
 const widgetController = new WidgetController(widgetService);
+const overlayQueueController = new OverlayQueueController(overlayQueueService, widgetService);
 const uploadedFileController = new UploadedFileController(uploadedFileService);
 const twitchController = new TwitchController(twitchService);
 const linkedAccountController = new LinkedAccountController(linkedAccountService, authMiddleware);
@@ -258,7 +279,8 @@ const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEven
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(
   randomDbdPerkService,
   dropImageService,
-  randomDBDKillerService
+  randomDBDKillerService,
+  randomPoolService
 );
 const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
 const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
@@ -266,7 +288,8 @@ const twitchChannelRaidEvent = new TwitchChannelRaidEvent(endCreditService);
 const twitchChannelBitsUseEvent = new TwitchChannelBitsUseEvent(endCreditService);
 
 // Cron
-const tbCron = new TbCron(userService, linkedAccountService);
+const eventSubReconcilerService = new EventSubReconcilerService(eventSubReconcilerRepository, firstWordService, endCreditService);
+const tbCron = new TbCron(userService, linkedAccountService, eventSubReconcilerService);
 
 // genReqId is a UUID (not fastify's default incrementing counter) so it can
 // be safely used as the transaction_id threaded through every log line for
@@ -351,6 +374,12 @@ server.post(
   authController.syncTwitchGqlToken.bind(authController)
 );
 server.post('/api/v1/refresh-token', userController.refresh.bind(userController));
+
+// Overlays report here when the item they were showing actually finished.
+server.post(
+  '/api/v1/overlay-queue/:userId/:slug/ack',
+  overlayQueueController.ack.bind(overlayQueueController)
+);
 
 server.post('/api/v1/first-word', firstWordController.create.bind(firstWordController));
 server.get('/api/v1/first-word', firstWordController.get.bind(firstWordController));
@@ -615,5 +644,8 @@ server.post(
 );
 
 tbCron.run();
+randomPoolController.register(server);
+overlayQueueService.start();
 
+export { overlayQueueService };
 export default server;

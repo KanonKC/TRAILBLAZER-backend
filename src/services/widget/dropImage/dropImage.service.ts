@@ -1,4 +1,5 @@
 import DropImageRepository from "@/repositories/dropImage/dropImage.repository";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import TLogger, { Layer } from "@/logging/logger";
 import { CreateDropImageServiceRequest, UpdateDropImageServiceRequest } from "./request";
 import UserRepository from "@/repositories/user/user.repository";
@@ -8,11 +9,18 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DropImageWidget } from "@/repositories/dropImage/response";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { publisher } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import axios from "axios";
 import Sightengine from "@/providers/sightengine";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { WidgetTypeSlug } from "@/services/constant";
+
+/** What a queued image drop carries until it is dispatched. */
+interface DropImageJobPayload {
+    url: string
+}
 
 export default class DropImageService {
     private readonly logger: TLogger;
@@ -21,9 +29,24 @@ export default class DropImageService {
         private readonly dropImageRepository: DropImageRepository,
         private readonly userRepository: UserRepository,
         private readonly sightengine: Sightengine,
-        private readonly widgetService: WidgetService
+        private readonly widgetService: WidgetService,
+        private readonly overlayQueue: OverlayQueueService
     ) {
         this.logger = new TLogger(Layer.SERVICE);
+        this.registerOverlayHandler();
+    }
+
+    /**
+     * The display duration is the streamer's own setting, and it travels with
+     * the event so the overlay and the queue agree on when this image is done.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<DropImageJobPayload>(WidgetTypeSlug.DROP_IMAGE, {
+            channel: "drop-image:image-url",
+            event: "image-url",
+            resolve: async (job) => ({ url: job.payload.url }),
+            estimateDurationMs: (job) => job.durationMs ?? 5_000,
+        })
     }
 
     async getByUserId(userId: string, transactionId?: string): Promise<DropImageWidget> {
@@ -54,6 +77,7 @@ export default class DropImageService {
                 throw new NotFoundError("User not found");
             }
 
+            await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.DROP_IMAGE, transactionId);
             const existing = await this.dropImageRepository.getByOwnerId(user.id, transactionId).catch(() => null);
             if (existing) {
                 logger.warn({ message: "Drop image config already exists", data: request });
@@ -145,15 +169,7 @@ export default class DropImageService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.dropImage.subscribeToRedemptionEvents", transactionId);
         try {
-            const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
-            const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled');
-
-            const channelRewardRedemptionSub = enabledSubs.filter(sub => sub.type === 'channel.channel_points_custom_reward_redemption.add');
-            if (channelRewardRedemptionSub.length === 0) {
-                const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add");
-                await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(twitchId, tsp);
-                logger.info({ message: "Subscribed to channel redemption add events", data: { userId, twitchId } });
-            }
+            await EventSubReconcilerService.ensureEventSubs(twitchId, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.DROP_IMAGE]));
         } catch (error) {
             logger.error({ message: "Failed to subscribe to redemption events", error: error as Error, data: { userId, twitchId } });
         }
@@ -175,6 +191,7 @@ export default class DropImageService {
             logger.warn({ message: "Drop image config not found", data: { event } });
             return;
         }
+        if (!config.widget.enabled || !await this.widgetService.isAvailable(config.widget.owner_id, config.widget_id, transactionId)) return;
 
         logger.info({ message: "Drop image config found", data: { config } });
 
@@ -250,11 +267,16 @@ export default class DropImageService {
             }
         }
 
-        logger.info({ message: "All check passed, triggering DropImage", data: { url, userId: config.widget.owner_id } });
-        await publisher.publish(`drop-image:image-url`, JSON.stringify({
-            url: url,
+        logger.info({ message: "All check passed, queueing DropImage", data: { url, userId: config.widget.owner_id } });
+        // Queued so a second redemption cannot replace an image that is still up.
+        await this.overlayQueue.enqueue<DropImageJobPayload>({
             userId: config.widget.owner_id,
-        }));
-        this.widgetService.increaseTriggeredCount(config.widget_id, transactionId)
+            widgetSlug: WidgetTypeSlug.DROP_IMAGE,
+            widgetId: config.widget_id,
+            payload: { url },
+            durationMs: (config.display_duration ?? 5) * 1000,
+            awaitsAck: true,
+            transactionId,
+        })
     }
 }

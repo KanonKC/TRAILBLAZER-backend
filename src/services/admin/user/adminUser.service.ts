@@ -23,13 +23,13 @@ export default class AdminUserService {
     this.logger = new TLogger(Layer.SERVICE);
   }
 
-  async list(pagination: Pagination, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string): Promise<ListResponse<User & { widget_count: number }>> {
+  async list(pagination: Pagination, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string, isWhitelisted?: boolean): Promise<ListResponse<User & { widget_count: number }>> {
         let logger: TLogger = this.logger;
     logger = this.logger.setContext('service.adminUser.list', transactionId);
     const skip = (pagination.page - 1) * pagination.limit;
     const [users, total] = await Promise.all([
-      this.userRepository.findMany(skip, pagination.limit, search, tier, isShowcase, transactionId),
-      this.userRepository.count(search, tier, isShowcase, transactionId),
+      this.userRepository.findMany(skip, pagination.limit, search, tier, isShowcase, transactionId, isWhitelisted),
+      this.userRepository.count(search, tier, isShowcase, transactionId, isWhitelisted),
     ]);
     const data = users.map(({ _count, ...user }) => ({ ...user, widget_count: _count.widgets }));
     return { data, pagination: { ...pagination, total } };

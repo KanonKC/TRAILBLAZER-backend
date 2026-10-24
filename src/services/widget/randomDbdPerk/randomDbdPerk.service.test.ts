@@ -55,6 +55,9 @@ describe("RandomDbdPerkService", () => {
         } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
+            authorizeWidgetType: jest.fn(),
+            isAvailable: jest.fn().mockResolvedValue(true),
+            validateOverlayAccess: jest.fn().mockResolvedValue(true),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
             updateOverlayKey: jest.fn(),
@@ -85,7 +88,7 @@ describe("RandomDbdPerkService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
             mockRandomDbdPerkRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
-            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             const result = await service.create(request, transactionId);
 
@@ -105,7 +108,7 @@ describe("RandomDbdPerkService", () => {
                 data: [{ type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' }] 
             });
             mockRandomDbdPerkRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
-            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             await service.create(request, transactionId);
 
@@ -115,7 +118,7 @@ describe("RandomDbdPerkService", () => {
 
     describe("update", () => {
         it("should update successfully and cap random size", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
             mockRandomDbdPerkRepo.findById.mockResolvedValue(mockExisting as any);
             mockRandomDbdPerkRepo.update.mockResolvedValue(mockExisting as any);
 
@@ -141,7 +144,7 @@ describe("RandomDbdPerkService", () => {
 
     describe("delete", () => {
         it("should delete successfully", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1", twitch_id: "twitch_1" } };
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             await service.delete("user_1", transactionId);
@@ -158,7 +161,7 @@ describe("RandomDbdPerkService", () => {
 
     describe("getByUserId", () => {
         it("should return config successfully", async () => {
-            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
             const result = await service.getByUserId("user_1", transactionId);
             expect(result).toBeDefined();
         });
@@ -176,7 +179,7 @@ describe("RandomDbdPerkService", () => {
         } as any;
 
         beforeEach(() => {
-            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue({ id: "rw_1", widget_id: "widget_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByTwitchId.mockResolvedValue({ id: "rw_1", widget_id: "widget_1", widget: { enabled: true, id: "widget_1" } } as any);
         });
 
         it("should return early if widget not found", async () => {
@@ -230,20 +233,20 @@ describe("RandomDbdPerkService", () => {
 
     describe("validateOverlayAccess", () => {
         it("should return true if keys match (cache)", async () => {
-            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { overlay_key: "key_1" } }));
+            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { enabled: true, overlay_key: "key_1" } }));
             const result = await service.validateOverlayAccess("user_1", "key_1", transactionId);
             expect(result).toBe(true);
         });
 
         it("should return false if keys mismatch", async () => {
-            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { overlay_key: "key_1" } }));
+            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ widget: { enabled: true, overlay_key: "key_1" } }));
             const result = await service.validateOverlayAccess("user_1", "key_2", transactionId);
             expect(result).toBe(false);
         });
 
         it("should fetch from repository if not in cache", async () => {
             (redis.get as jest.Mock).mockResolvedValue(null);
-            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ widget: { overlay_key: "key_1" } } as any);
+            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ widget: { enabled: true, overlay_key: "key_1" } } as any);
             const result = await service.validateOverlayAccess("user_1", "key_1", transactionId);
             expect(result).toBe(true);
             expect(redis.set).toHaveBeenCalled();
@@ -259,7 +262,7 @@ describe("RandomDbdPerkService", () => {
 
     describe("refreshKey", () => {
         it("should refresh key successfully", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1" } };
             mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             const result = await service.refreshKey("user_1", transactionId);
@@ -277,7 +280,7 @@ describe("RandomDbdPerkService", () => {
 
     describe("trigger", () => {
         it("should trigger successfully", async () => {
-            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRandomDbdPerkRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
             await service.trigger("user_1", transactionId);
         });
     });

@@ -1,7 +1,7 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
 import { CreateRandomDbdPerk, RandomDbdPerkClassType, UpdateRandomDbdPerk } from "./request";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { RandomDbdPerkWidget } from "./response";
 import { RandomDbdPerkClass } from "generated/prisma/client";
 
@@ -130,7 +130,8 @@ export default class RandomDbdPerkRepository {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
-                    owner_id_widget_type_slug: {
+                    owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                         owner_id: ownerId,
                         widget_type_slug: WidgetTypeSlug.RANDOM_DBD_PERK
                     }
@@ -164,7 +165,8 @@ export default class RandomDbdPerkRepository {
         try {
             const widget = await prisma.widget.findUnique({
                 where: {
-                    twitch_id_widget_type_slug: {
+                    twitch_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                         twitch_id: twitchId,
                         widget_type_slug: WidgetTypeSlug.RANDOM_DBD_PERK
                     }

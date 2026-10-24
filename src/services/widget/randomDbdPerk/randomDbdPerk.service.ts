@@ -1,8 +1,10 @@
+import { WidgetTypeSlug } from "@/services/constant";
 import config from "@/config";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { NotFoundError } from "@/errors";
 import { TwitchChannelRedemptionAddEventRequest } from "@/events/twitch/channelRedemptionAdd/request";
 import redis, { TTL } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import RandomDbdPerkRepository from "@/repositories/randomDbdPerk/randomDbdPerk.repository";
 import { CreateRandomDbdPerk, RandomDbdPerkClassType, UpdateRandomDbdPerk } from "@/repositories/randomDbdPerk/request";
@@ -46,15 +48,8 @@ export default class RandomDbdPerkService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const channelRewardRedemptionSub = enabledSubs.filter(sub => sub.type === 'channel.channel_points_custom_reward_redemption.add')
-        if (channelRewardRedemptionSub.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-redemption-add")
-            await twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(user.twitch_id, tsp)
-            logger.info({ message: "Subscribed to channel redemption add events", data: { userId: user.id, twitchId: user.twitch_id } });
-        }
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.RANDOM_DBD_PERK, transactionId);
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.RANDOM_DBD_PERK]));
 
         const res = await this.randomDbdPerkRepository.create(request, transactionId)
         await this.widgetService.setInitialEnabled(res.widget_id, user.id, transactionId);
@@ -133,6 +128,7 @@ export default class RandomDbdPerkService {
             logger.warn({ message: "Random Dbd Perk widget not found", data: { twitchId: event.broadcaster_user_id } });
             return;
         }
+        if (!config.widget.enabled || !await this.widgetService.isAvailable(config.widget.owner_id, config.widget_id, transactionId)) return;
         const randomClass = await this.randomDbdPerkRepository.getClassByRewardId(rewardId, transactionId)
 
         if (!randomClass) {
@@ -159,6 +155,11 @@ export default class RandomDbdPerkService {
         const message = `Random ${capitalize(randomClass.type)} Perks [${randomPerkMessage} ]`
 
         const senderId = event.broadcaster_user_id
+        // TODO(overlay-queue): this widget has no working overlay yet — no SSE
+        // route, nothing published — so a chat message is all it produces and
+        // there is nothing for events to cut each other off over. If an overlay
+        // is added, route this through overlayQueue.enqueue() like the other
+        // widgets so the chat line and the overlay stay together.
         try {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
@@ -205,7 +206,7 @@ export default class RandomDbdPerkService {
 
         if (!widget) return false;
 
-        return widget.widget.overlay_key === key;
+        return widget.widget.overlay_key === key && await this.widgetService.validateOverlayAccess(userId, key, transactionId);
     }
 
 

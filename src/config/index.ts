@@ -15,6 +15,12 @@ export default interface Configurations {
         redirectUrl: string;
         defaultBotId: string;
         paymentChannelId: string;
+        eventSubHealthCheck: {
+            enabled: boolean;
+            cron: string;
+            liveLookbackMs: number;
+            deleteEnabled: boolean;
+        };
     }
     twitchGql: {
         clientId: string;

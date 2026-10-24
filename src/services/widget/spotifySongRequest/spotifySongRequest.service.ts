@@ -1,4 +1,6 @@
+import { WidgetTypeSlug } from "@/services/constant";
 import TLogger, { Layer } from "@/logging/logger";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import Spotify from "@/providers/spotify";
 import SpotifySongRequestRepository from "@/repositories/spotifySongRequest/spotifySongRequest.repository";
 import { SpotifySongRequestWidget } from "@/repositories/spotifySongRequest/response";
@@ -8,7 +10,7 @@ import WidgetService from "@/services/widget/widget.service";
 import { ForbiddenError, NotFoundError } from "@/errors";
 import { randomBytes } from "node:crypto";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import AuthService from "@/services/auth/auth.service";
 import { HelixSendChatMessageAsAppParams } from "@twurple/api/lib/interfaces/endpoints/chat.input";
 import { mapMessageVariables } from "@/utils/message";
@@ -61,13 +63,8 @@ export default class SpotifySongRequestService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === "enabled");
-        const hasChatMessageSub = enabledSubs.some(sub => sub.type === "channel.chat.message");
-        if (!hasChatMessageSub) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-chat-message");
-            await twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents(user.twitch_id, tsp);
-        }
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.SPOTIFY_SONG_REQUEST, transactionId);
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.SPOTIFY_SONG_REQUEST]));
 
         const res = await this.spotifyRepository.create({
             twitch_id: request.twitch_id,
@@ -224,7 +221,7 @@ export default class SpotifySongRequestService {
             return;
         }
 
-        if (!config.widget.enabled) {
+        if (!config.widget.enabled || !await this.widgetService.isEnabledAndAvailable(config.widget_id, transactionId)) {
             this.logger.warn({ message: "Widget is disabled", data: { twitchId: e.broadcaster_user_id } });
             return;
         }

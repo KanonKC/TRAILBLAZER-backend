@@ -3,6 +3,7 @@ import DropImageRepository from "@/repositories/dropImage/dropImage.repository";
 import UserRepository from "@/repositories/user/user.repository";
 import Sightengine from "@/providers/sightengine";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import axios from "axios";
@@ -47,6 +48,7 @@ describe("DropImageService", () => {
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockSightengine: jest.Mocked<Sightengine>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockDropImageRepo = {
@@ -65,23 +67,31 @@ describe("DropImageService", () => {
         } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
+            authorizeWidgetType: jest.fn(),
+            isAvailable: jest.fn().mockResolvedValue(true),
             authorizeOwnership: jest.fn(),
             authorizeTierUsage: jest.fn(),
             increaseTriggeredCount: jest.fn(),
+        } as any;
+
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
         } as any;
 
         service = new DropImageService(
             mockDropImageRepo,
             mockUserRepo,
             mockSightengine,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue
         );
         jest.clearAllMocks();
     });
 
     describe("getByUserId", () => {
         it("should return config successfully", async () => {
-            const mockConfig = { id: "di_1", widget: { id: "widget_1" } };
+            const mockConfig = { id: "di_1", widget: { enabled: true, id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockConfig as any);
 
             const result = await service.getByUserId("user_1", transactionId);
@@ -105,7 +115,7 @@ describe("DropImageService", () => {
             mockDropImageRepo.getByOwnerId.mockRejectedValueOnce(null); // No existing
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
             mockDropImageRepo.create.mockResolvedValue({ id: "di_1", widget_id: "widget_1" } as any);
-            mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { id: "widget_1" } } as any);
+            mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             const result = await service.create(request, transactionId);
 
@@ -150,7 +160,7 @@ describe("DropImageService", () => {
             const mockConfig = { 
                 twitch_bot_id: "bot_1", 
                 invalid_message: "invalid",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
@@ -166,7 +176,7 @@ describe("DropImageService", () => {
             const mockConfig = { 
                 twitch_bot_id: "bot_1", 
                 invalid_message: "invalid",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockRejectedValue(new Error("Network error"));
@@ -182,7 +192,7 @@ describe("DropImageService", () => {
             const mockConfig = { 
                 twitch_bot_id: "bot_1", 
                 not_image_message: "not-image",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockResolvedValue({ 
@@ -202,7 +212,7 @@ describe("DropImageService", () => {
                 twitch_bot_id: "bot_1", 
                 enabled_moderation: true,
                 contain_mature_message: "mature",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockResolvedValue({ 
@@ -223,7 +233,7 @@ describe("DropImageService", () => {
 
         it("should publish image on success", async () => {
             const mockConfig = { 
-                widget: { owner_id: "user_1" }
+                widget: { enabled: true, owner_id: "user_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockResolvedValue({ 
@@ -233,17 +243,18 @@ describe("DropImageService", () => {
 
             await service.handleDropImage(event, transactionId);
 
-            expect(publisher.publish).toHaveBeenCalledWith(
-                "drop-image:image-url", 
-                expect.stringContaining('"url":"https://example.com/image.png"')
-            );
+            // Queued rather than published directly, so a second redemption
+            // cannot replace an image that is still on screen.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                payload: { url: "https://example.com/image.png" },
+            }));
         });
 
         it("should handle test-message-id branch with invalid URL", async () => {
             const mockConfig = { 
                 twitch_bot_id: "bot_1",
                 invalid_message: "invalid",
-                widget: { owner_id: "user_1", twitch_id: "twitch_1" }
+                widget: { enabled: true, owner_id: "user_1", twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const testEvent = { ...event, message_id: "test-message-id-123", message: { text: "not-a-url" } };
@@ -259,7 +270,7 @@ describe("DropImageService", () => {
         it("should skip chat message if twitch_bot_id is missing on failure", async () => {
             const mockConfig = { 
                 invalid_message: "invalid",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
@@ -272,7 +283,7 @@ describe("DropImageService", () => {
         it("should skip chat message if invalid_message is missing on failure", async () => {
             const mockConfig = { 
                 twitch_bot_id: "bot_1",
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             const invalidEvent = { ...event, message: { text: "not-a-url" } };
@@ -285,7 +296,7 @@ describe("DropImageService", () => {
         it("should skip moderation if disabled", async () => {
             const mockConfig = { 
                 enabled_moderation: false,
-                widget: { owner_id: "user_1" }
+                widget: { enabled: true, owner_id: "user_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockResolvedValue({ 
@@ -296,13 +307,13 @@ describe("DropImageService", () => {
             await service.handleDropImage(event, transactionId);
 
             expect(mockSightengine.detectMatureContent).not.toHaveBeenCalled();
-            expect(publisher.publish).toHaveBeenCalled();
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalled();
         });
 
         it("should handle mature content but skip message if config missing", async () => {
             const mockConfig = { 
                 enabled_moderation: true,
-                widget: { twitch_id: "twitch_1" }
+                widget: { enabled: true, twitch_id: "twitch_1" }
             };
             mockDropImageRepo.getByTwitchRewardId.mockResolvedValue(mockConfig as any);
             mockedAxios.get.mockResolvedValue({ 
@@ -326,10 +337,13 @@ describe("DropImageService", () => {
             mockUserRepo.get.mockResolvedValue(mockUser as any);
             mockDropImageRepo.getByOwnerId.mockRejectedValueOnce(null);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ 
-                data: [{ type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' }] 
+                data: [
+                    { type: 'channel.channel_points_custom_reward_redemption.add', status: 'enabled' },
+                    { type: 'channel.chat.message', status: 'enabled' },
+                ]
             });
             mockDropImageRepo.create.mockResolvedValue({ id: "di_1", widget_id: "widget_1" } as any);
-            mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { id: "widget_1" } } as any);
+            mockDropImageRepo.getByOwnerId.mockResolvedValue({ id: "di_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             await service.create({ userId: "user_1" } as any, transactionId);
 
@@ -339,7 +353,7 @@ describe("DropImageService", () => {
 
     describe("update", () => {
         it("should update successfully", async () => {
-            const mockExisting = { id: "di_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "di_1", widget: { enabled: true, id: "widget_1", twitch_id: "twitch_1" } };
             mockDropImageRepo.findById.mockResolvedValue(mockExisting as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockResolvedValue({ data: [] });
 
@@ -349,7 +363,7 @@ describe("DropImageService", () => {
         });
 
         it("should log error if subscription fails during update", async () => {
-            const mockExisting = { id: "di_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "di_1", widget: { enabled: true, id: "widget_1", twitch_id: "twitch_1" } };
             mockDropImageRepo.findById.mockResolvedValue(mockExisting as any);
             (twitchAppAPI.eventSub.getSubscriptionsForUser as jest.Mock).mockRejectedValue(new Error("API Error"));
 
@@ -366,7 +380,7 @@ describe("DropImageService", () => {
 
     describe("delete", () => {
         it("should delete successfully", async () => {
-            const mockExisting = { id: "di_1", widget: { id: "widget_1" } };
+            const mockExisting = { id: "di_1", widget: { enabled: true, id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             await service.delete("user_1", transactionId);
@@ -381,7 +395,7 @@ describe("DropImageService", () => {
         });
 
         it("should throw error if delete fails", async () => {
-            const mockExisting = { id: "di_1", widget: { id: "widget_1" } };
+            const mockExisting = { id: "di_1", widget: { enabled: true, id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
             mockDropImageRepo.delete.mockRejectedValue(new Error("DB error"));
 
@@ -391,7 +405,7 @@ describe("DropImageService", () => {
 
     describe("refreshOverlayKey", () => {
         it("should refresh key successfully", async () => {
-            const mockExisting = { id: "di_1", widget: { id: "widget_1" } };
+            const mockExisting = { id: "di_1", widget: { enabled: true, id: "widget_1" } };
             mockDropImageRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             await service.refreshOverlayKey("user_1", transactionId);

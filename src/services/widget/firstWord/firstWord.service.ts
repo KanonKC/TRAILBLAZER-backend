@@ -1,9 +1,10 @@
 import Configurations from "@/config/index";
+import EventSubReconcilerService from "@/services/twitch/eventSubReconciler/eventSubReconciler.service";
 import { TwitchChannelChatMessageEventRequest } from "@/events/twitch/channelChatMessage/request";
 import { TwitchStreamOnlineEventRequest } from "@/events/twitch/streamOnline/request";
 import s3 from "@/libs/awsS3";
 import redis, { TTL, publisher } from "@/libs/redis";
-import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { twitchAppAPI } from "@/libs/twurple";
 import TLogger, { Layer } from "@/logging/logger";
 import FirstWordRepository from "@/repositories/firstWord/firstWord.repository";
 import { UpdateFirstWord, ListCustomerReplyRequest, CreateCustomReply, UpdateCustomReply } from "@/repositories/firstWord/request";
@@ -18,19 +19,31 @@ import { ForbiddenError, NotFoundError, TError } from "@/errors";
 import { ListResponse, Pagination } from "../../response";
 
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
+import { WidgetTypeSlug } from "@/services/constant";
+import { FIRST_WORD_FALLBACK_DURATION_MS } from "@/services/overlayQueue/constants";
+
+/** What a queued greeting carries until it is dispatched. */
+interface FirstWordJobPayload {
+    audioKey: string
+    volume: number
+}
 
 export default class FirstWordService {
     private readonly cfg: Configurations
     private readonly firstWordRepository: FirstWordRepository;
     private readonly userRepository: UserRepository;
     private readonly widgetService: WidgetService;
+    private readonly overlayQueue: OverlayQueueService;
     private readonly logger = new TLogger(Layer.SERVICE);
 
-    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService) {
+    constructor(cfg: Configurations, firstWordRepository: FirstWordRepository, userRepository: UserRepository, widgetService: WidgetService, overlayQueue: OverlayQueueService) {
         this.cfg = cfg;
         this.firstWordRepository = firstWordRepository;
         this.userRepository = userRepository;
         this.widgetService = widgetService;
+        this.overlayQueue = overlayQueue;
+        this.registerOverlayHandler();
     }
 
     async create(request: CreateFirstWordRequest, transactionId?: string): Promise<FirstWordWidget> {
@@ -42,26 +55,8 @@ export default class FirstWordService {
             throw new NotFoundError("User not found");
         }
 
-        const userSubs = await twitchAppAPI.eventSub.getSubscriptionsForUser(user.twitch_id);
-        const enabledSubs = userSubs.data.filter(sub => sub.status === 'enabled')
-
-        const userChatMessageSub = enabledSubs.filter(sub => sub.type === 'channel.chat.message')
-        if (userChatMessageSub.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/channel-chat-message")
-            await twitchAppAPI.eventSub.subscribeToChannelChatMessageEvents(user.twitch_id, tsp)
-        }
-
-        const streamOnlineSubs = enabledSubs.filter(sub => sub.type === 'stream.online')
-        if (streamOnlineSubs.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-online")
-            await twitchAppAPI.eventSub.subscribeToStreamOnlineEvents(user.twitch_id, tsp)
-        }
-
-        const streamOfflineSubs = enabledSubs.filter(sub => sub.type === 'stream.offline')
-        if (streamOfflineSubs.length === 0) {
-            const tsp = createESTransport("/webhook/v1/twitch/event-sub/stream-offline")
-            await twitchAppAPI.eventSub.subscribeToStreamOfflineEvents(user.twitch_id, tsp)
-        }
+        await this.widgetService.authorizeWidgetType(user.id, WidgetTypeSlug.FIRST_WORD, transactionId);
+        await EventSubReconcilerService.ensureEventSubs(user.twitch_id, EventSubReconcilerService.getRequiredEventTypes([WidgetTypeSlug.FIRST_WORD]));
 
         const res = await this.firstWordRepository.create({
             ...request,
@@ -191,7 +186,7 @@ export default class FirstWordService {
         logger.debug({ message: "firstWord validate passed", data: { overlay_key: firstWord.widget.overlay_key, key } });
         // Use constant time comparison if possible, but for UUIDs/strings here standard checks are okay 
         // as long as we handle missing keys.
-        return firstWord.widget.overlay_key === key;
+        return firstWord.widget.overlay_key === key && await this.widgetService.validateOverlayAccess(userId, key, transactionId);
     }
 
     async greetNewChatter(e: TwitchChannelChatMessageEventRequest, transactionId?: string): Promise<void> {
@@ -239,7 +234,7 @@ export default class FirstWordService {
         logger.info({ message: "First word config found", data: { firstWord } });
 
         // Check if first word is enabled
-        if (!firstWord.widget.enabled) {
+        if (!firstWord.widget.enabled || !await this.widgetService.isEnabledAndAvailable(firstWord.widget_id, transactionId)) {
             logger.info({ message: "First word is not enabled", data: { firstWord } });
             return
         }
@@ -307,7 +302,6 @@ export default class FirstWordService {
 
         let message = customReply?.reply_message || firstWord.reply_message
 
-        // If replay message does not empty -> Send message to Twitch
         if (message) {
             const greetCount = await this.firstWordRepository.getGreetCount(e.chatter_user_id, e.broadcaster_user_id, transactionId)
             const replaceMap = {
@@ -315,28 +309,59 @@ export default class FirstWordService {
                 "{{greet_count}}": (greetCount?.count || 0).toString()
             }
             message = mapMessageVariables(message, replaceMap)
-            logger.debug({ message: "send chat message", data: { broadcaster_user_id: e.broadcaster_user_id, message } });
+        }
+
+        // With audio configured, the greeting is queued so it cannot cut off the
+        // previous viewer's audio — and the chat message rides along in the same
+        // job so it lands with the sound, not ten seconds before it.
+        if (firstWord.audio_key) {
+            const audioKey = customReply?.audio_key || firstWord.audio_key
+            const audioVolume = customReply?.audio_volume ?? firstWord.audio_volume ?? 100
+            const durationMs = (customReply?.audio_key ? customReply.audio?.duration_ms : firstWord.audio?.duration_ms) ?? undefined
+
+            logger.info({ message: "Queueing first word greeting", data: { audioKey, durationMs } });
+            await this.overlayQueue.enqueue<FirstWordJobPayload>({
+                userId: user.id,
+                widgetSlug: WidgetTypeSlug.FIRST_WORD,
+                widgetId: firstWord.widget.id,
+                payload: { audioKey, volume: audioVolume },
+                effects: message
+                    ? [{ type: "chat", senderId, broadcasterId: e.broadcaster_user_id, message }]
+                    : [],
+                durationMs: durationMs ?? undefined,
+                // The overlay reports the real end via the audio element, which
+                // beats any duration we can record up front.
+                awaitsAck: true,
+                transactionId,
+            })
+            return
+        }
+
+        // No audio means nothing is drawn on the overlay, so there is nothing to
+        // stay in sync with — the chat greeting goes out immediately.
+        if (message) {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, e.broadcaster_user_id, message)
         }
 
-        // If audio key does not empty -> Send audio to overlay
-        if (firstWord.audio_key) {
-            logger.debug({ message: "audio_key", data: { audio_key: firstWord.audio_key } });
-            const audioKey = customReply?.audio_key || firstWord.audio_key
-            const audioVolume = customReply?.audio_volume ?? firstWord.audio_volume ?? 100
-            const url = await s3.getSignedURL(audioKey, { expiresIn: 3600 });
-            logger.debug({ message: "url", data: { url } });
-            logger.info({ message: "Sending audio to overlay", data: { url } });
-            await publisher.publish("first-word-audio", JSON.stringify({
-                userId: user.id,
-                audioUrl: url,
-                volume: audioVolume
-            }))
-            logger.debug({ message: "published" });
-        }
-
         await this.widgetService.increaseTriggeredCount(firstWord.widget.id, transactionId)
+    }
+
+    /**
+     * Turns a queued greeting into the payload the overlay receives. The signed
+     * URL is minted here, at dispatch, so a greeting that waited behind a long
+     * queue never arrives with an expired link.
+     */
+    private registerOverlayHandler() {
+        this.overlayQueue.register<FirstWordJobPayload>(WidgetTypeSlug.FIRST_WORD, {
+            channel: "first-word-audio",
+            event: "audio",
+            resolve: async (job) => {
+                const url = await s3.getSignedURL(job.payload.audioKey, { expiresIn: 3600 });
+                return { url, audioUrl: url, volume: job.payload.volume }
+            },
+            estimateDurationMs: () => FIRST_WORD_FALLBACK_DURATION_MS,
+        })
     }
 
     async resetChattersOnStartStream(e: TwitchStreamOnlineEventRequest, transactionId?: string): Promise<void> {

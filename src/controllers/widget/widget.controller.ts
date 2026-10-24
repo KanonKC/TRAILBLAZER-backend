@@ -83,7 +83,9 @@ export default class WidgetController {
             const { id } = req.params as { id: string };
             const request = updateWidgetSchema.parse(req.body);
             // Pass user.id to service update method
-            const updated = await this.widgetService.update(id, user.id, request, req.id);
+            const { enabled, ...settings } = request;
+            if (enabled !== undefined) await this.widgetService.updateEnable(id, user.id, enabled, req.id);
+            const updated = Object.keys(settings).length ? await this.widgetService.update(id, user.id, settings, req.id) : undefined;
             logger.info({ message: "Successfully updated widget", data: { userId: user.id, widgetId: id } });
             res.send(updated);
         } catch (error) {

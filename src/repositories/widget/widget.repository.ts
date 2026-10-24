@@ -4,6 +4,8 @@ import { ListWidgetFilters, UpdateWidget } from "./request";
 import { prisma } from "@/libs/prisma";
 import { ExtendedWidget } from "./response";
 import { Pagination } from "@/services/response";
+import { WidgetQuotaLimitError } from "@/services/widget/error";
+import { ForbiddenError, NotFoundError } from "@/errors";
 import { WidgetWhereInput } from "generated/prisma/models";
 
 const logger = new TLogger(Layer.REPOSITORY);
@@ -131,7 +133,8 @@ export default class WidgetRepository {
         return prisma.widget.findFirst({
             where: {
                 owner_id: ownerId,
-                enabled: true
+                enabled: true,
+                OR: [{ widget_type: { availability: "active" } }, { widget_type: { availability: "whitelist_only" }, owner: { is_whitelisted: true } }]
             },
             include: {
                 widget_type: true
@@ -153,6 +156,32 @@ export default class WidgetRepository {
             logger.setContext("repository.widget.updateOverlayKey", transactionId).error({ message: "updateOverlayKey failed", error: error as Error });
             throw error;
         }
+    }
+
+    async updateEnabledWithinQuota(id: string, ownerId: string, enabled: boolean, quota: number, transactionId?: string): Promise<void> {
+        const contextLogger = logger.setContext("repository.widget.updateEnabledWithinQuota", transactionId);
+        try {
+            await prisma.$transaction(async transaction => {
+                // The same lock serializes enables of every widget type for this owner.
+                await transaction.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+                const widget = await transaction.widget.findFirst({ where: { id, owner_id: ownerId }, include: { widget_type: true, owner: true } });
+                if (!widget) throw new NotFoundError("Widget not found");
+                if (enabled) {
+                    if (widget.widget_type_slug) {
+                        await transaction.$queryRaw`SELECT id FROM "WidgetType" WHERE slug = ${widget.widget_type_slug} FOR SHARE`;
+                    }
+                    const currentWidgetType = widget.widget_type_slug ? await transaction.widgetType.findUnique({ where: { slug: widget.widget_type_slug } }) : null;
+                    const availability = currentWidgetType?.availability;
+                    if (availability !== "active" && !(availability === "whitelist_only" && widget.owner.is_whitelisted)) {
+                        throw new ForbiddenError("Widget type is unavailable for this streamer");
+                    }
+                    const others = await transaction.widget.findMany({ where: { owner_id: ownerId, enabled: true, id: { not: id } }, include: { widget_type: true } });
+                    const used = others.reduce((sum, other) => sum + (other.widget_type?.cost ?? 1), 0);
+                    if (used + (currentWidgetType?.cost ?? 1) > quota) throw new WidgetQuotaLimitError();
+                }
+                await transaction.widget.update({ where: { id }, data: { enabled } });
+            });
+        } catch (error) { contextLogger.error({ message: "Widget enable transaction failed", error: error as Error }); throw error; }
     }
 
     async increaseTriggeredCount(id: string, transactionId?: string): Promise<void> {

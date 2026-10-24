@@ -19,6 +19,7 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { convertPrismaError } from "@/utils/error";
 import { ListUserShowcaseResponse } from "./response";
 import { CacheKey } from "../cacheKey";
+import { prisma } from "@/libs/prisma";
 
 // Bump this (and the matching CONSENT_VERSION in TRAILBLAZER-frontend's
 // lib/twitch-login.ts) whenever the consent terms change — it invalidates
@@ -229,7 +230,20 @@ export default class UserService {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.user.update", transactionId);
         try {
-            const user = await this.userRepository.update(id, request, tx, transactionId)
+            const updateWithWhitelistRevocation = async (databaseClient: Pick<typeof prisma, "widget" | "user">) => {
+                const updatedUser = await this.userRepository.update(id, request, databaseClient, transactionId);
+                const affectedWidgets = await databaseClient.widget.findMany({ where: { owner_id: id, enabled: true, widget_type: { availability: "whitelist_only" } }, select: { id: true } });
+                await databaseClient.widget.updateMany({ where: { id: { in: affectedWidgets.map(widget => widget.id) } }, data: { enabled: false } });
+                return { updatedUser, affectedWidgets };
+            };
+            const result = request.is_whitelisted === false
+                ? tx ? await updateWithWhitelistRevocation(tx) : await prisma.$transaction(updateWithWhitelistRevocation)
+                : { updatedUser: await this.userRepository.update(id, request, tx, transactionId), affectedWidgets: [] };
+            const user = result.updatedUser;
+            if (request.is_whitelisted === false) {
+                await Promise.all(result.affectedWidgets.map(widget => redis.del(`widget:${widget.id}`)));
+                await redis.del(`widget:total:owner:${id}`);
+            }
             await redis.del(`user:id:${id}`)
             await redis.del(`user:tier:${id}`)
             await redis.del(`user:twitch_id:${user.twitch_id}`)

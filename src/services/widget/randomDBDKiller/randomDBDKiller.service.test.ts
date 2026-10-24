@@ -3,6 +3,7 @@ import RandomDBDKillerRepository from "@/repositories/randomDBDKiller/randomDBDK
 import DBDKillerMasterRepository from "@/repositories/dbdKillerMaster/dbdKillerMaster.repository";
 import UserRepository from "@/repositories/user/user.repository";
 import WidgetService from "../widget.service";
+import OverlayQueueService from "@/services/overlayQueue/overlayQueue.service";
 import redis, { publisher } from "@/libs/redis";
 import { twitchAppAPI, createESTransport } from "@/libs/twurple";
 import { BadRequestError, NotFoundError } from "@/errors";
@@ -47,6 +48,7 @@ describe("RandomDBDKillerService", () => {
     let mockMasterRepo: jest.Mocked<DBDKillerMasterRepository>;
     let mockUserRepo: jest.Mocked<UserRepository>;
     let mockWidgetService: jest.Mocked<WidgetService>;
+    let mockOverlayQueue: jest.Mocked<OverlayQueueService>;
 
     beforeEach(() => {
         mockRepo = {
@@ -67,17 +69,25 @@ describe("RandomDBDKillerService", () => {
         } as any;
         mockWidgetService = {
             setInitialEnabled: jest.fn(),
+            authorizeWidgetType: jest.fn(),
+            isAvailable: jest.fn().mockResolvedValue(true),
             authorizeOwnership: jest.fn(),
             updateOverlayKey: jest.fn(),
             validateOverlayAccess: jest.fn(),
             increaseTriggeredCount: jest.fn(),
         } as any;
 
+        mockOverlayQueue = {
+            enqueue: jest.fn().mockResolvedValue({ enqueued: true, jobId: "job_1" }),
+            register: jest.fn(),
+        } as any;
+
         service = new RandomDBDKillerService(
             mockRepo,
             mockMasterRepo,
             mockUserRepo,
-            mockWidgetService
+            mockWidgetService,
+            mockOverlayQueue
         );
         jest.clearAllMocks();
     });
@@ -92,7 +102,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
             mockRepo.getByOwnerId
                 .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
+                .mockResolvedValueOnce({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             const result = await service.create(request, transactionId);
 
@@ -103,7 +113,7 @@ describe("RandomDBDKillerService", () => {
         it("should throw BadRequestError if widget already exists", async () => {
             const mockUser = { id: "user_1", twitch_id: "twitch_1" };
             mockUserRepo.get.mockResolvedValue(mockUser as any);
-            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             await expect(service.create(request, transactionId)).rejects.toThrow("Random DBD Killer widget already exists for this user");
             expect(mockRepo.create).not.toHaveBeenCalled();
@@ -136,7 +146,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.create.mockResolvedValue({ id: "rw_1", widget_id: "widget_1" } as any);
             mockRepo.getByOwnerId
                 .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce({ id: "rw_1", widget: { id: "widget_1" } } as any);
+                .mockResolvedValueOnce({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
 
             await service.create(request, transactionId);
 
@@ -146,7 +156,7 @@ describe("RandomDBDKillerService", () => {
 
     describe("update", () => {
         it("should update successfully", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
             mockRepo.findById.mockResolvedValue(mockExisting as any);
             mockRepo.update.mockResolvedValue(mockExisting as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper" }, { slug: "wraith" }] as any);
@@ -163,7 +173,7 @@ describe("RandomDBDKillerService", () => {
         });
 
         it("should throw BadRequestError for unknown killer slug", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1", owner_id: "user_1", twitch_id: "twitch_1" } };
             mockRepo.findById.mockResolvedValue(mockExisting as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper" }] as any);
 
@@ -174,7 +184,7 @@ describe("RandomDBDKillerService", () => {
 
     describe("delete", () => {
         it("should delete successfully", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1", twitch_id: "twitch_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1", twitch_id: "twitch_1" } };
             mockRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             await service.delete("user_1", transactionId);
@@ -191,7 +201,7 @@ describe("RandomDBDKillerService", () => {
 
     describe("getByUserId", () => {
         it("should return config successfully", async () => {
-            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { id: "widget_1" } } as any);
+            mockRepo.getByOwnerId.mockResolvedValue({ id: "rw_1", widget: { enabled: true, id: "widget_1" } } as any);
             const result = await service.getByUserId("user_1", transactionId);
             expect(result).toBeDefined();
         });
@@ -218,7 +228,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: [],
-                widget: { owner_id: "user_1" }
+                widget: { enabled: true, owner_id: "user_1" }
             } as any);
             await service.randomizeKiller(event, transactionId);
             expect(publisher.publish).not.toHaveBeenCalled();
@@ -228,7 +238,7 @@ describe("RandomDBDKillerService", () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" }
+                widget: { enabled: true, owner_id: "user_1" }
             } as any);
             mockMasterRepo.getBySlug.mockResolvedValue(null);
 
@@ -237,11 +247,11 @@ describe("RandomDBDKillerService", () => {
             expect(publisher.publish).not.toHaveBeenCalled();
         });
 
-        it("should publish result and increase triggered count on success", async () => {
+        it("should queue the roll instead of publishing it directly", async () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" },
+                widget: { enabled: true, owner_id: "user_1" },
                 animation_style: "spin"
             } as any);
             mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
@@ -249,52 +259,40 @@ describe("RandomDBDKillerService", () => {
 
             await service.randomizeKiller(event, transactionId);
 
-            expect(publisher.publish).toHaveBeenCalledWith("random-dbd-killer:result", JSON.stringify({
+            // Queued so a second redemption cannot remount the spinner
+            // mid-animation; the counter now increments when it actually rolls.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
                 userId: "user_1",
-                killer: { slug: "trapper", title: "The Trapper", image_url: "url" },
-                pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
-                animationStyle: "spin"
+                widgetId: "widget_1",
+                payload: {
+                    killer: { slug: "trapper", title: "The Trapper", image_url: "url" },
+                    pool: [{ slug: "trapper", title: "The Trapper", image_url: "url" }],
+                    animationStyle: "spin",
+                },
             }));
-            expect(mockWidgetService.increaseTriggeredCount).toHaveBeenCalledWith("widget_1", transactionId);
+            expect(publisher.publish).not.toHaveBeenCalled();
         });
 
-        it("should send a chat message announcing the result after a 10s delay", async () => {
-            jest.useFakeTimers();
+        it("keeps the chat announcement delayed so it cannot spoil the spinner", async () => {
             mockRepo.getByTwitchRewardId.mockResolvedValue({
                 widget_id: "widget_1",
                 killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" }
+                widget: { enabled: true, owner_id: "user_1" }
             } as any);
             mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
             mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
 
-            await service.randomizeKiller(event, transactionId);
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+            await service.randomizeKiller(event);
 
-            await jest.advanceTimersByTimeAsync(10_000);
-
-            expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
-                "broadcaster_1",
-                "broadcaster_1",
-                "Random Killer: The Trapper"
-            );
-            jest.useRealTimers();
-        });
-
-        it("should not throw if sending the chat message fails", async () => {
-            jest.useFakeTimers();
-            mockRepo.getByTwitchRewardId.mockResolvedValue({
-                widget_id: "widget_1",
-                killer_pool: ["trapper"],
-                widget: { owner_id: "user_1" }
-            } as any);
-            mockMasterRepo.getBySlug.mockResolvedValue({ slug: "trapper", title: "The Trapper", image_url: "url" } as any);
-            mockMasterRepo.getBySlugs.mockResolvedValue([{ slug: "trapper", title: "The Trapper", image_url: "url" }] as any);
-            (twitchAppAPI.chat.sendChatMessageAsApp as jest.Mock).mockRejectedValue(new Error("Chat Error"));
-
-            await service.randomizeKiller(event, transactionId);
-            await expect(jest.advanceTimersByTimeAsync(10_000)).resolves.not.toThrow();
-            jest.useRealTimers();
+            // The delay now rides on the queued job, measured from the moment
+            // the roll actually starts rather than from the redemption.
+            expect(mockOverlayQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+                effects: [expect.objectContaining({
+                    type: "chat",
+                    message: "Random Killer: The Trapper",
+                    delayMs: 10_000,
+                })],
+            }));
         });
     });
 
@@ -309,7 +307,7 @@ describe("RandomDBDKillerService", () => {
 
     describe("refreshKey", () => {
         it("should refresh key successfully", async () => {
-            const mockExisting = { id: "rw_1", widget: { id: "widget_1" } };
+            const mockExisting = { id: "rw_1", widget: { enabled: true, id: "widget_1" } };
             mockRepo.getByOwnerId.mockResolvedValue(mockExisting as any);
 
             const result = await service.refreshKey("user_1", transactionId);

@@ -1,6 +1,6 @@
 import TLogger, { Layer } from "@/logging/logger";
 import { prisma } from "@/libs/prisma";
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 import { CreateSpotifySongRequest, UpdateSpotifySongRequest } from "./request";
 import { SpotifySongRequestWidget } from "./response";
 
@@ -82,7 +82,8 @@ export default class SpotifySongRequestRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                owner_id_widget_type_slug: {
+                owner_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     owner_id: ownerId,
                     widget_type_slug: WidgetTypeSlug.SPOTIFY_SONG_REQUEST,
                 },
@@ -108,7 +109,8 @@ export default class SpotifySongRequestRepository {
         try {
         const widget = await prisma.widget.findUniqueOrThrow({
             where: {
-                twitch_id_widget_type_slug: {
+                twitch_id_widget_type_slug_instance_key: {
+                    instance_key: "",
                     twitch_id: twitchId,
                     widget_type_slug: WidgetTypeSlug.SPOTIFY_SONG_REQUEST,
                 },

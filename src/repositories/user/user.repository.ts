@@ -54,19 +54,19 @@ export default class UserRepository {
         }
     }
 
-    async count(search?: string, tier?: number, isShowcase?: boolean, transactionId?: string): Promise<number> {
+    async count(search?: string, tier?: number, isShowcase?: boolean, transactionId?: string, isWhitelisted?: boolean): Promise<number> {
         try {
-        return prisma.user.count({ where: this.buildFilterWhere(search, tier, isShowcase) });
+        return prisma.user.count({ where: this.buildFilterWhere(search, tier, isShowcase, isWhitelisted) });
     } catch (error) {
             logger.setContext("repository.user.count", transactionId).error({ message: "count failed", error: error as Error });
             throw error;
         }
     }
 
-    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string) {
+    async findMany(skip: number, take: number, search?: string, tier?: number, isShowcase?: boolean, transactionId?: string, isWhitelisted?: boolean) {
         try {
         return prisma.user.findMany({
-            where: this.buildFilterWhere(search, tier, isShowcase),
+            where: this.buildFilterWhere(search, tier, isShowcase, isWhitelisted),
             skip,
             take,
             orderBy: { created_at: 'desc' },
@@ -80,7 +80,7 @@ export default class UserRepository {
         }
     }
 
-    private buildFilterWhere(search?: string, tier?: number, isShowcase?: boolean): UserWhereInput | undefined {
+    private buildFilterWhere(search?: string, tier?: number, isShowcase?: boolean, isWhitelisted?: boolean): UserWhereInput | undefined {
         const where: UserWhereInput = {};
 
         if (search) {
@@ -98,6 +98,7 @@ export default class UserRepository {
         if (isShowcase !== undefined) {
             where.is_showcase = isShowcase;
         }
+        if (isWhitelisted !== undefined) where.is_whitelisted = isWhitelisted;
 
         return Object.keys(where).length > 0 ? where : undefined;
     }

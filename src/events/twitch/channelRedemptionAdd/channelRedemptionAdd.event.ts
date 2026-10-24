@@ -1,3 +1,4 @@
+import RandomPoolService from "@/services/randomPool/randomPool.service";
 import { FastifyReply, FastifyRequest } from "fastify";
 import RandomDbdPerkService from "@/services/widget/randomDbdPerk/randomDbdPerk.service";
 import DropImageService from "@/services/widget/dropImage/dropImage.service";
@@ -11,7 +12,7 @@ export default class TwitchChannelRedemptionAddEvent {
     private readonly randomDBDKillerService: RandomDBDKillerService;
     private readonly logger: TLogger;
 
-    constructor(randomDbdPerkService: RandomDbdPerkService, dropImageService: DropImageService, randomDBDKillerService: RandomDBDKillerService) {
+    constructor(randomDbdPerkService: RandomDbdPerkService, dropImageService: DropImageService, randomDBDKillerService: RandomDBDKillerService, private readonly randomPoolService?: RandomPoolService) {
         this.randomDbdPerkService = randomDbdPerkService;
         this.dropImageService = dropImageService;
         this.randomDBDKillerService = randomDBDKillerService;
@@ -35,6 +36,7 @@ export default class TwitchChannelRedemptionAddEvent {
             logger.info({ message: "Handling channel redemption add event", data: event })
             try {
                 await Promise.allSettled([
+                    this.randomPoolService?.redeem(event, req.id),
                     this.randomDbdPerkService.randomPerk(event, req.id),
                     this.randomDBDKillerService.randomizeKiller(event, req.id),
                 ])

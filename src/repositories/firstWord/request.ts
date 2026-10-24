@@ -1,4 +1,4 @@
-import { WidgetTypeSlug } from "@/services/widget/constant";
+import { WidgetTypeSlug } from "@/services/constant";
 
 export interface CreateFirstWord {
     twitch_id: string;
