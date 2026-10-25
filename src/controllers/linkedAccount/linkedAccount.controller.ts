@@ -27,7 +27,7 @@ export default class LinkedAccountController {
             res.send(accounts);
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: err.message, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Failed to list linked accounts", error: err as Error });
@@ -54,7 +54,7 @@ export default class LinkedAccountController {
             res.send(linkedAccount);
         } catch (err) { 
             if (err instanceof TError) {
-                logger.error({ message: err.message, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Failed to bind account", error: err as Error });
@@ -75,7 +75,7 @@ export default class LinkedAccountController {
             res.status(204).send();
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: err.message, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Failed to unbind account", error: err as Error });

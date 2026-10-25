@@ -48,7 +48,7 @@ export default class WidgetTypeController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create widget type", error: error as Error });
@@ -73,7 +73,7 @@ export default class WidgetTypeController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update widget type", error: error as Error });
@@ -109,7 +109,7 @@ export default class WidgetTypeController {
             res.send({ url });
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to upload widget icon", error: error as Error });
@@ -130,7 +130,7 @@ export default class WidgetTypeController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete widget type", error: error as Error });

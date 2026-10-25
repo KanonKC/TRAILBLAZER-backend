@@ -31,7 +31,7 @@ export default class WidgetController {
             res.send(first);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to fetch first enabled widget", data: { userId: user.id }, error: error as Error });
@@ -61,7 +61,7 @@ export default class WidgetController {
             res.send(result);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to list widgets", data: { userId: user.id }, error: error as Error });
@@ -94,7 +94,7 @@ export default class WidgetController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update widget", data: { userId: user.id }, error: error as Error });
@@ -124,7 +124,7 @@ export default class WidgetController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update widget enable status", data: { userId: user.id }, error: error as Error });
@@ -149,7 +149,7 @@ export default class WidgetController {
             res.send({ valid });
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to validate overlay access", data: { userId: user.id }, error: error as Error });
@@ -175,7 +175,7 @@ export default class WidgetController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete widget", data: { userId: user.id }, error: error as Error });
@@ -198,7 +198,7 @@ export default class WidgetController {
             res.send(quota);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to fetch quota", data: { userId: user.id }, error: error as Error });

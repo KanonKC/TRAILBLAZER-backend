@@ -130,7 +130,7 @@ export default class RandomPoolController {
           : prismaCode === 'P2002'
             ? 409
             : 500;
-    logger.error({
+    logger[status >= 500 ? 'error' : 'warn']({
       message: 'Random pool request failed',
       data: { status },
       error: error as Error,

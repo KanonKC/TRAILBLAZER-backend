@@ -53,7 +53,7 @@ export default class OverlayQueueController {
             logger.info({ message: "Overlay job acked", data: { userId, slug, jobId } });
             return res.status(204).send();
         } catch (error) {
-            logger.error({ message: "Failed to ack overlay job", error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to ack overlay job", error: error as Error });
 
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });

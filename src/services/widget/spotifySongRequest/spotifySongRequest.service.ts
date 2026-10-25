@@ -88,7 +88,7 @@ export default class SpotifySongRequestService {
         logger.info({ message: "Getting spotify song request config", data: { userId } });
         const config = await this.spotifyRepository.getByOwnerId(userId, transactionId);
         if (!config) {
-            logger.error({ message: "Spotify song request config not found", data: { userId } });
+            logger.warn({ message: "Spotify song request config not found", data: { userId } });
             throw new NotFoundError("Spotify song request config not found");
         }
         logger.info({ message: "Got spotify song request config", data: { userId, config } });

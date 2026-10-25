@@ -35,7 +35,7 @@ export default class ExportVideoController {
                 return res.status(404).send({ message: "Export video not enabled" });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get export video", data: { userId: user.id }, error: error as Error });
@@ -64,7 +64,7 @@ export default class ExportVideoController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create export video", data: { userId: user.id }, error: error as Error });
@@ -93,7 +93,7 @@ export default class ExportVideoController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update export video", data: { userId: user.id }, error: error as Error });
@@ -117,7 +117,7 @@ export default class ExportVideoController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete export video", data: { userId: user.id }, error: error as Error });
@@ -144,7 +144,7 @@ export default class ExportVideoController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create export video history", data: { userId: user.id }, error: error as Error });
@@ -170,7 +170,7 @@ export default class ExportVideoController {
             res.send(history);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to list export video history", data: { userId: user.id }, error: error as Error });
@@ -193,7 +193,7 @@ export default class ExportVideoController {
             res.send(entry);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id, historyId }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id, historyId }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get export video history", data: { userId: user.id, historyId }, error: error as Error });
@@ -216,7 +216,7 @@ export default class ExportVideoController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id, historyId }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id, historyId }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete export video history", data: { userId: user.id, historyId }, error: error as Error });
@@ -238,7 +238,7 @@ export default class ExportVideoController {
             res.status(200).send({ message: "Success" });
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to test export video", data: { userId: user.id }, error: error as Error });
