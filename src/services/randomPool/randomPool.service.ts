@@ -43,7 +43,8 @@ export default class RandomPoolService {
         const config = (await repository.listConfigs(ownerId, transactionId)).find(
           (candidate) => candidate.widget_id === widgetId
         );
-        if (config && poolState(config.pool) !== 'READY')
+        // An unfinished config (no reward, empty pool) may be on: it is created that way and idles.
+        if (config && ['DELETED', 'HIDDEN'].includes(poolState(config.pool)))
           throw new BadRequestError(`Pool is ${poolState(config.pool).toLowerCase()}`);
       },
       afterChange: async (widgetId, ownerId, _enabled, transactionId) => {
@@ -271,6 +272,20 @@ export default class RandomPoolService {
     await this.publishState(config.pool_id, ownerId, transactionId);
     logger.info({ message: 'Saved random pool config', data: { configId: config.id } });
     return this.extendConfig(config);
+  }
+  /** Enables the widget: creates the first config (with an empty pool) the first time. */
+  async enable(ownerId: string, twitchId: string, transactionId?: string) {
+    const logger = this.logger.setContext('service.randomPool.enable', transactionId);
+    await this.widgets.authorizeWidgetType(ownerId, WidgetTypeSlug.RANDOM_POOL, transactionId);
+    const { config, created } = await this.repository.createDefaultConfig(
+      ownerId,
+      twitchId,
+      { pool: 'กองสุ่มของฉัน', config: 'การตั้งค่าหลัก' },
+      transactionId
+    );
+    if (created) await this.widgets.setInitialEnabled(config.widget_id, ownerId, transactionId);
+    logger.info({ message: 'Enabled random pool', data: { configId: config.id, created } });
+    return this.getConfig(ownerId, config.id, transactionId);
   }
   async refreshOverlayKey(ownerId: string, id: string, transactionId?: string) {
     const config = await this.ownedConfig(ownerId, id, transactionId);

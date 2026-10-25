@@ -125,7 +125,7 @@ export default class WidgetService {
         }
     }
 
-    async update(id: string, userId: string, request: UpdateWidget, transactionId?: string) {
+    async update(id: string, userId: string, request: UpdateWidget, transactionId?: string, skipBeforeEnable = false) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widget.update", transactionId);
         const existing = await this.widgetRepository.get(id, transactionId);
@@ -133,7 +133,7 @@ export default class WidgetService {
             throw new NotFoundError("Widget not found");
         }
         await this.authorizeOwnership(userId, existing.id, transactionId);
-        if (request.enabled !== undefined) await this.updateEnable(id, userId, request.enabled, transactionId);
+        if (request.enabled !== undefined) await this.updateEnable(id, userId, request.enabled, transactionId, skipBeforeEnable);
         const res = request.overlay_key !== undefined
             ? await this.widgetRepository.update(id, { overlay_key: request.overlay_key }, transactionId)
             : undefined;
@@ -142,7 +142,8 @@ export default class WidgetService {
         return res
     }
 
-    async updateEnable(id: string, userId: string, value: boolean, transactionId?: string) {
+    /** `skipBeforeEnable` is for the first switch-on at creation, when the type's own setup is not done yet. */
+    async updateEnable(id: string, userId: string, value: boolean, transactionId?: string, skipBeforeEnable = false) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widget.updateEnable", transactionId);
         logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
@@ -151,7 +152,7 @@ export default class WidgetService {
         if (value) await this.authorizeAvailability(userId, id, transactionId);
         const widget = await this.get(id, transactionId);
         const handler = widget.widget_type_slug ? this.enableHandlers.get(widget.widget_type_slug) : undefined;
-        if (value) await handler?.beforeEnable?.(id, userId, transactionId);
+        if (value && !skipBeforeEnable) await handler?.beforeEnable?.(id, userId, transactionId);
         const user = await this.userService.get(userId, transactionId);
         const quota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER] + user.extra_widget_quota;
         await this.widgetRepository.updateEnabledWithinQuota(id, userId, value, quota, transactionId);
@@ -171,7 +172,7 @@ export default class WidgetService {
         const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id], transactionId);
         const isEnabled = usedQuota + cost <= quota && await this.isAvailable(userId, id, transactionId);
         logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
-        await this.update(id, userId, { enabled: isEnabled }, transactionId);
+        await this.update(id, userId, { enabled: isEnabled }, transactionId, true);
     }
 
     async delete(id: string, userId: string, transactionId?: string) {

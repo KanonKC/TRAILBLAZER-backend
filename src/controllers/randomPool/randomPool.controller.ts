@@ -27,6 +27,7 @@ export default class RandomPoolController {
       ['DELETE', '/pools/:id', 'deletePool'],
       ['GET', '/configs', 'listConfigs'],
       ['GET', '/configs/:id', 'getConfig'],
+      ['POST', '/enable', 'enable'],
       ['POST', '/configs', 'saveConfig'],
       ['PUT', '/configs/:id', 'saveConfig'],
       ['DELETE', '/configs/:id', 'deleteConfig'],
@@ -90,6 +91,9 @@ export default class RandomPoolController {
             id,
             request.id
           );
+          break;
+        case 'enable':
+          result = await this.service.enable(user.id, user.twitchId, request.id);
           break;
         case 'refreshKey':
           result = await this.service.refreshOverlayKey(user.id, id!, request.id);

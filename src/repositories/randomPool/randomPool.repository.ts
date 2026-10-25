@@ -109,7 +109,7 @@ export default class RandomPoolRepository {
       prisma.randomPoolConfig.findMany({
         where: { widget: { owner_id: ownerId } },
         include: configInclude,
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: 'asc' },
       })
     );
   }
@@ -181,6 +181,52 @@ export default class RandomPoolRepository {
           where: { id: config.id },
           include: configInclude,
         });
+      })
+    );
+  }
+  /** Creates the owner's first config with an empty pool (or their existing one); no-op if a config exists. */
+  createDefaultConfig(
+    ownerId: string,
+    twitchId: string,
+    names: { pool: string; config: string },
+    transactionId?: string
+  ) {
+    return this.run(transactionId, () =>
+      prisma.$transaction(async (transaction) => {
+        await transaction.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+        const existing = await transaction.randomPoolConfig.findFirst({
+          where: { widget: { owner_id: ownerId } },
+          orderBy: { created_at: 'asc' },
+          include: configInclude,
+        });
+        if (existing) return { config: existing, created: false };
+        const pool =
+          (await transaction.randomPool.findFirst({
+            where: { owner_id: ownerId, deleted_at: null },
+            orderBy: { created_at: 'asc' },
+          })) ??
+          (await transaction.randomPool.create({
+            data: { owner_id: ownerId, name: names.pool, visibility: 'PRIVATE' },
+          }));
+        const config = await transaction.randomPoolConfig.create({
+          data: {
+            name: names.config,
+            twitch_bot_id: twitchId,
+            pool: { connect: { id: pool.id } },
+            widget: {
+              create: {
+                owner_id: ownerId,
+                twitch_id: twitchId,
+                widget_type_slug: 'random-pool',
+                instance_key: randomUUID(),
+                overlay_key: randomUUID(),
+                enabled: false,
+              },
+            },
+          },
+          include: configInclude,
+        });
+        return { config, created: true };
       })
     );
   }

@@ -85,8 +85,9 @@ describe('RandomPoolService authorization and lifecycle', () => {
       saveConfig: jest.fn().mockResolvedValue(config),
       deletePool: jest.fn(),
       log: jest.fn(),
+      createDefaultConfig: jest.fn().mockResolvedValue({ config, created: true }),
     } as unknown as jest.Mocked<RandomPoolRepository>;
-    widgets = { updateEnable: jest.fn(), registerEnableHandler: jest.fn((slug, registered) => { enableHandler = registered; }), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
+    widgets = { updateEnable: jest.fn(), setInitialEnabled: jest.fn(), registerEnableHandler: jest.fn((slug, registered) => { enableHandler = registered; }), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
     queue = {
       register: jest.fn((slug, registered) => {
         handler = registered;
@@ -203,8 +204,8 @@ describe('RandomPoolService authorization and lifecycle', () => {
   it('registers a handler so the shared widget enable flow validates the pool', async () => {
     expect(widgets.registerEnableHandler).toHaveBeenCalledWith('random-pool', expect.anything());
     await expect(enableHandler.beforeEnable!('widget', 'owner')).resolves.toBeUndefined();
-    config.pool.items = [];
-    await expect(enableHandler.beforeEnable!('widget', 'owner')).rejects.toThrow('empty');
+    config.pool.moderation_status = 'HIDDEN';
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).rejects.toThrow('hidden');
     // Widgets that are not random-pool configs are ignored.
     await expect(enableHandler.beforeEnable!('unknown', 'owner')).resolves.toBeUndefined();
   });
@@ -281,5 +282,24 @@ describe('RandomPoolService authorization and lifecycle', () => {
     expect(await handler.resolve(job)).toBeNull();
     await handler.onAck!(job);
     expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+  });
+  it('creates the first config on enable and applies the initial enabled state once', async () => {
+    await service.enable('owner', 'channel');
+    expect(repository.createDefaultConfig).toHaveBeenCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ pool: expect.any(String), config: expect.any(String) }),
+      undefined
+    );
+    expect(widgets.setInitialEnabled).toHaveBeenCalledWith('widget', 'owner', undefined);
+    widgets.setInitialEnabled.mockClear();
+    repository.createDefaultConfig.mockResolvedValue({ config, created: false });
+    await service.enable('owner', 'channel');
+    expect(widgets.setInitialEnabled).not.toHaveBeenCalled();
+  });
+  it('lets an unfinished config (no reward, empty pool) be switched on again', async () => {
+    config.twitch_reward_id = null;
+    config.pool.items = [];
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).resolves.toBeUndefined();
   });
 });
