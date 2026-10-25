@@ -34,7 +34,7 @@ export default class RandomDbdPerkController {
             res.send(result);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get random dbd perk config", data: { userId: user.id }, error: error as Error });
@@ -66,7 +66,7 @@ export default class RandomDbdPerkController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create random dbd perk config", data: { userId: user.id }, error: error as Error });
@@ -101,7 +101,7 @@ export default class RandomDbdPerkController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update random dbd perk config", data: { userId: user.id }, error: error as Error });
@@ -124,7 +124,7 @@ export default class RandomDbdPerkController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete random dbd perk config", data: { userId: user.id }, error: error as Error });
@@ -147,7 +147,7 @@ export default class RandomDbdPerkController {
             res.send(result);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to refresh random dbd perk overlay key", data: { userId: user.id }, error: error as Error });

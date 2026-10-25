@@ -40,7 +40,7 @@ export default class UploadedFileController {
             logger.info({ message: "Successfully uploaded file", data: { userId: user.id, filename: file.filename } });
             res.status(201).send(created);
         } catch (error) {
-            logger.error({ message: "Failed to upload file", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to upload file", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -72,7 +72,7 @@ export default class UploadedFileController {
             logger.info({ message: "Successfully retrieved uploaded file", data: { id } });
             res.send(file);
         } catch (error) {
-            logger.error({ message: "Failed to get uploaded file", data: { id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to get uploaded file", data: { id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -100,7 +100,7 @@ export default class UploadedFileController {
             logger.info({ message: "Successfully updated uploaded file", data: { id } });
             res.send(updated);
         } catch (error) {
-            logger.error({ message: "Failed to update uploaded file", data: { id }, error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to update uploaded file", data: { id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -127,7 +127,7 @@ export default class UploadedFileController {
             logger.info({ message: "Successfully deleted uploaded file", data: { id } });
             res.status(204).send();
         } catch (error) {
-            logger.error({ message: "Failed to delete uploaded file", data: { id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to delete uploaded file", data: { id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -157,7 +157,7 @@ export default class UploadedFileController {
             logger.info({ message: "Successfully listed uploaded files" });
             res.send(result);
         } catch (error) {
-            logger.error({ message: "Failed to list uploaded files", error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to list uploaded files", error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }

@@ -38,7 +38,7 @@ export default class SpotifySongRequestController {
             logger.info({ message: "Successfully created spotify song request", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
-            logger.error({ message: "Failed to create spotify song request", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to create spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -64,7 +64,7 @@ export default class SpotifySongRequestController {
             logger.info({ message: "Successfully retrieved spotify song request", data: { userId: user.id } });
             res.send(config);
         } catch (error) {
-            logger.error({ message: "Failed to get spotify song request", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to get spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -88,7 +88,7 @@ export default class SpotifySongRequestController {
             logger.info({ message: "Successfully updated spotify song request", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
-            logger.error({ message: "Failed to update spotify song request", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to update spotify song request", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -114,7 +114,7 @@ export default class SpotifySongRequestController {
             logger.info({ message: "Test completed", data: { userId: user.id } });
             res.status(204).send();
         } catch (error) {
-            logger.error({ message: "Test failed", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Test failed", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }

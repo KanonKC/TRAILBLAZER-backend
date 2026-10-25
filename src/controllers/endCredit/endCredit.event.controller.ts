@@ -70,7 +70,7 @@ export default class EndCreditEventController {
             });
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send({ message: error.message });
             }
             logger.error({ message: "SSE connection failed", error: error as Error });

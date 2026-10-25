@@ -35,7 +35,7 @@ export default class DropImageController {
             res.send(config);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get drop image", data: { userId: user.id }, error: error as Error });
@@ -69,7 +69,7 @@ export default class DropImageController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update drop image", data: { userId: user.id }, error: error as Error });
@@ -98,7 +98,7 @@ export default class DropImageController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create drop image", data: { userId: user.id }, error: error as Error });
@@ -122,7 +122,7 @@ export default class DropImageController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete drop image", data: { userId: user.id }, error: error as Error });
@@ -146,7 +146,7 @@ export default class DropImageController {
             res.send(updated);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to refresh overlay key", data: { userId: user.id }, error: error as Error });

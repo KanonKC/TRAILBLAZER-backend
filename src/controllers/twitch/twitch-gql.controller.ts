@@ -22,7 +22,7 @@ export default class TwitchGqlController {
             return res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to export video", error: error as Error });

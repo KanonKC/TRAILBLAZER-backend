@@ -231,15 +231,15 @@ export default class LinkedAccountService {
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof OAuth2RequestError) {
-                logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
+                logger.warn({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
                 throw new BadRequestError("Invalid OAuth code, credentials, or redirect URI");
             }
             if (error instanceof ArcticFetchError) {
-                logger.error({ message: "Arctic fetch error", error: error as Error });
+                logger.warn({ message: "Arctic fetch error", error: error as Error });
                 throw new BadRequestError("Failed to communicate with OAuth provider");
             }
             if (error instanceof BadRequestError) throw error;
-            logger.error({ message: "Failed to exchange OAuth code", error: error as Error });
+            logger.warn({ message: "Failed to exchange OAuth code", error: error as Error });
             throw new BadRequestError("Failed to exchange OAuth code. The code may be expired or invalid.");
         }
     }
@@ -279,7 +279,7 @@ export default class LinkedAccountService {
             throw new BadRequestError(`Unsupported platform: ${platform}`);
         } catch (error) {
             if (error instanceof BadRequestError) throw error;
-            logger.error({ message: "Failed to refresh access token", error: error as Error });
+            logger.warn({ message: "Failed to refresh access token", error: error as Error });
             throw new BadRequestError("Failed to refresh access token");
         }
     }
@@ -321,7 +321,7 @@ export default class LinkedAccountService {
                 platform_avatar_url: channel.snippet.thumbnails?.default?.url || null,
             };
         } catch (error: any) {
-            this.logger.error({
+            this.logger.warn({
                 message: "Failed to fetch YouTube profile",
                 data: error.response?.data,
                 error: error as Error
@@ -347,7 +347,7 @@ export default class LinkedAccountService {
                 platform_avatar_url: avatarUrl,
             };
         } catch (error: any) {
-            this.logger.error({
+            this.logger.warn({
                 message: "Failed to fetch Discord profile",
                 data: error.response?.data,
                 error: error as Error
@@ -371,7 +371,7 @@ export default class LinkedAccountService {
                 platform_avatar_url: avatarUrl,
             };
         } catch (error: any) {
-            this.logger.error({
+            this.logger.warn({
                 message: "Failed to fetch Spotify profile",
                 data: error.response?.data,
                 error: error as Error

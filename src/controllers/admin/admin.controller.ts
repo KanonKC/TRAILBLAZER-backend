@@ -39,7 +39,7 @@ export default class AdminController {
             res.send(updatedUser);
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: "Failed to update user", error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: "Failed to update user", error: err });
                 return res.status(err.status).send({ message: err.message });
             }
             logger.error({ message: "Failed to update user", error: err as Error });
@@ -62,7 +62,7 @@ export default class AdminController {
             res.send({ message: "Bulk adjustment completed successfully" });
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: "Failed during bulk adjustment", error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: "Failed during bulk adjustment", error: err });
                 return res.status(err.status).send({ message: err.message });
             }
             logger.error({ message: "Failed during bulk adjustment", error: err as Error });

@@ -184,7 +184,7 @@ export default class ExportVideoService {
                 reqLog.status = "FAILED";
                 reqLog.message = "Missing Twitch OAuth token. Please sync using the TRAILBLAZER extension.";
             } else {
-                const res = await this.twitchGql.exportVideosToYoutube(req, gqlToken)
+                const res = await this.twitchGql.exportVideosToYoutube(req, gqlToken, transactionId)
                 const result = res[0]
                 if (result.errors) {
                     reqLog.status = "FAILED"

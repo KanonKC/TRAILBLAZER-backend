@@ -58,7 +58,7 @@ export default class AdminAuthController {
       res.redirect(this.cfg.admin.frontendOrigin);
     } catch (err) {
       if (err instanceof TError) {
-        logger.warn({ message: err.message, error: err });
+        logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
         return res.redirect(
           `${this.cfg.admin.frontendOrigin}/login?error=${encodeURIComponent(err.message)}`
         );
@@ -82,11 +82,11 @@ export default class AdminAuthController {
       res.send({ message: 'Token refreshed' });
     } catch (err) {
       if (err instanceof TError) {
-        logger.error({ message: err.message, error: err });
+        logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
         clearAdminAuthCookies(res);
         return res.status(err.status).send(err.toJSON());
       }
-      logger.error({ message: 'Admin token refresh failed', error: err as string | Error });
+      logger.warn({ message: 'Admin token refresh failed', error: err as string | Error });
       clearAdminAuthCookies(res);
       res.status(401).send({ message: 'Invalid refresh token' });
     }

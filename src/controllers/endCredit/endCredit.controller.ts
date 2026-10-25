@@ -36,7 +36,7 @@ export default class EndCreditController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to create end credit config", data: { userId: user.id }, error: error as Error });
@@ -60,7 +60,7 @@ export default class EndCreditController {
             res.send(config);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get end credit config", data: { userId: user.id }, error: error as Error });
@@ -94,7 +94,7 @@ export default class EndCreditController {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to update end credit config", data: { userId: user.id }, error: error as Error });
@@ -118,7 +118,7 @@ export default class EndCreditController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to delete end credit config", data: { userId: user.id }, error: error as Error });
@@ -142,7 +142,7 @@ export default class EndCreditController {
             res.send(updated);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to refresh overlay key", data: { userId: user.id }, error: error as Error });
@@ -175,7 +175,7 @@ export default class EndCreditController {
             });
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get end credit viewer records", data: { userId }, error: error as Error });
@@ -199,7 +199,7 @@ export default class EndCreditController {
             res.status(204).send();
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to test end credit widget", data: { userId: user.id }, error: error as Error });

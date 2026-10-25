@@ -83,7 +83,7 @@ export default class FirstWordService {
         if (!config) {
             const res = await this.firstWordRepository.getByOwnerId(userId, transactionId)
             if (!res) {
-                logger.error({ message: "First word config not found", data: { userId, res } });
+                logger.warn({ message: "First word config not found", data: { userId, res } });
                 throw new NotFoundError("First word config not found")
             }
             config = res
@@ -100,7 +100,7 @@ export default class FirstWordService {
         logger.info({ message: "Initializing update first word config", data: { userId, data } });
         const existing = await this.firstWordRepository.getByOwnerId(userId, transactionId)
         if (!existing) {
-            logger.error({ message: "First word config not found", data: { userId } });
+            logger.warn({ message: "First word config not found", data: { userId } });
             throw new NotFoundError("First word config not found")
         }
         await this.widgetService.authorizeOwnership(userId, existing.widget.id, transactionId)
@@ -147,7 +147,7 @@ export default class FirstWordService {
         logger = this.logger.setContext("service.firstWord.refreshOverlayKey", transactionId);
         const firstWord = await this.firstWordRepository.getByOwnerId(userId, transactionId);
         if (!firstWord) {
-            logger.error({ message: "First word config not found", data: { userId } });
+            logger.warn({ message: "First word config not found", data: { userId } });
             throw new NotFoundError("First word config not found");
         }
         await this.widgetService.authorizeOwnership(userId, firstWord.widget.id, transactionId)
@@ -207,7 +207,7 @@ export default class FirstWordService {
         }
 
         if (!user) {
-            logger.error({ message: "User not found", data: { event: e } });
+            logger.warn({ message: "User not found", data: { event: e } });
             throw new NotFoundError("User not found");
         }
 
@@ -227,7 +227,7 @@ export default class FirstWordService {
         }
 
         if (!firstWord) {
-            logger.error({ message: "First word config not found", data: { user } });
+            logger.warn({ message: "First word config not found", data: { user } });
             throw new NotFoundError("First word config not found");
         }
 
@@ -381,13 +381,13 @@ export default class FirstWordService {
         logger = this.logger.setContext("service.firstWord.resetChatters", transactionId);
         const user = await this.userRepository.getByTwitchId(twitchId, transactionId);
         if (!user) {
-            logger.error({ message: "User not found", data: { twitchId } });
+            logger.warn({ message: "User not found", data: { twitchId } });
             throw new NotFoundError("User not found");
         }
 
         const firstWord = await this.firstWordRepository.getByOwnerId(user.id, transactionId);
         if (!firstWord) {
-            logger.error({ message: "First word not found", data: { user } });
+            logger.warn({ message: "First word not found", data: { user } });
             throw new NotFoundError("First word not found");
         }
 
@@ -434,7 +434,7 @@ export default class FirstWordService {
         const twitchUser = await twitchAppAPI.users.getUserById(request.twitch_chatter_id)
         logger.info({ message: "Found twitch user", data: { twitchUser } });
         if (!twitchUser) {
-            logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
+            logger.warn({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
             throw new NotFoundError("Twitch user not found");
         }
 
@@ -475,7 +475,7 @@ export default class FirstWordService {
             const twitchUser = await twitchAppAPI.users.getUserById(request.twitch_chatter_id)
             logger.info({ message: "Found twitch user", data: { twitchUser } });
             if (!twitchUser) {
-                logger.error({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
+                logger.warn({ message: "Twitch user not found", data: { twitch_chatter_id: request.twitch_chatter_id } });
                 throw new NotFoundError("Twitch user not found");
             }
             req.twitch_chatter_username = twitchUser.displayName;
