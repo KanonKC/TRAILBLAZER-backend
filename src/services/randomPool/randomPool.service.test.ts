@@ -10,6 +10,8 @@ import { TwitchChannelRedemptionAddEventRequest } from '@/events/twitch/channelR
 import { WidgetHandler, OverlayJob } from '@/services/overlayQueue/overlayQueue.types';
 import { ConfigInput } from './request';
 import { twitchAppAPI } from '@/libs/twurple';
+import { publisher } from '@/libs/redis';
+import { WidgetEnableHandler } from '@/services/widget/widget.service';
 jest.mock('@/libs/redis', () => ({ publisher: { publish: jest.fn().mockResolvedValue(1) } }));
 jest.mock('@/libs/awsS3', () => ({
   __esModule: true,
@@ -35,6 +37,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
   let service: RandomPoolService;
   let config: ConfigRecord;
   let handler: WidgetHandler<unknown>;
+  let enableHandler: WidgetEnableHandler;
   const input: ConfigInput = {
     name: 'Config',
     pool_id: poolId,
@@ -82,7 +85,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
       deletePool: jest.fn(),
       log: jest.fn(),
     } as unknown as jest.Mocked<RandomPoolRepository>;
-    widgets = { updateEnable: jest.fn(), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
+    widgets = { updateEnable: jest.fn(), registerEnableHandler: jest.fn((slug, registered) => { enableHandler = registered; }), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
     queue = {
       register: jest.fn((slug, registered) => {
         handler = registered;
@@ -135,13 +138,14 @@ describe('RandomPoolService authorization and lifecycle', () => {
     }
     expect(repository.savePool).not.toHaveBeenCalled();
   });
-  it('rejects long/unknown audio and accepts 15-second audio', async () => {
-    for (const duration_ms of [null, 15001]) {
+  it('rejects oversized or unsupported audio and accepts audio up to 2.5 MB of any length', async () => {
+    for (const file of [
+      { size_kb: 2561, type: 'audio/mpeg' },
+      { size_kb: 100, type: 'audio/flac' },
+    ]) {
       repository.file.mockResolvedValue({
         owner_id: 'owner',
-        size_kb: 100,
-        type: 'audio/mpeg',
-        duration_ms,
+        ...file,
       } as Awaited<ReturnType<RandomPoolRepository['file']>>);
       await expect(
         service.saveConfig('owner', 'channel', { ...input, spin_sound_key: 'audio' })
@@ -149,9 +153,9 @@ describe('RandomPoolService authorization and lifecycle', () => {
     }
     repository.file.mockResolvedValue({
       owner_id: 'owner',
-      size_kb: 2048,
+      size_kb: 2560,
       type: 'audio/mpeg',
-      duration_ms: 15000,
+      duration_ms: 90000,
     } as Awaited<ReturnType<RandomPoolRepository['file']>>);
     await service.saveConfig('owner', 'channel', { ...input, spin_sound_key: 'audio' });
     expect(repository.saveConfig).toHaveBeenCalled();
@@ -165,16 +169,24 @@ describe('RandomPoolService authorization and lifecycle', () => {
       service.saveConfig('owner', 'channel', { ...input, items: [{ item_id: poolId, weight: 1 }] })
     ).rejects.toThrow('Item');
   });
-  it('creates a config without requiring quota and delegates enabling to shared widget accounting', async () => {
+  it('creates a config without enabling it itself', async () => {
     await service.saveConfig('owner', 'channel', input);
     expect(widgets.updateEnable).not.toHaveBeenCalled();
-    await service.enable('owner', 'config', true);
-    expect(widgets.updateEnable).toHaveBeenCalledWith('widget', 'owner', true, undefined);
   });
-  it('rejects enabling invalid pools', async () => {
+  it('registers a handler so the shared widget enable flow validates the pool', async () => {
+    expect(widgets.registerEnableHandler).toHaveBeenCalledWith('random-pool', expect.anything());
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).resolves.toBeUndefined();
     config.pool.items = [];
-    await expect(service.enable('owner', 'config', true)).rejects.toThrow('empty');
-    await service.enable('owner', 'config', false);
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).rejects.toThrow('empty');
+    // Widgets that are not random-pool configs are ignored.
+    await expect(enableHandler.beforeEnable!('unknown', 'owner')).resolves.toBeUndefined();
+  });
+  it('tells overlays about the new state after the enabled flag changes', async () => {
+    await enableHandler.afterChange!('widget', 'owner', true);
+    expect(publisher.publish).toHaveBeenCalledWith(
+      'random-pool:state',
+      JSON.stringify({ config_id: 'config', pool_state: 'READY', enabled: true })
+    );
   });
   it('requires the config-specific overlay token', async () => {
     await expect(service.ack('config', 'bad', 'job')).rejects.toThrow('token');

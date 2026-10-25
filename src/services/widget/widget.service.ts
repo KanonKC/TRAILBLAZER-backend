@@ -13,7 +13,16 @@ import { WidgetQuotaLimitError } from "./error";
 import { prisma } from "@/libs/prisma";
 
 
+/** Per widget type hooks around the shared enable flow, so every type is enabled through the same endpoint. */
+export interface WidgetEnableHandler {
+    /** Runs before a widget is switched on. Throw to block it. */
+    beforeEnable?: (widgetId: string, userId: string, transactionId?: string) => Promise<void>;
+    /** Runs after the enabled flag changed, for example to tell an overlay. */
+    afterChange?: (widgetId: string, userId: string, enabled: boolean, transactionId?: string) => Promise<void>;
+}
+
 export default class WidgetService {
+    private readonly enableHandlers = new Map<string, WidgetEnableHandler>();
     private readonly widgetRepository: WidgetRepository;
     private readonly userService: UserService
     private readonly userRepository: UserRepository
@@ -28,6 +37,10 @@ export default class WidgetService {
         this.userService = userService;
         this.userRepository = userRepository;
         this.logger = new TLogger(Layer.SERVICE);
+    }
+
+    registerEnableHandler(slug: string, handler: WidgetEnableHandler) {
+        this.enableHandlers.set(slug, handler);
     }
 
     async authorizeOwnership(userId: string, widgetId: string, transactionId?: string) {
@@ -136,11 +149,15 @@ export default class WidgetService {
 
         await this.authorizeOwnership(userId, id, transactionId);
         if (value) await this.authorizeAvailability(userId, id, transactionId);
+        const widget = await this.get(id, transactionId);
+        const handler = widget.widget_type_slug ? this.enableHandlers.get(widget.widget_type_slug) : undefined;
+        if (value) await handler?.beforeEnable?.(id, userId, transactionId);
         const user = await this.userService.get(userId, transactionId);
         const quota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER] + user.extra_widget_quota;
         await this.widgetRepository.updateEnabledWithinQuota(id, userId, value, quota, transactionId);
         await redis.del(`widget:${id}`);
         await redis.del(`widget:total:owner:${userId}`);
+        await handler?.afterChange?.(id, userId, value, transactionId);
     }
 
     async setInitialEnabled(id: string, userId: string, transactionId?: string) {

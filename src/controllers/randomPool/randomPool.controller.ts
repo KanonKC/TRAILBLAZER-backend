@@ -30,7 +30,6 @@ export default class RandomPoolController {
       ['POST', '/configs', 'saveConfig'],
       ['PUT', '/configs/:id', 'saveConfig'],
       ['DELETE', '/configs/:id', 'deleteConfig'],
-      ['PUT', '/configs/:id/enabled', 'enable'],
       ['POST', '/configs/:id/refresh-key', 'refreshKey'],
       ['GET', '/configs/:id/logs', 'logs'],
       ['POST', '/configs/:id/test', 'testSpin'],
@@ -89,14 +88,6 @@ export default class RandomPoolController {
             user.twitchId,
             configSchema.parse(request.body),
             id,
-            request.id
-          );
-          break;
-        case 'enable':
-          result = await this.service.enable(
-            user.id,
-            id!,
-            z.object({ enabled: z.boolean() }).parse(request.body).enabled,
             request.id
           );
           break;

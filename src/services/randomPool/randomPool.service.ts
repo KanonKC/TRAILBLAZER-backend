@@ -37,6 +37,21 @@ export default class RandomPoolService {
     private readonly queue: OverlayQueueService,
     private readonly twitch: TwitchService
   ) {
+    widgets.registerEnableHandler(WidgetTypeSlug.RANDOM_POOL, {
+      beforeEnable: async (widgetId, ownerId, transactionId) => {
+        const config = (await repository.listConfigs(ownerId, transactionId)).find(
+          (candidate) => candidate.widget_id === widgetId
+        );
+        if (config && poolState(config.pool) !== 'READY')
+          throw new BadRequestError(`Pool is ${poolState(config.pool).toLowerCase()}`);
+      },
+      afterChange: async (widgetId, ownerId, _enabled, transactionId) => {
+        const config = (await repository.listConfigs(ownerId, transactionId)).find(
+          (candidate) => candidate.widget_id === widgetId
+        );
+        if (config) await this.publishState(config.pool_id, ownerId, transactionId);
+      },
+    });
     queue.register<SpinPayload>(WidgetTypeSlug.RANDOM_POOL, {
       channel: 'random-pool:result',
       event: 'pool-result',
@@ -111,15 +126,16 @@ export default class RandomPoolService {
     const file = await this.repository.file(key, transactionId);
     if (!file || file.owner_id !== ownerId)
       throw new BadRequestError('Select an uploaded file you own');
-    if (file.size_kb > 2048) throw new BadRequestError('Files must be at most 2 MB');
+    if (kind === 'image') {
+      if (file.size_kb > 2048) throw new BadRequestError('Files must be at most 2 MB');
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'].includes(file.type))
+        throw new BadRequestError('Invalid image type');
+      return;
+    }
+    // Audio follows the shared audio uploader: mp3, wav or ogg up to 2.5 MB.
+    if (file.size_kb > 2560) throw new BadRequestError('Audio must be at most 2.5 MB');
     if (
-      kind === 'image' &&
-      !['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'].includes(file.type)
-    )
-      throw new BadRequestError('Invalid image type');
-    if (
-      kind === 'audio' &&
-      (![
+      ![
         'audio/mpeg',
         'audio/mp3',
         'audio/ogg',
@@ -127,11 +143,9 @@ export default class RandomPoolService {
         'audio/wav',
         'audio/x-wav',
         'audio/wave',
-      ].includes(file.type) ||
-        !file.duration_ms ||
-        file.duration_ms > 15000)
+      ].includes(file.type)
     )
-      throw new BadRequestError('Audio must be mp3/ogg/wav and at most 15 seconds');
+      throw new BadRequestError('Audio must be mp3, wav or ogg');
   }
   private async extendPool(pool: PoolRecord) {
     return {
@@ -249,14 +263,6 @@ export default class RandomPoolService {
     await this.publishState(config.pool_id, ownerId, transactionId);
     logger.info({ message: 'Saved random pool config', data: { configId: config.id } });
     return this.extendConfig(config);
-  }
-  async enable(ownerId: string, id: string, enabled: boolean, transactionId?: string) {
-    const config = await this.ownedConfig(ownerId, id, transactionId);
-    if (enabled && poolState(config.pool) !== 'READY')
-      throw new BadRequestError(`Pool is ${poolState(config.pool).toLowerCase()}`);
-    await this.widgets.updateEnable(config.widget_id, ownerId, enabled, transactionId);
-    await this.publishState(config.pool_id, ownerId, transactionId);
-    return this.getConfig(ownerId, id, transactionId);
   }
   async refreshOverlayKey(ownerId: string, id: string, transactionId?: string) {
     const config = await this.ownedConfig(ownerId, id, transactionId);
