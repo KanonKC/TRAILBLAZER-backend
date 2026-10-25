@@ -9,7 +9,7 @@ export default class TwitchGql {
   private readonly endpoint: string = 'https://gql.twitch.tv/gql';
   private readonly api: AxiosInstance;
   private readonly cfg: Configurations;
-  private readonly logger = new TLogger(Layer.SERVICE);
+  private readonly logger = new TLogger(Layer.PROVIDER);
 
   constructor(cfg: Configurations) {
     this.cfg = cfg;
@@ -21,8 +21,8 @@ export default class TwitchGql {
     });
   }
 
-  async getClip(slug: string): Promise<TwitchClipResponse> {
-    this.logger.setContext('twitch.gql.getClip');
+  async getClip(slug: string, transactionId?: string): Promise<TwitchClipResponse> {
+    const logger = this.logger.setContext('provider.twitchGql.getClip', transactionId);
     const body = {
       operationName: 'VideoAccessToken_Clip',
       variables: {
@@ -38,10 +38,10 @@ export default class TwitchGql {
     };
     try {
       const response = await this.api.post('', body);
-      this.logger.info({ message: 'Fetched clip from Twitch GQL', data: { slug } });
+      logger.info({ message: 'Fetched clip from Twitch GQL', data: { slug } });
       return response.data;
     } catch (error) {
-      this.logger.error({
+      logger[axios.isAxiosError(error) && error.response?.status && error.response.status >= 400 && error.response.status < 500 ? 'warn' : 'error']({
         message: 'Failed to fetch clip from Twitch GQL',
         error: error as Error,
         data: { slug },
@@ -50,9 +50,9 @@ export default class TwitchGql {
     }
   }
 
-  async getClipProductionUrl(slug: string): Promise<string> {
-    this.logger.setContext('twitch.gql.getClipProductionUrl');
-    const response = await this.getClip(slug);
+  async getClipProductionUrl(slug: string, transactionId?: string): Promise<string> {
+    const logger = this.logger.setContext('provider.twitchGql.getClipProductionUrl', transactionId);
+    const response = await this.getClip(slug, transactionId);
     const clipData = response.data.clip;
     const playbackToken = clipData.playbackAccessToken;
     const videoQualities = clipData.videoQualities;
@@ -65,22 +65,23 @@ export default class TwitchGql {
       const token = encodeURIComponent(playbackToken.value);
 
       const finalLink = `${sourceUrl}?sig=${signature}&token=${token}`;
-      this.logger.info({
+      logger.info({
         message: 'Resolved clip production URL',
         data: { slug, quality: distinctQuality.quality },
       });
       return finalLink;
     } else {
-      this.logger.warn({ message: 'No suitable video quality found for clip', data: { slug } });
+      logger.warn({ message: 'No suitable video quality found for clip', data: { slug } });
       throw new Error('No suitable video quality found.');
     }
   }
 
   async exportVideosToYoutube(
     req: ExportVideoToYoutubeRequest[],
-    token: string
+    token: string,
+    transactionId?: string
   ): Promise<ExportVideoToYoutubeResponse[]> {
-    this.logger.setContext('twitch.gql.exportVideosToYoutube');
+    const logger = this.logger.setContext('provider.twitchGql.exportVideosToYoutube', transactionId);
     const body = req.map((r) => ({
       operationName: 'YoutubeExportModal_ExportVideoToYoutube',
       variables: {
@@ -106,13 +107,13 @@ export default class TwitchGql {
           Authorization: `OAuth ${token}`,
         },
       });
-      this.logger.info({
+      logger.info({
         message: 'Exported videos to YouTube',
         data: { count: req.length, videoIds: req.map((r) => r.videoId) },
       });
       return response.data;
     } catch (error) {
-      this.logger.error({
+      logger[axios.isAxiosError(error) && error.response?.status && error.response.status >= 400 && error.response.status < 500 ? 'warn' : 'error']({
         message: 'Failed to export videos to YouTube',
         error: error as Error,
         data: { count: req.length, videoIds: req.map((r) => r.videoId) },
