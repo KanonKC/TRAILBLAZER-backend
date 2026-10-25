@@ -25,6 +25,8 @@ export const configSchema = z
     name: z.string().trim().min(1).max(100),
     pool_id: z.string().uuid(),
     twitch_reward_id: z.string().min(1),
+    /** Account that sends the result to chat: the streamer's own Twitch id, or null for the default bot. */
+    twitch_bot_id: z.string().min(1).nullable().optional(),
     mode: z.enum(['UNIFORM', 'WEIGHTED']),
     visualization: z.enum(['SHUFFLE', 'SLIDE', 'WHEEL']),
     default_chat_message: z.string().max(500).nullable().optional(),

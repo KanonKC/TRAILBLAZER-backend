@@ -31,7 +31,7 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get channel rewards", data: { userId: user.id }, error: error as Error });
@@ -53,7 +53,7 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to list event subs", data: { userId: user.id }, error: error as Error });
@@ -82,7 +82,7 @@ export default class TwitchController {
             return res.status(200).send(response);
         } catch (error) {
             if (error instanceof TError) {
-                logger.error({ message: error.message, data: { userId: user.id }, error });
+                logger[error.status >= 500 ? "error" : "warn"]({ message: error.message, data: { userId: user.id }, error });
                 return res.status(error.status).send(error.toJSON());
             }
             logger.error({ message: "Failed to get user", data: { userId: user.id }, error: error as Error });

@@ -75,7 +75,7 @@ export default class UserController {
                 return res.status(400).send({ message: "Validation Error", errors: err.issues });
             }
             if (err instanceof TError) {
-                logger.error({ message: err.message, data: req.query, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, data: req.query, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Login failed", data: req.query, error: err as Error | string });
@@ -100,7 +100,7 @@ export default class UserController {
             logger.info({ message: "Successfully retrieved user info", data: info });
             res.send(info);
         } catch (err) {
-            logger.error({ message: "Failed to get current user info", error: err as string | Error });
+            logger[err instanceof TError && err.status < 500 ? "warn" : "error"]({ message: "Failed to get current user info", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -121,7 +121,7 @@ export default class UserController {
             logger.info({ message: "Successfully retrieved user tier", data: { userId: decoded.id, tier, force } });
             res.send({ tier });
         } catch (err) {
-            logger.error({ message: "Failed to get user tier", error: err as string | Error });
+            logger[err instanceof TError && err.status < 500 ? "warn" : "error"]({ message: "Failed to get user tier", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -148,7 +148,7 @@ export default class UserController {
             res.send({ message: "Token refreshed" });
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: err.message, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 clearAuthCookies(res);
                 return res.status(err.status).send(err.toJSON());
             }
@@ -167,7 +167,7 @@ export default class UserController {
             logger.info({ message: "Successfully retrieved user showcase" });
             res.send(showcase);
         } catch (err) {
-            logger.error({ message: "Failed to list user showcase", error: err as string | Error });
+            logger[err instanceof TError && err.status < 500 ? "warn" : "error"]({ message: "Failed to list user showcase", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }
@@ -188,7 +188,7 @@ export default class UserController {
 
             res.send({ ...status, code });
         } catch (err) {
-            logger.error({ message: "Failed to get referral status", error: err as string | Error });
+            logger[err instanceof TError && err.status < 500 ? "warn" : "error"]({ message: "Failed to get referral status", error: err as string | Error });
             if (err instanceof TError) {
                 return res.status(err.status).send(err.toJSON());
             }

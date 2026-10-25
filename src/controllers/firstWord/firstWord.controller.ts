@@ -34,7 +34,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully retrieved first word", data: { userId: user.id, firstWord } });
             res.send(firstWord);
         } catch (error) {
-            logger.error({ message: "Failed to get first word", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to get first word", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -58,7 +58,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully updated first word", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
-            logger.error({ message: "Failed to update first word", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to update first word", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -85,7 +85,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully created first word", data: { userId: user.id } });
             res.status(201).send(created);
         } catch (error) {
-            logger.error({ message: "Failed to create first word", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof z.ZodError || (error instanceof TError && error.status < 500) ? "warn" : "error"]({ message: "Failed to create first word", data: { userId: user.id }, error: error as Error });
             if (error instanceof z.ZodError) {
                 return res.status(400).send({ message: "Validation Error", errors: error.issues });
             }
@@ -132,7 +132,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully refreshed overlay key", data: { userId: user.id } });
             res.send(updated);
         } catch (error) {
-            logger.error({ message: "Failed to refresh overlay key", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to refresh overlay key", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -157,7 +157,7 @@ export default class FirstWordController {
             await this.firstWordService.createCustomReply(user.id, result.data, req.id);
             res.status(201).send({ message: "Custom reply created successfully" });
         } catch (error) {
-            logger.error({ message: "Failed to create custom reply", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to create custom reply", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -187,7 +187,7 @@ export default class FirstWordController {
             await this.firstWordService.updateCustomReply(user.id, id, result.data, req.id);
             res.status(200).send({ message: "Custom reply updated successfully" });
         } catch (error) {
-            logger.error({ message: "Failed to update custom reply", data: { userId: user.id, id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to update custom reply", data: { userId: user.id, id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -212,7 +212,7 @@ export default class FirstWordController {
             await this.firstWordService.deleteCustomReply(user.id, id, req.id);
             res.status(200).send({ message: "Custom reply deleted successfully" });
         } catch (error) {
-            logger.error({ message: "Failed to delete custom reply", data: { userId: user.id, id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to delete custom reply", data: { userId: user.id, id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -238,7 +238,7 @@ export default class FirstWordController {
             const result = await this.firstWordService.listCustomReplies(user.id, { search }, { limit, page, total: 0 }, req.id);
             res.status(200).send(result);
         } catch (error) {
-            logger.error({ message: "Failed to list custom replies", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to list custom replies", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -261,7 +261,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully reset chatters", data: { userId: user.id } });
             res.status(200).send({ message: "Chatters reset successfully" });
         } catch (error) {
-            logger.error({ message: "Failed to reset chatters", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to reset chatters", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }
@@ -284,7 +284,7 @@ export default class FirstWordController {
             logger.info({ message: "Successfully listed chatters", data: { userId: user.id } });
             res.status(200).send(result);
         } catch (error) {
-            logger.error({ message: "Failed to list chatters", data: { userId: user.id }, error: error as Error });
+            logger[error instanceof TError && error.status < 500 ? "warn" : "error"]({ message: "Failed to list chatters", data: { userId: user.id }, error: error as Error });
             if (error instanceof TError) {
                 return res.status(error.status).send(error.toJSON());
             }

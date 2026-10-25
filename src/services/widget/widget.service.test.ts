@@ -136,6 +136,24 @@ describe("WidgetService", () => {
             expect(mockWidgetRepo.updateEnabledWithinQuota).toHaveBeenCalledWith("w_1", "u_1", true, 1, transactionId);
             expect(redis.del).toHaveBeenCalledWith("widget:w_1");
         });
+        it("runs the registered handler for the widget type around the shared enable flow", async () => {
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type_slug: "demo", widget_type: { availability: "active" } } as any);
+            const beforeEnable = jest.fn();
+            const afterChange = jest.fn();
+            service.registerEnableHandler("demo", { beforeEnable, afterChange });
+            await service.updateEnable("w_1", "u_1", true, transactionId);
+            expect(beforeEnable).toHaveBeenCalledWith("w_1", "u_1", transactionId);
+            expect(afterChange).toHaveBeenCalledWith("w_1", "u_1", true, transactionId);
+            await service.updateEnable("w_1", "u_1", false, transactionId);
+            expect(beforeEnable).toHaveBeenCalledTimes(1);
+            expect(afterChange).toHaveBeenCalledWith("w_1", "u_1", false, transactionId);
+        });
+        it("does not enable the widget when the handler blocks it", async () => {
+            mockWidgetRepo.get.mockResolvedValue({ id: "w_1", owner_id: "u_1", widget_type_slug: "demo", widget_type: { availability: "active" } } as any);
+            service.registerEnableHandler("demo", { beforeEnable: jest.fn().mockRejectedValue(new Error("blocked")) });
+            await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow("blocked");
+            expect(mockWidgetRepo.updateEnabledWithinQuota).not.toHaveBeenCalled();
+        });
         it("propagates quota exhaustion from the transaction", async () => {
             mockWidgetRepo.updateEnabledWithinQuota.mockRejectedValue(new WidgetQuotaLimitError());
             await expect(service.updateEnable("w_1", "u_1", true, transactionId)).rejects.toThrow(WidgetQuotaLimitError);

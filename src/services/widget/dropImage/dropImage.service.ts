@@ -251,7 +251,7 @@ export default class DropImageService {
         }
 
         if (config.enabled_moderation) {
-            const result = await this.sightengine.detectMatureContent(url);
+            const result = await this.sightengine.detectMatureContent(url, transactionId);
             logger.info({ message: "Image moderation result", data: { url, result } });
             if (result.nudity.none < 0.8 || result.gore.prob > 0.5) {
                 logger.warn({ message: "Image contains mature content", data: { url, result } });

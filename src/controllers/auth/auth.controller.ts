@@ -25,7 +25,7 @@ export default class AuthController {
             res.status(200).send({ message: "Logged out" });
         } catch (err) {
             if (err instanceof TError) {
-                logger.error({ message: err.message, error: err });
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Logout failed", error: err as string | Error });
@@ -52,6 +52,7 @@ export default class AuthController {
             res.status(204).send();
         } catch (err) {
             if (err instanceof TError) {
+                logger[err.status >= 500 ? "error" : "warn"]({ message: err.message, error: err });
                 return res.status(err.status).send(err.toJSON());
             }
             logger.error({ message: "Token sync failed", error: err as string | Error });

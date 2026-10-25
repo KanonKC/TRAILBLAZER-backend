@@ -27,10 +27,10 @@ export default class RandomPoolController {
       ['DELETE', '/pools/:id', 'deletePool'],
       ['GET', '/configs', 'listConfigs'],
       ['GET', '/configs/:id', 'getConfig'],
+      ['POST', '/enable', 'enable'],
       ['POST', '/configs', 'saveConfig'],
       ['PUT', '/configs/:id', 'saveConfig'],
       ['DELETE', '/configs/:id', 'deleteConfig'],
-      ['PUT', '/configs/:id/enabled', 'enable'],
       ['POST', '/configs/:id/refresh-key', 'refreshKey'],
       ['GET', '/configs/:id/logs', 'logs'],
       ['POST', '/configs/:id/test', 'testSpin'],
@@ -93,12 +93,7 @@ export default class RandomPoolController {
           );
           break;
         case 'enable':
-          result = await this.service.enable(
-            user.id,
-            id!,
-            z.object({ enabled: z.boolean() }).parse(request.body).enabled,
-            request.id
-          );
+          result = await this.service.enable(user.id, user.twitchId, request.id);
           break;
         case 'refreshKey':
           result = await this.service.refreshOverlayKey(user.id, id!, request.id);
@@ -135,7 +130,7 @@ export default class RandomPoolController {
           : prismaCode === 'P2002'
             ? 409
             : 500;
-    logger.error({
+    logger[status >= 500 ? 'error' : 'warn']({
       message: 'Random pool request failed',
       data: { status },
       error: error as Error,

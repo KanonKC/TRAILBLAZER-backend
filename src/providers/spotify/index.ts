@@ -16,27 +16,27 @@ export default class Spotify {
     ) {
         this.cfg = cfg
         this.linkedAccountRepository = linkedAccountRepository
-        this.logger = new TLogger(Layer.SERVICE)
+        this.logger = new TLogger(Layer.PROVIDER)
     }
 
     async createUserAPI(userId: string, transactionId?: string): Promise<SpotifyApi> {
-        let logger: TLogger = this.logger;
-        logger = this.logger.setContext("provider.spotify.createUserAPI", transactionId)
+        const logger = this.logger.setContext("provider.spotify.createUserAPI", transactionId)
         logger.info({ message: "Creating user Spotify API", data: { userId } })
 
         const linkedAccount = await this.linkedAccountRepository.getByUserIdAndPlatform(userId, "spotify", transactionId)
         const refreshToken = linkedAccount?.refresh_token
         if (!refreshToken) {
-            logger.error({ message: "No refresh token found", data: { userId } })
+            logger.warn({ message: "No refresh token found", data: { userId } })
             throw new Error("No refresh token found")
         }
 
-        const auth = await this.refresh(refreshToken)
-
+        const auth = await this.refresh(refreshToken, transactionId)
+        logger.info({ message: "Created user Spotify API", data: { userId } })
         return SpotifyApi.withAccessToken(this.cfg.spotify.clientId, auth)
     }
 
-    async refresh(token: string): Promise<AccessToken> {
+    async refresh(token: string, transactionId?: string): Promise<AccessToken> {
+        const logger = this.logger.setContext("provider.spotify.refresh", transactionId)
         const authOptions = {
             url: 'https://accounts.spotify.com/api/token',
             form: {
@@ -52,9 +52,16 @@ export default class Spotify {
             json: true
         };
 
-        const response = await axios.post<AccessToken>(authOptions.url, authOptions.form, {
-            headers: authOptions.headers
-        })
+        let response;
+        try {
+            response = await axios.post<AccessToken>(authOptions.url, authOptions.form, {
+                headers: authOptions.headers
+            })
+            logger.info({ message: "Spotify access token refreshed" })
+        } catch (error) {
+            logger[axios.isAxiosError(error) && error.response?.status && error.response.status >= 400 && error.response.status < 500 ? "warn" : "error"]({ message: "Failed to refresh Spotify access token", error: error as Error })
+            throw error
+        }
 
         // Spotify doesn't always return a new refresh_token on refresh; preserve the original
         // so the SDK's auto-refresh mechanism can use it if the access token expires mid-session.

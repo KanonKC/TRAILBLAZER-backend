@@ -13,7 +13,16 @@ import { WidgetQuotaLimitError } from "./error";
 import { prisma } from "@/libs/prisma";
 
 
+/** Per widget type hooks around the shared enable flow, so every type is enabled through the same endpoint. */
+export interface WidgetEnableHandler {
+    /** Runs before a widget is switched on. Throw to block it. */
+    beforeEnable?: (widgetId: string, userId: string, transactionId?: string) => Promise<void>;
+    /** Runs after the enabled flag changed, for example to tell an overlay. */
+    afterChange?: (widgetId: string, userId: string, enabled: boolean, transactionId?: string) => Promise<void>;
+}
+
 export default class WidgetService {
+    private readonly enableHandlers = new Map<string, WidgetEnableHandler>();
     private readonly widgetRepository: WidgetRepository;
     private readonly userService: UserService
     private readonly userRepository: UserRepository
@@ -28,6 +37,10 @@ export default class WidgetService {
         this.userService = userService;
         this.userRepository = userRepository;
         this.logger = new TLogger(Layer.SERVICE);
+    }
+
+    registerEnableHandler(slug: string, handler: WidgetEnableHandler) {
+        this.enableHandlers.set(slug, handler);
     }
 
     async authorizeOwnership(userId: string, widgetId: string, transactionId?: string) {
@@ -112,7 +125,7 @@ export default class WidgetService {
         }
     }
 
-    async update(id: string, userId: string, request: UpdateWidget, transactionId?: string) {
+    async update(id: string, userId: string, request: UpdateWidget, transactionId?: string, skipBeforeEnable = false) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widget.update", transactionId);
         const existing = await this.widgetRepository.get(id, transactionId);
@@ -120,7 +133,7 @@ export default class WidgetService {
             throw new NotFoundError("Widget not found");
         }
         await this.authorizeOwnership(userId, existing.id, transactionId);
-        if (request.enabled !== undefined) await this.updateEnable(id, userId, request.enabled, transactionId);
+        if (request.enabled !== undefined) await this.updateEnable(id, userId, request.enabled, transactionId, skipBeforeEnable);
         const res = request.overlay_key !== undefined
             ? await this.widgetRepository.update(id, { overlay_key: request.overlay_key }, transactionId)
             : undefined;
@@ -129,18 +142,23 @@ export default class WidgetService {
         return res
     }
 
-    async updateEnable(id: string, userId: string, value: boolean, transactionId?: string) {
+    /** `skipBeforeEnable` is for the first switch-on at creation, when the type's own setup is not done yet. */
+    async updateEnable(id: string, userId: string, value: boolean, transactionId?: string, skipBeforeEnable = false) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widget.updateEnable", transactionId);
         logger.info({ message: "Updating widget enabled status", data: { id, userId, value } });
 
         await this.authorizeOwnership(userId, id, transactionId);
         if (value) await this.authorizeAvailability(userId, id, transactionId);
+        const widget = await this.get(id, transactionId);
+        const handler = widget.widget_type_slug ? this.enableHandlers.get(widget.widget_type_slug) : undefined;
+        if (value && !skipBeforeEnable) await handler?.beforeEnable?.(id, userId, transactionId);
         const user = await this.userService.get(userId, transactionId);
         const quota = PLAN_QUOTA[user.tier >= UserTier.PRO_TIER ? UserTier.PRO_TIER : UserTier.FREE_TIER] + user.extra_widget_quota;
         await this.widgetRepository.updateEnabledWithinQuota(id, userId, value, quota, transactionId);
         await redis.del(`widget:${id}`);
         await redis.del(`widget:total:owner:${userId}`);
+        await handler?.afterChange?.(id, userId, value, transactionId);
     }
 
     async setInitialEnabled(id: string, userId: string, transactionId?: string) {
@@ -154,7 +172,7 @@ export default class WidgetService {
         const usedQuota = await this.widgetRepository.getEnabledQuotaUsed(userId, [id], transactionId);
         const isEnabled = usedQuota + cost <= quota && await this.isAvailable(userId, id, transactionId);
         logger.info({ message: "Setting initial enabled state", data: { id, cost, usedQuota, quota, isEnabled, extraQuota: user.extra_widget_quota } });
-        await this.update(id, userId, { enabled: isEnabled }, transactionId);
+        await this.update(id, userId, { enabled: isEnabled }, transactionId, true);
     }
 
     async delete(id: string, userId: string, transactionId?: string) {

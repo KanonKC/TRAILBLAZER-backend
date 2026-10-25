@@ -10,6 +10,8 @@ import { TwitchChannelRedemptionAddEventRequest } from '@/events/twitch/channelR
 import { WidgetHandler, OverlayJob } from '@/services/overlayQueue/overlayQueue.types';
 import { ConfigInput } from './request';
 import { twitchAppAPI } from '@/libs/twurple';
+import { publisher } from '@/libs/redis';
+import { WidgetEnableHandler } from '@/services/widget/widget.service';
 jest.mock('@/libs/redis', () => ({ publisher: { publish: jest.fn().mockResolvedValue(1) } }));
 jest.mock('@/libs/awsS3', () => ({
   __esModule: true,
@@ -35,6 +37,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
   let service: RandomPoolService;
   let config: ConfigRecord;
   let handler: WidgetHandler<unknown>;
+  let enableHandler: WidgetEnableHandler;
   const input: ConfigInput = {
     name: 'Config',
     pool_id: poolId,
@@ -50,6 +53,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
       widget_id: 'widget',
       pool_id: poolId,
       twitch_reward_id: 'reward',
+      twitch_bot_id: 'channel',
       mode: 'UNIFORM',
       visualization: 'SHUFFLE',
       default_chat_message: '{user}: {item}',
@@ -81,8 +85,9 @@ describe('RandomPoolService authorization and lifecycle', () => {
       saveConfig: jest.fn().mockResolvedValue(config),
       deletePool: jest.fn(),
       log: jest.fn(),
+      createDefaultConfig: jest.fn().mockResolvedValue({ config, created: true }),
     } as unknown as jest.Mocked<RandomPoolRepository>;
-    widgets = { updateEnable: jest.fn(), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
+    widgets = { updateEnable: jest.fn(), setInitialEnabled: jest.fn(), registerEnableHandler: jest.fn((slug, registered) => { enableHandler = registered; }), authorizeWidgetType: jest.fn(), isEnabledAndAvailable: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WidgetService>;
     queue = {
       register: jest.fn((slug, registered) => {
         handler = registered;
@@ -93,7 +98,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
     twitch = {
       listChannelRewards: jest.fn().mockResolvedValue({ data: [{ id: 'reward' }] }),
     } as unknown as jest.Mocked<TwitchService>;
-    service = new RandomPoolService(repository, widgets, queue, twitch);
+    service = new RandomPoolService(repository, widgets, queue, twitch, 'default-bot');
   });
   it('protects configs and pools against other owners', async () => {
     await expect(service.getConfig('other', 'config')).rejects.toThrow('own');
@@ -135,13 +140,14 @@ describe('RandomPoolService authorization and lifecycle', () => {
     }
     expect(repository.savePool).not.toHaveBeenCalled();
   });
-  it('rejects long/unknown audio and accepts 15-second audio', async () => {
-    for (const duration_ms of [null, 15001]) {
+  it('rejects oversized or unsupported audio and accepts audio up to 2.5 MB of any length', async () => {
+    for (const file of [
+      { size_kb: 2561, type: 'audio/mpeg' },
+      { size_kb: 100, type: 'audio/flac' },
+    ]) {
       repository.file.mockResolvedValue({
         owner_id: 'owner',
-        size_kb: 100,
-        type: 'audio/mpeg',
-        duration_ms,
+        ...file,
       } as Awaited<ReturnType<RandomPoolRepository['file']>>);
       await expect(
         service.saveConfig('owner', 'channel', { ...input, spin_sound_key: 'audio' })
@@ -149,12 +155,38 @@ describe('RandomPoolService authorization and lifecycle', () => {
     }
     repository.file.mockResolvedValue({
       owner_id: 'owner',
-      size_kb: 2048,
+      size_kb: 2560,
       type: 'audio/mpeg',
-      duration_ms: 15000,
+      duration_ms: 90000,
     } as Awaited<ReturnType<RandomPoolRepository['file']>>);
     await service.saveConfig('owner', 'channel', { ...input, spin_sound_key: 'audio' });
     expect(repository.saveConfig).toHaveBeenCalled();
+  });
+  it('lets a config announce as the streamer or the default bot only', async () => {
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'default-bot' });
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: null });
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'channel' });
+    await expect(
+      service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'someone-else' })
+    ).rejects.toThrow('sender');
+  });
+  it('announces as the streamer for a new config that names no sender', async () => {
+    await service.saveConfig('owner', 'channel', input);
+    expect(repository.saveConfig).toHaveBeenLastCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ twitch_bot_id: 'channel' }),
+      undefined,
+      undefined
+    );
+    await service.saveConfig('owner', 'channel', input, 'config');
+    expect(repository.saveConfig).toHaveBeenLastCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ twitch_bot_id: undefined }),
+      'config',
+      undefined
+    );
   });
   it('rejects reward reuse, foreign rewards and foreign item settings', async () => {
     repository.rewardUsed.mockResolvedValueOnce(true);
@@ -165,16 +197,24 @@ describe('RandomPoolService authorization and lifecycle', () => {
       service.saveConfig('owner', 'channel', { ...input, items: [{ item_id: poolId, weight: 1 }] })
     ).rejects.toThrow('Item');
   });
-  it('creates a config without requiring quota and delegates enabling to shared widget accounting', async () => {
+  it('creates a config without enabling it itself', async () => {
     await service.saveConfig('owner', 'channel', input);
     expect(widgets.updateEnable).not.toHaveBeenCalled();
-    await service.enable('owner', 'config', true);
-    expect(widgets.updateEnable).toHaveBeenCalledWith('widget', 'owner', true, undefined);
   });
-  it('rejects enabling invalid pools', async () => {
-    config.pool.items = [];
-    await expect(service.enable('owner', 'config', true)).rejects.toThrow('empty');
-    await service.enable('owner', 'config', false);
+  it('registers a handler so the shared widget enable flow validates the pool', async () => {
+    expect(widgets.registerEnableHandler).toHaveBeenCalledWith('random-pool', expect.anything());
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).resolves.toBeUndefined();
+    config.pool.moderation_status = 'HIDDEN';
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).rejects.toThrow('hidden');
+    // Widgets that are not random-pool configs are ignored.
+    await expect(enableHandler.beforeEnable!('unknown', 'owner')).resolves.toBeUndefined();
+  });
+  it('tells overlays about the new state after the enabled flag changes', async () => {
+    await enableHandler.afterChange!('widget', 'owner', true);
+    expect(publisher.publish).toHaveBeenCalledWith(
+      'random-pool:state',
+      JSON.stringify({ config_id: 'config', pool_state: 'READY', enabled: true })
+    );
   });
   it('requires the config-specific overlay token', async () => {
     await expect(service.ack('config', 'bad', 'job')).rejects.toThrow('token');
@@ -209,6 +249,17 @@ describe('RandomPoolService authorization and lifecycle', () => {
       'Viewer: Prize'
     );
   });
+  it('sends the result from the default bot when the config has no sender', async () => {
+    config.twitch_bot_id = null;
+    await service.redeem(event);
+    const job = queue.enqueue.mock.calls[0][0] as OverlayJob;
+    await handler.onAck!(job);
+    expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
+      'default-bot',
+      'channel',
+      'Viewer: Prize'
+    );
+  });
   it('skips draws for disabled, empty, deleted, hidden and different-channel pools', async () => {
     const pool = config.pool;
     for (const state of ['disabled', 'empty', 'deleted', 'hidden', 'channel']) {
@@ -231,5 +282,24 @@ describe('RandomPoolService authorization and lifecycle', () => {
     expect(await handler.resolve(job)).toBeNull();
     await handler.onAck!(job);
     expect(twitchAppAPI.chat.sendChatMessageAsApp).not.toHaveBeenCalled();
+  });
+  it('creates the first config on enable and applies the initial enabled state once', async () => {
+    await service.enable('owner', 'channel');
+    expect(repository.createDefaultConfig).toHaveBeenCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ pool: expect.any(String), config: expect.any(String) }),
+      undefined
+    );
+    expect(widgets.setInitialEnabled).toHaveBeenCalledWith('widget', 'owner', undefined);
+    widgets.setInitialEnabled.mockClear();
+    repository.createDefaultConfig.mockResolvedValue({ config, created: false });
+    await service.enable('owner', 'channel');
+    expect(widgets.setInitialEnabled).not.toHaveBeenCalled();
+  });
+  it('lets an unfinished config (no reward, empty pool) be switched on again', async () => {
+    config.twitch_reward_id = null;
+    config.pool.items = [];
+    await expect(enableHandler.beforeEnable!('widget', 'owner')).resolves.toBeUndefined();
   });
 });

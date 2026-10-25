@@ -59,14 +59,14 @@ export default class AdminAuthService {
             claims = decodeIdToken(tokens.idToken()) as GoogleIdTokenClaims;
         } catch (error) {
             if (error instanceof OAuth2RequestError) {
-                logger.error({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
+                logger.warn({ message: "OAuth2 request error", data: { code: error.code }, error: error as Error });
                 throw new UnauthorizedError("Invalid OAuth code, credentials, or redirect URI");
             }
             if (error instanceof ArcticFetchError) {
-                logger.error({ message: "Arctic fetch error", error: error as Error });
+                logger.warn({ message: "Arctic fetch error", error: error as Error });
                 throw new UnauthorizedError("Failed to communicate with Google");
             }
-            logger.error({ message: "Failed to exchange Google OAuth code", error: error as Error });
+            logger.warn({ message: "Failed to exchange Google OAuth code", error: error as Error });
             throw new UnauthorizedError("Failed to complete Google login");
         }
 
