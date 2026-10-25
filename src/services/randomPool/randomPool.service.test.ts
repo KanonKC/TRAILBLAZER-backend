@@ -53,6 +53,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
       widget_id: 'widget',
       pool_id: poolId,
       twitch_reward_id: 'reward',
+      twitch_bot_id: 'channel',
       mode: 'UNIFORM',
       visualization: 'SHUFFLE',
       default_chat_message: '{user}: {item}',
@@ -96,7 +97,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
     twitch = {
       listChannelRewards: jest.fn().mockResolvedValue({ data: [{ id: 'reward' }] }),
     } as unknown as jest.Mocked<TwitchService>;
-    service = new RandomPoolService(repository, widgets, queue, twitch);
+    service = new RandomPoolService(repository, widgets, queue, twitch, 'default-bot');
   });
   it('protects configs and pools against other owners', async () => {
     await expect(service.getConfig('other', 'config')).rejects.toThrow('own');
@@ -160,6 +161,32 @@ describe('RandomPoolService authorization and lifecycle', () => {
     await service.saveConfig('owner', 'channel', { ...input, spin_sound_key: 'audio' });
     expect(repository.saveConfig).toHaveBeenCalled();
   });
+  it('lets a config announce as the streamer or the default bot only', async () => {
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'default-bot' });
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: null });
+    await service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'channel' });
+    await expect(
+      service.saveConfig('owner', 'channel', { ...input, twitch_bot_id: 'someone-else' })
+    ).rejects.toThrow('sender');
+  });
+  it('announces as the streamer for a new config that names no sender', async () => {
+    await service.saveConfig('owner', 'channel', input);
+    expect(repository.saveConfig).toHaveBeenLastCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ twitch_bot_id: 'channel' }),
+      undefined,
+      undefined
+    );
+    await service.saveConfig('owner', 'channel', input, 'config');
+    expect(repository.saveConfig).toHaveBeenLastCalledWith(
+      'owner',
+      'channel',
+      expect.objectContaining({ twitch_bot_id: undefined }),
+      'config',
+      undefined
+    );
+  });
   it('rejects reward reuse, foreign rewards and foreign item settings', async () => {
     repository.rewardUsed.mockResolvedValueOnce(true);
     await expect(service.saveConfig('owner', 'channel', input)).rejects.toThrow('bound');
@@ -217,6 +244,17 @@ describe('RandomPoolService authorization and lifecycle', () => {
     await handler.onAck!(job);
     expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
       'channel',
+      'channel',
+      'Viewer: Prize'
+    );
+  });
+  it('sends the result from the default bot when the config has no sender', async () => {
+    config.twitch_bot_id = null;
+    await service.redeem(event);
+    const job = queue.enqueue.mock.calls[0][0] as OverlayJob;
+    await handler.onAck!(job);
+    expect(twitchAppAPI.chat.sendChatMessageAsApp).toHaveBeenCalledWith(
+      'default-bot',
       'channel',
       'Viewer: Prize'
     );

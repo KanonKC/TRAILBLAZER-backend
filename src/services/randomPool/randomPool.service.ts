@@ -35,7 +35,8 @@ export default class RandomPoolService {
     private readonly repository: RandomPoolRepository,
     private readonly widgets: WidgetService,
     private readonly queue: OverlayQueueService,
-    private readonly twitch: TwitchService
+    private readonly twitch: TwitchService,
+    private readonly defaultBotId: string
   ) {
     widgets.registerEnableHandler(WidgetTypeSlug.RANDOM_POOL, {
       beforeEnable: async (widgetId, ownerId, transactionId) => {
@@ -89,7 +90,7 @@ export default class RandomPoolService {
           logger.info({ message: 'Sending random pool result to Twitch' });
           const { twitchAppAPI } = await import('@/libs/twurple');
           await twitchAppAPI.chat.sendChatMessageAsApp(
-            payload.broadcaster_id,
+            config.twitch_bot_id || this.defaultBotId,
             payload.broadcaster_id,
             payload.message
           );
@@ -235,7 +236,14 @@ export default class RandomPoolService {
   ) {
     const logger = this.logger.setContext('service.randomPool.saveConfig', transactionId);
     await this.widgets.authorizeWidgetType(ownerId, WidgetTypeSlug.RANDOM_POOL, transactionId);
-    const data = configSchema.parse(input);
+    const parsed = configSchema.parse(input);
+    // A new config without a sender keeps announcing as the streamer; null means the default bot.
+    const data = {
+      ...parsed,
+      twitch_bot_id: id ? parsed.twitch_bot_id : (parsed.twitch_bot_id === undefined ? twitchId : parsed.twitch_bot_id),
+    };
+    if (data.twitch_bot_id && data.twitch_bot_id !== twitchId && data.twitch_bot_id !== this.defaultBotId)
+      throw new BadRequestError('Chat sender must be your own account or the default bot');
     if (id) await this.ownedConfig(ownerId, id, transactionId);
     const pool = await this.ownedPool(ownerId, data.pool_id, transactionId);
     if (data.items.some((setting) => !pool.items.some((item) => item.id === setting.item_id)))

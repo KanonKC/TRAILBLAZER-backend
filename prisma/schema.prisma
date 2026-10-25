@@ -494,6 +494,7 @@ model RandomPoolConfig {
   pool_id                  String
   pool                     RandomPool             @relation(fields: [pool_id], references: [id])
   twitch_reward_id         String                 @unique
+  twitch_bot_id            String?
   mode                     String                 @default("UNIFORM")
   visualization            String                 @default("SHUFFLE")
   default_chat_message     String?
