@@ -300,6 +300,7 @@ export default class WidgetService {
         try {
             await this.widgetRepository.increaseTriggeredCount(id, transactionId)
             await redis.del(`widget:${id}`)
+            logger.info({ message: "Increase Widget triggered count", data: { widgetId: id } });
         } catch (err) {
             logger.error({ message: "Failed to increase Widget triggered count", data: { widgetId: id }, error: err as Error });
         }

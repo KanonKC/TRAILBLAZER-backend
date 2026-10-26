@@ -60,9 +60,12 @@ export default class TLogger {
     }
 
     private createPayload(meta: LogMeta) {
+        const [_, domain, action] = this.context.split(" ")
         return {
             layer: this.layer,
             context: this.context,
+            domain: domain,
+            action: action,
             transaction_id: this.transactionId,
             user: meta.user,
             error: meta.error instanceof Error
