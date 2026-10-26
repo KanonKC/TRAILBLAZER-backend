@@ -60,7 +60,7 @@ export default class TLogger {
     }
 
     private createPayload(meta: LogMeta) {
-        const [_, domain, action] = this.context.split(" ")
+        const [_, domain, action] = this.context.split(".")
         return {
             layer: this.layer,
             context: this.context,
