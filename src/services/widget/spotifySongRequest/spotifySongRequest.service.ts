@@ -268,6 +268,7 @@ export default class SpotifySongRequestService {
             )
         }
 
+        this.logger.setContext("service.spotifySongRequest.handleTwitchEvent", transactionId).info({ message: "Spotify song request handled, increasing widget triggered count", data: { widgetId: config.widget_id } });
         await this.widgetService.increaseTriggeredCount(config.widget_id, transactionId)
     }
 }

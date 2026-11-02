@@ -410,6 +410,6 @@ export default class RandomPoolService {
         { id: item.id, name: item.name, image_key: item.image_key },
         transactionId
       );
-    logger.info({ message: 'Random pool redemption queued', data: result });
+    logger.info({ message: 'Random pool redemption queued, widget triggered count will increase on dispatch', data: { ...result, widgetId: config.widget_id } });
   }
 }

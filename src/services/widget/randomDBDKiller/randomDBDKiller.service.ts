@@ -213,6 +213,7 @@ export default class RandomDBDKillerService {
             awaitsAck: true,
             transactionId,
         });
+        logger.info({ message: "Random DBD Killer queued, widget triggered count will increase on dispatch", data: { widgetId: config.widget_id, killer: killer.slug } });
     }
 
     private async subscribeToRedemptionEvents(twitchId: string, userId: string, transactionId?: string): Promise<void> {

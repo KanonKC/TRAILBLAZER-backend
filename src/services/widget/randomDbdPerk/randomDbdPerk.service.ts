@@ -163,6 +163,7 @@ export default class RandomDbdPerkService {
         try {
             logger.info({ message: "Sending chat message", data: { message } });
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, senderId, message)
+            logger.info({ message: "Chat message sent, increasing widget triggered count", data: { widgetId: config.widget_id } });
             await this.widgetService.increaseTriggeredCount(config.widget_id, transactionId)
         } catch (error) {
             logger.error({ message: "Failed to send chat message", data: { error } });

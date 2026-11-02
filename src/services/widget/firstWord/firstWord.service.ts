@@ -344,6 +344,7 @@ export default class FirstWordService {
             await twitchAppAPI.chat.sendChatMessageAsApp(senderId, e.broadcaster_user_id, message)
         }
 
+        logger.info({ message: "First word greeting sent, increasing widget triggered count", data: { widgetId: firstWord.widget.id } });
         await this.widgetService.increaseTriggeredCount(firstWord.widget.id, transactionId)
     }
 

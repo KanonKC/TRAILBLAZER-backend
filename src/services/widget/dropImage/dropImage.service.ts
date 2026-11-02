@@ -278,5 +278,6 @@ export default class DropImageService {
             awaitsAck: true,
             transactionId,
         })
+        logger.info({ message: "DropImage queued, widget triggered count will increase on dispatch", data: { widgetId: config.widget_id } });
     }
 }

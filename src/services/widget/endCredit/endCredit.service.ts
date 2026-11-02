@@ -356,6 +356,7 @@ export default class EndCreditService {
             const enriched = await this.enrichRecordsWithTwitchProfile(records, transactionId);
 
             await this.publishRoll(endCredit.widget.owner_id, endCredit, enriched);
+            logger.info({ message: "End credit rolled, increasing widget triggered count", data: { widgetId: endCredit.widget_id } });
             await this.widgetService.increaseTriggeredCount(endCredit.widget_id, transactionId);
         } catch (error) {
             logger.error({ message: "Failed to handle raid event for end credit", error: error as Error, data: { event } });
