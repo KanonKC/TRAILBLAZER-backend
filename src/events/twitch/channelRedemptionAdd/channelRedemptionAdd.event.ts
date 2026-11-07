@@ -4,6 +4,7 @@ import RandomDbdPerkService from "@/services/widget/randomDbdPerk/randomDbdPerk.
 import DropImageService from "@/services/widget/dropImage/dropImage.service";
 import RandomDBDKillerService from "@/services/widget/randomDBDKiller/randomDBDKiller.service";
 import RedemptionClaimService from "@/services/redemptionClaim/redemptionClaim.service";
+import ReactiveRewardService from "@/services/reactiveReward/reactiveReward.service";
 import TLogger, { Layer } from "@/logging/logger";
 import { verifyTwitchSignature } from "../verifySignature";
 import { TwitchChannelRedemptionAddEventRequest } from "./request";
@@ -29,6 +30,7 @@ export default class TwitchChannelRedemptionAddEvent {
         private readonly randomPoolService?: RandomPoolService,
         private readonly redemptionClaimService?: RedemptionClaimService,
         private readonly eventSubSecret: string = "",
+        private readonly reactiveRewardService?: ReactiveRewardService,
     ) {
         this.randomDbdPerkService = randomDbdPerkService;
         this.dropImageService = dropImageService;
@@ -111,10 +113,14 @@ export default class TwitchChannelRedemptionAddEvent {
                 return res.status(400).send({ message: "Invalid body" });
             }
             logger.info({ message: "Handling channel redemption add event", data: envelope.event });
-            try {
-                await this.runClaimedWidgets(envelope.event, req.id);
-            } catch (err: any) {
-                logger.error({ message: "Handle event failed", error: err });
+            // Reactive Reward only listens here, in the verified route, and sits outside the claim: the overlay queue
+            // dedupes on the redemption id itself, so a second delivery of the same redemption plays nothing twice.
+            const results = await Promise.allSettled([
+                this.runClaimedWidgets(envelope.event, req.id),
+                this.reactiveRewardService?.redeem(envelope.event, req.id),
+            ]);
+            for (const result of results) {
+                if (result.status === "rejected") logger.error({ message: "Handle event failed", error: result.reason });
             }
             return res.status(204).send();
         }

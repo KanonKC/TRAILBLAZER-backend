@@ -36,11 +36,13 @@ describe("signed channel redemption add route", () => {
     const randomDBDKillerService = { randomizeKiller: jest.fn() };
     const randomPoolService = { redeem: jest.fn() };
     const redemptionClaimService = { claim: jest.fn() };
+    const reactiveRewardService = { redeem: jest.fn() };
     let server: FastifyInstance;
 
     beforeEach(async () => {
         jest.clearAllMocks();
         redemptionClaimService.claim.mockResolvedValue(true);
+        reactiveRewardService.redeem.mockResolvedValue(undefined);
         const event = new TwitchChannelRedemptionAddEvent(
             randomDbdPerkService as any,
             {} as any,
@@ -48,11 +50,14 @@ describe("signed channel redemption add route", () => {
             randomPoolService as any,
             redemptionClaimService as any,
             SECRET,
+            reactiveRewardService as any,
         );
         server = fastify();
         registerChannelRedemptionAddV2Route(server, event.handleSigned.bind(event));
         // A route outside the signed scope, registered the way routes.ts registers the rest
         server.post("/plain-json", async (req) => ({ bodyType: typeof req.body, body: req.body }));
+        // The unverified v1 route, registered the way routes.ts registers it
+        server.post("/webhook/v1/channel-redemption-add", event.handle.bind(event));
         await server.ready();
     });
 
@@ -65,6 +70,7 @@ describe("signed channel redemption add route", () => {
         expect(randomPoolService.redeem).not.toHaveBeenCalled();
         expect(randomDbdPerkService.randomPerk).not.toHaveBeenCalled();
         expect(randomDBDKillerService.randomizeKiller).not.toHaveBeenCalled();
+        expect(reactiveRewardService.redeem).not.toHaveBeenCalled();
     }
 
     it("returns 204 and runs the widgets for a correctly signed notification", async () => {
@@ -73,6 +79,48 @@ describe("signed channel redemption add route", () => {
         expect(randomPoolService.redeem).toHaveBeenCalledWith(redemptionEvent, expect.any(String));
         expect(randomDbdPerkService.randomPerk).toHaveBeenCalledWith(redemptionEvent, expect.any(String));
         expect(randomDBDKillerService.randomizeKiller).toHaveBeenCalledWith(redemptionEvent, expect.any(String));
+    });
+
+    it("plays the matching Reactive Reward for a correctly signed notification", async () => {
+        const response = await server.inject(buildSignedRequest());
+        expect(response.statusCode).toBe(204);
+        expect(reactiveRewardService.redeem).toHaveBeenCalledTimes(1);
+        expect(reactiveRewardService.redeem).toHaveBeenCalledWith(redemptionEvent, expect.any(String));
+    });
+
+    it("still offers a duplicate delivery to Reactive Reward, which dedupes on the redemption id in the queue", async () => {
+        redemptionClaimService.claim.mockResolvedValue(false);
+        const response = await server.inject(buildSignedRequest());
+        expect(response.statusCode).toBe(204);
+        expect(reactiveRewardService.redeem).toHaveBeenCalledWith(redemptionEvent, expect.any(String));
+        expect(randomPoolService.redeem).not.toHaveBeenCalled();
+    });
+
+    it("does not let a failing widget stop Reactive Reward, nor Reactive Reward stop the others", async () => {
+        randomPoolService.redeem.mockRejectedValue(new Error("pool down"));
+        let response = await server.inject(buildSignedRequest());
+        expect(response.statusCode).toBe(204);
+        expect(reactiveRewardService.redeem).toHaveBeenCalledTimes(1);
+
+        jest.clearAllMocks();
+        redemptionClaimService.claim.mockResolvedValue(true);
+        reactiveRewardService.redeem.mockRejectedValue(new Error("reactive down"));
+        response = await server.inject(buildSignedRequest());
+        expect(response.statusCode).toBe(204);
+        expect(randomDbdPerkService.randomPerk).toHaveBeenCalledTimes(1);
+        expect(randomDBDKillerService.randomizeKiller).toHaveBeenCalledTimes(1);
+    });
+
+    it("never offers a redemption to Reactive Reward through the unverified v1 route", async () => {
+        const response = await server.inject({
+            method: "POST",
+            url: "/webhook/v1/channel-redemption-add",
+            headers: { "content-type": "application/json" },
+            payload: JSON.stringify({ subscription: { status: "enabled" }, event: redemptionEvent }),
+        });
+        expect(response.statusCode).toBe(204);
+        expect(randomPoolService.redeem).toHaveBeenCalledTimes(1);
+        expect(reactiveRewardService.redeem).not.toHaveBeenCalled();
     });
 
     it("returns 403 and plays nothing for a signature made with the wrong secret", async () => {

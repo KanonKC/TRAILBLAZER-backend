@@ -140,6 +140,16 @@ const widgetTypes = [
     href: "/dashboard/widgets/end-credit",
     is_active: false,
   },
+  {
+    slug: "reactive-reward",
+    display_name: "Reactive Reward",
+    description: "เล่นเสียง รูปภาพ หรือวิดีโอบนโอเวอร์เลย์ OBS เมื่อผู้ชมแลก Channel Points",
+    cost: 1,
+    theme_color: "#a855f7",
+    href: "/dashboard/widgets/reactive-reward",
+    is_active: true,
+    availability: "whitelist_only",
+  },
 ];
 
 async function seedBootstrapAdmin() {
@@ -172,10 +182,12 @@ async function main() {
   }
 
   for (const widgetType of widgetTypes) {
+    // availability only applies when a type is first created, so re-seeding never undoes an admin promoting it to active
+    const { availability, ...fields } = widgetType as typeof widgetType & { availability?: string };
     await prisma.widgetType.upsert({
       where: { slug: widgetType.slug },
-      update: widgetType,
-      create: widgetType,
+      update: fields,
+      create: { ...fields, ...(availability ? { availability } : {}) },
     });
   }
 }

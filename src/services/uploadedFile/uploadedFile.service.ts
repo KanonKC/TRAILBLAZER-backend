@@ -12,9 +12,17 @@ import { ListUploadedFileRequest } from "@/repositories/uploadedFile/request"
 import TLogger, { Layer } from "@/logging/logger"
 import Configurations from "@/config/index"
 import path from "path"
-import { parseBuffer } from "music-metadata"
+import { readMediaDurationMs } from "./mediaDuration"
 import UserService from "../user/user.service"
 import { UserTier } from "../user/constant"
+
+// What the "type" list filter means. Unknown filter values match nothing special and list everything, as before.
+// A Map, not an object: the filter comes from the query string and "constructor" must not resolve to anything.
+const FILE_TYPES_BY_FILTER = new Map<string, string[]>([
+    ["audio", ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"]],
+    ["image", ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]],
+    ["video", ["video/mp4", "video/webm"]],
+])
 
 export class UploadedFileService {
     private ufr: UploadedFileRepository
@@ -93,29 +101,45 @@ export class UploadedFileService {
             owner_id: userId,
             key: key,
             size_kb: fileSizeKb,
-            duration_ms: await this.readAudioDurationMs(file.buffer, file.mimetype, transactionId)
+            duration_ms: await this.readDurationMs(file.buffer, file.mimetype, transactionId)
         }, transactionId)
         await redis.del(`uploadedFile:totalSize:${userId}`)
         return this.extend(created, transactionId)
     }
 
     /**
-     * Audio duration is what the overlay queue uses to know how long a sound
-     * occupies the overlay, so the next viewer's greeting waits the right
-     * amount of time. An unreadable file is not worth failing an upload over —
+     * Audio and video duration is what the overlay queue uses to know how long a file occupies the overlay, so the
+     * next viewer's item waits the right amount of time. An unreadable file is not worth failing an upload over —
      * the queue falls back to an estimate and the overlay reports the real end.
      */
-    private async readAudioDurationMs(buffer: Buffer, mimetype: string, transactionId?: string): Promise<number | null> {
-        const logger = this.logger.setContext("service.uploadedFile.readAudioDurationMs", transactionId)
-        if (!mimetype.startsWith("audio/") && mimetype !== "application/ogg") return null
+    private async readDurationMs(buffer: Buffer, mimetype: string, transactionId?: string): Promise<number | null> {
+        const logger = this.logger.setContext("service.uploadedFile.readDurationMs", transactionId)
+        const isTimed = mimetype.startsWith("audio/") || mimetype.startsWith("video/") || mimetype === "application/ogg"
+        if (!isTimed) return null
 
-        try {
-            const metadata = await parseBuffer(buffer, { mimeType: mimetype })
-            const seconds = metadata.format.duration
-            return seconds ? Math.round(seconds * 1000) : null
-        } catch (error) {
-            logger.warn({ message: "Could not read audio duration", data: { mimetype }, error: error as Error })
-            return null
+        const durationMs = await readMediaDurationMs(buffer, mimetype)
+        if (durationMs === null) {
+            logger.warn({ message: "Could not read media duration", data: { mimetype } })
+        }
+        return durationMs
+    }
+
+    /**
+     * Throws when `sizeBytes` more would not fit in the owner's storage.
+     * Reads the used space and the cap fresh instead of through getTotalFileSize(): that result is cached for an hour
+     * together with the cap, so right after an upgrade it would still reject an upload the new plan allows.
+     */
+    async assertCanStore(ownerId: string, sizeBytes: number, transactionId?: string): Promise<void> {
+        const logger = this.logger.setContext("service.uploadedFile.assertCanStore", transactionId)
+        const [usedKb, maxStorageMb] = await Promise.all([
+            this.ufr.getTotalFileSize(ownerId, transactionId),
+            this.userService.getMaxStorageMB(ownerId, transactionId),
+        ])
+        const incomingKb = Math.ceil(sizeBytes / 1024)
+        if (usedKb + incomingKb > maxStorageMb * 1024) {
+            logger.warn({ message: "Storage limit reached", data: { ownerId, usedKb, incomingKb, maxStorageMb } })
+            const usedMb = (usedKb / 1024).toFixed(1)
+            throw new BadRequestError(`พื้นที่จัดเก็บไม่เพียงพอ (ใช้ไป ${usedMb} จาก ${maxStorageMb} MB) กรุณาลบไฟล์ที่ไม่ใช้แล้วลองใหม่อีกครั้ง`)
         }
     }
 
@@ -150,7 +174,7 @@ export class UploadedFileService {
 
         const req: ListUploadedFileRequest = {
             search: filters.search,
-            types: filters.type === "audio" ? ["application/ogg", "audio/mpeg", "audio/mp3", "audio/wav"] : undefined,
+            types: filters.type ? FILE_TYPES_BY_FILTER.get(filters.type) : undefined,
             ownerId: userId
         }
 

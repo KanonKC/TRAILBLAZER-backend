@@ -74,19 +74,21 @@ model Trigger {
 }
 
 model UploadedFile {
-  id                        String                 @id @default(uuid())
-  key                       String                 @unique
+  id                        String                   @id @default(uuid())
+  key                       String                   @unique
   name                      String
   type                      String
   owner_id                  String
-  owner                     User                   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  created_at                DateTime               @default(now())
-  updated_at                DateTime               @updatedAt
-  size_kb                   Int                    @default(0)
+  owner                     User                     @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  created_at                DateTime                 @default(now())
+  updated_at                DateTime                 @updatedAt
+  size_kb                   Int                      @default(0)
   duration_ms               Int?
   firstWords                FirstWord[]
   first_word_custom_replies FirstWordCustomReply[]
   canvas_elements           CanvasElement[]
+  reaction_media            ReactiveRewardReaction[] @relation("ReactionMedia")
+  reaction_sounds           ReactiveRewardReaction[] @relation("ReactionSound")
 }
 
 model Widget {
@@ -112,6 +114,7 @@ model Widget {
   canvas_links       CanvasWidgetLink[]
   instance_key       String              @default("")
   random_pool_config RandomPoolConfig?
+  reactive_reward    ReactiveReward?
 
   @@unique([twitch_id, widget_type_slug, instance_key])
   @@unique([owner_id, widget_type_slug, instance_key])
@@ -531,4 +534,44 @@ model RandomPoolSpinLog {
   created_at    DateTime         @default(now())
 
   @@index([config_id, created_at])
+}
+
+/// One per streamer: owns the single OBS overlay and the shared queue. The widget row it hangs off has instance_key "".
+model ReactiveReward {
+  id         String                   @id @default(uuid())
+  widget_id  String                   @unique
+  widget     Widget                   @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+  reactions  ReactiveRewardReaction[]
+  created_at DateTime                 @default(now())
+  updated_at DateTime                 @updatedAt
+}
+
+/// Binds one Twitch Channel Points reward to the media it plays on the overlay.
+model ReactiveRewardReaction {
+  id                  String         @id @default(uuid())
+  reactive_reward_id  String
+  reactive_reward     ReactiveReward @relation(fields: [reactive_reward_id], references: [id], onDelete: Cascade)
+  twitch_reward_id    String         @unique
+  twitch_reward_title String
+  enabled             Boolean        @default(true)
+  sort_order          Int            @default(0)
+  /// IMAGE | AUDIO | VIDEO
+  media_type          String
+  media_key           String?
+  media_file          UploadedFile?  @relation("ReactionMedia", fields: [media_key], references: [key], onDelete: SetNull)
+  /// Only for IMAGE: a sound played together with the image
+  sound_key           String?
+  sound_file          UploadedFile?  @relation("ReactionSound", fields: [sound_key], references: [key], onDelete: SetNull)
+  /// 0-100
+  volume              Int            @default(80)
+  /// How long an IMAGE stays up. AUDIO and VIDEO play to their own end.
+  display_duration_ms Int            @default(5000)
+  /// 9-point grid: TOP_LEFT ... CENTER ... BOTTOM_RIGHT
+  position            String         @default("CENTER")
+  /// Width of IMAGE and VIDEO as a percentage of the overlay
+  size_percent        Int            @default(50)
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  @@index([reactive_reward_id, sort_order])
 }

@@ -4,8 +4,9 @@ import UserService from "../user/user.service";
 import s3 from "@/libs/awsS3";
 import redis, { TTL } from "@/libs/redis";
 import { randomBytes } from "crypto";
-import { NotFoundError, ForbiddenError } from "@/errors";
+import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors";
 import Configurations from "@/config/index";
+import { readMediaDurationMs } from "./mediaDuration";
 
 jest.mock("@/libs/awsS3", () => ({
     getSignedURL: jest.fn(),
@@ -19,6 +20,10 @@ jest.mock("@/libs/redis", () => ({
     TTL: {
         ONE_HOUR: 3600,
     },
+}));
+
+jest.mock("./mediaDuration", () => ({
+    readMediaDurationMs: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock("node:crypto", () => ({
@@ -273,6 +278,102 @@ describe("UploadedFileService", () => {
             await expect(service.delete(id, userId, transactionId)).rejects.toThrow(ForbiddenError);
         });
     });
+    describe("duration of timed media", () => {
+        const userId = "user1";
+        const create = (mimetype: string, filename: string) => {
+            mockUserService.getMaxStorageMB.mockResolvedValue(100);
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUploadedFileRepo.listByPattern.mockResolvedValue([]);
+            return service.create(userId, { buffer: Buffer.from("bytes"), filename, mimetype }, transactionId);
+        };
+
+        it("records the duration of a video, which the overlay queue needs to know how long it plays", async () => {
+            (readMediaDurationMs as jest.Mock).mockResolvedValue(4200);
+            await create("video/mp4", "reaction.mp4");
+            expect(readMediaDurationMs).toHaveBeenCalledWith(expect.any(Buffer), "video/mp4");
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: 4200 }), transactionId);
+        });
+
+        it("still records the duration of audio", async () => {
+            (readMediaDurationMs as jest.Mock).mockResolvedValue(1500);
+            await create("audio/mpeg", "sound.mp3");
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: 1500 }), transactionId);
+        });
+
+        it("stores a video whose duration cannot be read, with no duration", async () => {
+            (readMediaDurationMs as jest.Mock).mockResolvedValue(null);
+            await create("video/webm", "odd.webm");
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: null }), transactionId);
+        });
+
+        it("does not look for a duration in an image", async () => {
+            await create("image/png", "pic.png");
+            expect(readMediaDurationMs).not.toHaveBeenCalled();
+            expect(mockUploadedFileRepo.create).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: null }), transactionId);
+        });
+    });
+
+    describe("list type filters", () => {
+        const userId = "user1";
+        const pagination = { page: 1, limit: 10 };
+        beforeEach(() => mockUploadedFileRepo.list.mockResolvedValue([[], 0] as any));
+
+        it("filters images", async () => {
+            await service.list(userId, { type: "image" } as any, pagination, transactionId);
+            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(
+                expect.objectContaining({ types: ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"] }), pagination, transactionId);
+        });
+
+        it("filters videos", async () => {
+            await service.list(userId, { type: "video" } as any, pagination, transactionId);
+            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(
+                expect.objectContaining({ types: ["video/mp4", "video/webm"] }), pagination, transactionId);
+        });
+
+        it.each(["constructor", "__proto__", "toString", "pdf"])("treats the unknown filter %s as no filter", async (type) => {
+            await service.list(userId, { type } as any, pagination, transactionId);
+            expect(mockUploadedFileRepo.list).toHaveBeenCalledWith(expect.objectContaining({ types: undefined }), pagination, transactionId);
+        });
+    });
+
+    describe("assertCanStore", () => {
+        const ownerId = "user1";
+        const megabytes = (count: number) => count * 1024 * 1024;
+
+        it("accepts a file that fits in the remaining space", async () => {
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(3 * 1024);
+            mockUserService.getMaxStorageMB.mockResolvedValue(5);
+            await expect(service.assertCanStore(ownerId, megabytes(1), transactionId)).resolves.toBeUndefined();
+        });
+
+        it("accepts a file that exactly fills the storage", async () => {
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(3 * 1024);
+            mockUserService.getMaxStorageMB.mockResolvedValue(5);
+            await expect(service.assertCanStore(ownerId, megabytes(2), transactionId)).resolves.toBeUndefined();
+        });
+
+        it("rejects a file one kilobyte over, with a Thai message that says how much is used", async () => {
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(3 * 1024);
+            mockUserService.getMaxStorageMB.mockResolvedValue(5);
+            await expect(service.assertCanStore(ownerId, megabytes(2) + 1, transactionId)).rejects.toThrow("พื้นที่จัดเก็บไม่เพียงพอ (ใช้ไป 3.0 จาก 5 MB)");
+        });
+
+        it("rejects a 6 MB video from a free account with 5 MB of storage", async () => {
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUserService.getMaxStorageMB.mockResolvedValue(5);
+            await expect(service.assertCanStore(ownerId, megabytes(6), transactionId)).rejects.toBeInstanceOf(BadRequestError);
+        });
+
+        it("reads the used space and the cap fresh, ignoring the hour-long cache", async () => {
+            // The cache still holds the cap from before an upgrade
+            (redis.get as jest.Mock).mockResolvedValue(JSON.stringify({ total_size_kb: 0, max_storage_kb: 5 * 1024 }));
+            mockUploadedFileRepo.getTotalFileSize.mockResolvedValue(0);
+            mockUserService.getMaxStorageMB.mockResolvedValue(50);
+            await expect(service.assertCanStore(ownerId, megabytes(20), transactionId)).resolves.toBeUndefined();
+            expect(redis.get).not.toHaveBeenCalled();
+        });
+    });
+
     describe("getTotalFileSize", () => {
         const ownerId = "user1";
 

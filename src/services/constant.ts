@@ -8,4 +8,5 @@ export enum WidgetTypeSlug {
     SPOTIFY_SONG_REQUEST = "spotify-song-request",
     RANDOM_DBD_KILLER = "random-dbd-killer",
     END_CREDIT = "end-credit",
+    REACTIVE_REWARD = "reactive-reward",
 }
