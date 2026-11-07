@@ -21,6 +21,7 @@ const config: Configurations = {
         redirectUrl: process.env.TWITCH_REDIRECT_URL || "",
         defaultBotId: process.env.TWITCH_DEFAULT_BOT_ID || "",
         paymentChannelId: process.env.TWITCH_PAYMENT_CHANNEL_ID || "",
+        eventSubSecret: process.env.TWITCH_EVENTSUB_SECRET || "",
         eventSubHealthCheck: {
             // Explicit env var wins; otherwise on only for dev/prod so a local run never touches the shared Twitch app's subscriptions
             enabled: process.env.EVENTSUB_HEALTHCHECK_ENABLED

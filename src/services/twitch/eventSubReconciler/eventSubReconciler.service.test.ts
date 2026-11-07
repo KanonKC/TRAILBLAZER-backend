@@ -283,6 +283,147 @@ describe("EventSubReconcilerService", () => {
         });
     });
 
+    describe("legacy redemption route", () => {
+        const REDEMPTION_TYPE = "channel.channel_points_custom_reward_redemption.add";
+        const LEGACY_ROUTE = "/webhook/v1/twitch/event-sub/channel-redemption-add";
+        const CURRENT_ROUTE = "/webhook/v2/twitch/event-sub/channel-redemption-add";
+
+        const makeRedemptionSub = (id: string, status: string, owner: string, route: string, ageMs?: number) => ({
+            ...makeSub(id, REDEMPTION_TYPE, status, owner, ageMs),
+            _transport: { method: "webhook", callback: `https://api.test${route}` },
+        });
+        const wantRedemptions = (...twitchIds: string[]) =>
+            eventSubReconcilerRepository.listEnabledWidgets.mockResolvedValue(twitchIds.map(twitchId => ({ twitch_id: twitchId, widget_type_slug: "random-pool" })));
+        const deletedIds = () => eventSub.deleteSubscription.mock.calls.map(call => call[0] as string);
+
+        it("creates a subscription on the current route for a user who only has a legacy one, and keeps the legacy one", async () => {
+            wantRedemptions("1");
+            mockSubs([makeRedemptionSub("legacy", "enabled", "1", LEGACY_ROUTE)]);
+            const summary = await service.run("tx");
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).toHaveBeenCalledWith("1", expect.objectContaining({ callback: CURRENT_ROUTE }));
+            expect(eventSub.deleteSubscription).not.toHaveBeenCalled();
+            expect(summary).toMatchObject({ created: 1, deleted: 0 });
+        });
+
+        it("deletes the legacy subscription once the current one is healthy", async () => {
+            wantRedemptions("1");
+            mockSubs([makeRedemptionSub("legacy", "enabled", "1", LEGACY_ROUTE), makeRedemptionSub("current", "enabled", "1", CURRENT_ROUTE)]);
+            const summary = await service.run("tx");
+            expect(deletedIds()).toEqual(["legacy"]);
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).not.toHaveBeenCalled();
+            expect(summary).toMatchObject({ created: 0, deleted: 1 });
+        });
+
+        it("keeps the legacy subscription while the current one is still pending verification", async () => {
+            wantRedemptions("1");
+            mockSubs([
+                makeRedemptionSub("legacy", "enabled", "1", LEGACY_ROUTE),
+                makeRedemptionSub("current", "webhook_callback_verification_pending", "1", CURRENT_ROUTE, 60 * 1000),
+            ]);
+            const summary = await service.run("tx");
+            expect(eventSub.deleteSubscription).not.toHaveBeenCalled();
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).not.toHaveBeenCalled();
+            expect(summary).toMatchObject({ created: 0, deleted: 0 });
+        });
+
+        it("keeps the legacy subscription when the current one is broken, and replaces the broken one", async () => {
+            wantRedemptions("1");
+            mockSubs([
+                makeRedemptionSub("legacy", "enabled", "1", LEGACY_ROUTE),
+                makeRedemptionSub("current", "notification_failures_exceeded", "1", CURRENT_ROUTE),
+            ]);
+            await service.run("tx");
+            expect(deletedIds()).toEqual(["current"]);
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).toHaveBeenCalledTimes(1);
+        });
+
+        it("deletes both routes when no widget needs redemptions any more", async () => {
+            wantRedemptions("2");
+            mockSubs([
+                makeRedemptionSub("legacy", "enabled", "1", LEGACY_ROUTE),
+                makeRedemptionSub("current", "enabled", "1", CURRENT_ROUTE),
+                makeRedemptionSub("other-user-current", "enabled", "2", CURRENT_ROUTE),
+            ]);
+            await service.run("tx");
+            expect(deletedIds().sort()).toEqual(["current", "legacy"]);
+        });
+
+        it("retires legacy subscriptions in rounds of about a quarter, below the delete guard", async () => {
+            const twitchIds = Array.from({ length: 12 }, (_, index) => String(index + 1));
+            wantRedemptions(...twitchIds);
+            mockSubs(twitchIds.flatMap(twitchId => [
+                makeRedemptionSub(`legacy-${twitchId}`, "enabled", twitchId, LEGACY_ROUTE),
+                makeRedemptionSub(`current-${twitchId}`, "enabled", twitchId, CURRENT_ROUTE),
+            ]));
+            const summary = await service.run("tx");
+            // 24 managed subscriptions: a quarter is 6, and 6 / 24 stays under the 30% guard so the deletes are not cancelled
+            expect(eventSub.deleteSubscription).toHaveBeenCalledTimes(6);
+            expect(deletedIds().every(id => id.startsWith("legacy-"))).toBe(true);
+            expect(summary.deleted).toBe(6);
+        });
+
+        it("applies the same quarter budget to small installations", async () => {
+            const twitchIds = ["1", "2", "3", "4"];
+            wantRedemptions(...twitchIds);
+            mockSubs(twitchIds.flatMap(twitchId => [
+                makeRedemptionSub(`legacy-${twitchId}`, "enabled", twitchId, LEGACY_ROUTE),
+                makeRedemptionSub(`current-${twitchId}`, "enabled", twitchId, CURRENT_ROUTE),
+            ]));
+            await service.run("tx");
+            // 8 managed subscriptions: a quarter is 2
+            expect(eventSub.deleteSubscription).toHaveBeenCalledTimes(2);
+        });
+
+        it("does not spend legacy budget that other deletes already used", async () => {
+            // 8 managed subscriptions allow 2 deletes; two duplicate healthy subscriptions already take both
+            eventSubReconcilerRepository.listEnabledWidgets.mockResolvedValue([
+                { twitch_id: "1", widget_type_slug: "random-pool" },
+                { twitch_id: "2", widget_type_slug: "export-video" },
+                { twitch_id: "3", widget_type_slug: "export-video" },
+            ]);
+            mockSubs([
+                makeRedemptionSub("legacy-1", "enabled", "1", LEGACY_ROUTE),
+                makeRedemptionSub("current-1", "enabled", "1", CURRENT_ROUTE),
+                makeSub("duplicate-2a", "stream.offline", "enabled", "2"),
+                makeSub("duplicate-2b", "stream.offline", "enabled", "2"),
+                makeSub("duplicate-3a", "stream.offline", "enabled", "3"),
+                makeSub("duplicate-3b", "stream.offline", "enabled", "3"),
+                makeSub("fine-4", "stream.offline", "enabled", "4"),
+                makeSub("fine-5", "stream.offline", "enabled", "5"),
+            ]);
+            await service.run("tx");
+            expect(deletedIds()).not.toContain("legacy-1");
+        });
+    });
+
+    describe("ensureEventSubs with a legacy redemption subscription", () => {
+        const REDEMPTION_TYPE = "channel.channel_points_custom_reward_redemption.add";
+        const transportOf = (route: string) => ({ method: "webhook", callback: `https://api.test${route}` });
+
+        it("subscribes on the current route when only a legacy subscription is enabled", async () => {
+            eventSub.getSubscriptionsForUser.mockResolvedValue({
+                data: [{ type: REDEMPTION_TYPE, status: "enabled", _transport: transportOf("/webhook/v1/twitch/event-sub/channel-redemption-add") }],
+            });
+            const subscribed = await EventSubReconcilerService.ensureEventSubs("1", [REDEMPTION_TYPE], "tx");
+            expect(subscribed).toEqual([REDEMPTION_TYPE]);
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).toHaveBeenCalledWith("1", expect.objectContaining({
+                callback: "/webhook/v2/twitch/event-sub/channel-redemption-add",
+            }));
+        });
+
+        it("does nothing when the current route is already enabled next to a legacy one", async () => {
+            eventSub.getSubscriptionsForUser.mockResolvedValue({
+                data: [
+                    { type: REDEMPTION_TYPE, status: "enabled", _transport: transportOf("/webhook/v1/twitch/event-sub/channel-redemption-add") },
+                    { type: REDEMPTION_TYPE, status: "enabled", _transport: transportOf("/webhook/v2/twitch/event-sub/channel-redemption-add") },
+                ],
+            });
+            const subscribed = await EventSubReconcilerService.ensureEventSubs("1", [REDEMPTION_TYPE], "tx");
+            expect(subscribed).toEqual([]);
+            expect(eventSub.subscribeToChannelRedemptionAddEvents).not.toHaveBeenCalled();
+        });
+    });
+
     describe("getRequiredEventTypes", () => {
         it("returns empty list when no widgets are enabled", () => {
             expect(EventSubReconcilerService.getRequiredEventTypes([])).toEqual([]);

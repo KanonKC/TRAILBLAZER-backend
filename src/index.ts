@@ -4,10 +4,12 @@ import { connectRedis } from "@/libs/redis";
 import TLogger, { Layer } from "@/logging/logger";
 import config from "@/config";
 import { maskConfig } from "@/utils/maskConfig";
+import { assertEventSubSecretConfigured } from "@/config/validateEventSubSecret";
 
 const logger = new TLogger(Layer.OTHER, "index.main");
 
 async function main() {
+  assertEventSubSecretConfigured(config.twitch.eventSubSecret);
   await connectRedis();
 
   server.listen({ port: 8080, host: "0.0.0.0" }, (err, address) => {

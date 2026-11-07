@@ -8,7 +8,7 @@ import EventSubReconcilerRepository from "@/repositories/eventSubReconciler/even
 import type FirstWordService from "@/services/widget/firstWord/firstWord.service";
 import type EndCreditService from "@/services/widget/endCredit/endCredit.service";
 import { TwitchStreamOnlineEventRequest } from "@/events/twitch/streamOnline/request";
-import { TWITCH_EVENT_DEFINITIONS } from "../events";
+import { TWITCH_EVENT_DEFINITIONS, getSubscriptionCallback, isLegacySubscription } from "../events";
 import { ReconcileSummary } from "./response";
 import { TwitchEventType, WIDGET_EVENT_TYPES, WIDGET_MANAGED_EVENT_TYPES } from "../constant";
 import { WidgetTypeSlug } from "@/services/constant";
@@ -21,6 +21,9 @@ const STREAMS_BATCH_SIZE = 100;
 const MISSING_STATUS = "missing";
 const MAX_DELETE_RATIO = 0.3;
 const MIN_MANAGED_FOR_RATIO_CHECK = 20;
+// Legacy-route subscriptions are retired gradually. This must stay clearly below MAX_DELETE_RATIO, because
+// guardDeletes cancels every delete in the round once the ratio is exceeded, which would stall the migration.
+const LEGACY_DELETE_RATIO_PER_ROUND = 0.25;
 
 export class EventSubSubscribeError extends Error {
     constructor(public readonly eventType: string, public readonly cause: unknown) {
@@ -62,13 +65,15 @@ export default class EventSubReconcilerService {
      * Subscribes the user to every given event type that has no `enabled` subscription yet.
      * Uses a single list call. Throws EventSubSubscribeError on the first failed subscribe.
      * Never deletes — removal is the health check job's responsibility.
+     * A subscription on a legacy route does not count: the user is subscribed again on the current route
+     * and the legacy one is retired by the health check once the new one is healthy.
      * Static so widget services can call it without depending on a reconciler instance
      * (the reconciler itself depends on FirstWordService/EndCreditService, which would make the injection circular).
      */
     static async ensureEventSubs(twitchId: string, eventTypes: readonly string[], transactionId?: string): Promise<string[]> {
         const logger = EventSubReconcilerService.staticLogger.setContext("service.twitch.eventSubReconciler.ensureEventSubs", transactionId);
         const existing = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId);
-        const enabledTypes = new Set(existing.data.filter(sub => sub.status === "enabled").map(sub => sub.type));
+        const enabledTypes = new Set(existing.data.filter(sub => sub.status === "enabled" && !isLegacySubscription(sub)).map(sub => sub.type));
 
         const subscribed: string[] = [];
         for (const eventType of eventTypes) {
@@ -208,7 +213,7 @@ export default class EventSubReconcilerService {
     private isManaged(subscription: HelixEventSubSubscription): boolean {
         if (subscription.transportMethod !== "webhook") return false;
         if (!WIDGET_MANAGED_EVENT_TYPES.has(subscription.type as TwitchEventType)) return false;
-        const callback = (subscription._transport as { callback?: string }).callback ?? "";
+        const callback = getSubscriptionCallback(subscription);
         return config.origin !== "" && callback.startsWith(config.origin);
     }
 
@@ -231,16 +236,22 @@ export default class EventSubReconcilerService {
 
         const actionsByUser = new Map<string, ReconcileAction[]>();
         const push = (twitchId: string, action: ReconcileAction) => actionsByUser.set(twitchId, [...(actionsByUser.get(twitchId) ?? []), action]);
+        // Retired on a budget after everything else is planned, see the end of this method
+        const legacyDeletes: Extract<ReconcileAction, { kind: "delete" }>[] = [];
 
         for (const twitchId of users) {
             const wanted = desired.get(twitchId) ?? new Set<string>();
             const eventTypes = new Set<string>([...wanted, ...managed.filter(s => this.ownerOf(s) === twitchId).map(s => s.type)]);
             for (const eventType of eventTypes) {
-                const existing = subscriptionsByKey.get(`${twitchId}|${eventType}`) ?? [];
+                const allSubscriptions = subscriptionsByKey.get(`${twitchId}|${eventType}`) ?? [];
                 if (!wanted.has(eventType)) {
-                    existing.forEach(subscription => push(twitchId, { kind: "delete", twitchId, eventType, subscription, reason: "not required by any enabled widget" }));
+                    allSubscriptions.forEach(subscription => push(twitchId, { kind: "delete", twitchId, eventType, subscription, reason: "not required by any enabled widget" }));
                     continue;
                 }
+                // A subscription on a replaced route never counts as the current one, so a user who only has
+                // a legacy subscription falls through to "create" below and gets the current route.
+                const legacy = allSubscriptions.filter(s => isLegacySubscription(s));
+                const existing = allSubscriptions.filter(s => !legacy.includes(s));
                 const healthy = existing.filter(s => s.status === "enabled");
                 const freshPending = existing.filter(s => s.status === "webhook_callback_verification_pending"
                     && Date.now() - s.creationDate.getTime() < FRESH_PENDING_VERIFICATION_MS);
@@ -251,8 +262,19 @@ export default class EventSubReconcilerService {
                 if (healthy.length === 0 && freshPending.length === 0) {
                     push(twitchId, { kind: "create", twitchId, eventType, previousStatus: broken[0]?.status ?? MISSING_STATUS });
                 }
+                // Legacy subscriptions keep delivering until the current one is confirmed healthy, so no event is lost in between
+                if (healthy.length > 0) {
+                    legacy.forEach(subscription => legacyDeletes.push({ kind: "delete", twitchId, eventType, subscription, reason: "legacy route replaced by a healthy subscription" }));
+                }
             }
         }
+
+        // Spend only what is left of this round's legacy budget, so the migration never trips guardDeletes
+        let plannedDeletes = 0;
+        for (const actions of actionsByUser.values()) plannedDeletes += actions.filter(a => a.kind === "delete").length;
+        const legacyBudget = Math.max(0, Math.ceil(managed.length * LEGACY_DELETE_RATIO_PER_ROUND) - plannedDeletes);
+        legacyDeletes.slice(0, legacyBudget).forEach(action => push(action.twitchId, action));
+
         return actionsByUser;
     }
 

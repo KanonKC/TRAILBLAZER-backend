@@ -7,7 +7,7 @@ import { HelixErrorResponse } from "./response";
 import { ListChannelRewardsOptions } from "./request";
 import { HelixEventSubSubscriptionData } from "@twurple/api/lib/interfaces/endpoints/eventSub.external";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
-import { TWITCH_EVENT_DEFINITIONS } from "./events";
+import { TWITCH_EVENT_DEFINITIONS, isLegacySubscription } from "./events";
 import TLogger, { Layer } from "@/logging/logger";
 
 export default class TwitchService {
@@ -105,7 +105,8 @@ export default class TwitchService {
         }
         try {
             const existing = await twitchAppAPI.eventSub.getSubscriptionsForUser(twitchId)
-            if (existing.data.some(sub => sub.type === type && sub.status === "enabled")) {
+            // A subscription on a replaced route does not count, otherwise the user could never move to the current route
+            if (existing.data.some(sub => sub.type === type && sub.status === "enabled" && !isLegacySubscription(sub))) {
                 logger.info({ message: "Event already subscribed", data: { twitchId, type } })
                 return
             }

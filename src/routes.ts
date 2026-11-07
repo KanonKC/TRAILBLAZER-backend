@@ -63,6 +63,8 @@ import SystemController from './controllers/system/system.controller';
 import TwitchController from './controllers/twitch/twitch.controller';
 import TwitchGqlController from './controllers/twitch/twitch-gql.controller';
 import TwitchChannelRedemptionAddEvent from './events/twitch/channelRedemptionAdd/channelRedemptionAdd.event';
+import { registerChannelRedemptionAddV2Route } from './events/twitch/channelRedemptionAdd/channelRedemptionAdd.route';
+import RedemptionClaimService from './services/redemptionClaim/redemptionClaim.service';
 import TwitchStreamOnlineEvent from './events/twitch/streamOnline/streamOnline.event';
 import TwitchStreamOfflineEvent from './events/twitch/streamOffline/streamOffline.event';
 import TwitchChannelFollowEvent from './events/twitch/channelFollow/channelFollow.event';
@@ -276,11 +278,14 @@ const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(
   clipShoutoutService
 );
+const redemptionClaimService = new RedemptionClaimService();
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(
   randomDbdPerkService,
   dropImageService,
   randomDBDKillerService,
-  randomPoolService
+  randomPoolService,
+  redemptionClaimService,
+  config.twitch.eventSubSecret
 );
 const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
 const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
@@ -625,6 +630,11 @@ server.post(
 server.post(
   '/webhook/v1/twitch/event-sub/channel-redemption-add',
   twitchChannelRedemptionAddEvent.handle.bind(twitchChannelRedemptionAddEvent)
+);
+// Signed successor of the v1 route above; the v1 route is removed once no subscription uses it any more.
+registerChannelRedemptionAddV2Route(
+  server,
+  twitchChannelRedemptionAddEvent.handleSigned.bind(twitchChannelRedemptionAddEvent)
 );
 server.post(
   '/webhook/v1/twitch/event-sub/channel-follow',
