@@ -123,6 +123,13 @@ describe("signed channel redemption add route", () => {
         expect(reactiveRewardService.redeem).not.toHaveBeenCalled();
     });
 
+    it("still matches the raw body parser when Twitch sends a charset with the content type", async () => {
+        const request = buildSignedRequest();
+        const response = await server.inject({ ...request, headers: { ...request.headers, "content-type": "application/json; charset=utf-8" } });
+        expect(response.statusCode).toBe(204);
+        expect(randomPoolService.redeem).toHaveBeenCalledTimes(1);
+    });
+
     it("returns 403 and plays nothing for a signature made with the wrong secret", async () => {
         const response = await server.inject(buildSignedRequest({ secret: "attacker-secret-0123456789" }));
         expect(response.statusCode).toBe(403);
