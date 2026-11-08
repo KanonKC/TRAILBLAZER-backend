@@ -10,7 +10,8 @@ const WIDGET_TYPE_SLUG = 'reactive-reward';
 
 const reactionInclude = { media_file: true, sound_file: true };
 export const reactiveRewardInclude = {
-  widget: true,
+  // The widget type carries the point cost the dashboard shows next to the status switch
+  widget: { include: { widget_type: true } },
   reactions: { orderBy: { sort_order: 'asc' as const }, include: reactionInclude },
 };
 const reactionWithOwnerInclude = {
