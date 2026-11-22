@@ -3,6 +3,7 @@ import RandomPoolRepository, {
   ConfigRecord,
   PoolRecord,
 } from '@/repositories/randomPool/randomPool.repository';
+import RewardBindingRepository from '@/repositories/rewardBinding/rewardBinding.repository';
 import { ConfigInput, configSchema, PoolInput, poolSchema } from './request';
 import { chatMessage, drawItem, poolState } from './randomPool.logic';
 import WidgetService from '@/services/widget/widget.service';
@@ -36,7 +37,8 @@ export default class RandomPoolService {
     private readonly widgets: WidgetService,
     private readonly queue: OverlayQueueService,
     private readonly twitch: TwitchService,
-    private readonly defaultBotId: string
+    private readonly defaultBotId: string,
+    private readonly rewardBindings: RewardBindingRepository
   ) {
     widgets.registerEnableHandler(WidgetTypeSlug.RANDOM_POOL, {
       beforeEnable: async (widgetId, ownerId, transactionId) => {
@@ -249,7 +251,7 @@ export default class RandomPoolService {
     const pool = await this.ownedPool(ownerId, data.pool_id, transactionId);
     if (data.items.some((setting) => !pool.items.some((item) => item.id === setting.item_id)))
       throw new BadRequestError('Item does not belong to selected pool');
-    if (await this.repository.rewardUsed(data.twitch_reward_id, id, transactionId))
+    if (await this.rewardBindings.rewardUsed(data.twitch_reward_id, { randomPoolConfigId: id }, transactionId))
       throw new BadRequestError('Reward is already bound to a widget');
     logger.info({ message: 'Checking channel rewards' });
     const rewards = await this.twitch.listChannelRewards(twitchId, undefined, transactionId);

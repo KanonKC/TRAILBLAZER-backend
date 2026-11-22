@@ -3,6 +3,7 @@ import RandomPoolRepository, {
   ConfigRecord,
   PoolRecord,
 } from '@/repositories/randomPool/randomPool.repository';
+import RewardBindingRepository from '@/repositories/rewardBinding/rewardBinding.repository';
 import OverlayQueueService from '@/services/overlayQueue/overlayQueue.service';
 import WidgetService from '@/services/widget/widget.service';
 import TwitchService from '@/services/twitch/twitch';
@@ -31,6 +32,7 @@ const poolId = '11111111-1111-4111-8111-111111111111';
 const itemId = '22222222-2222-4222-8222-222222222222';
 describe('RandomPoolService authorization and lifecycle', () => {
   let repository: jest.Mocked<RandomPoolRepository>;
+  let rewardBindings: jest.Mocked<RewardBindingRepository>;
   let queue: jest.Mocked<OverlayQueueService>;
   let widgets: jest.Mocked<WidgetService>;
   let twitch: jest.Mocked<TwitchService>;
@@ -76,7 +78,6 @@ describe('RandomPoolService authorization and lifecycle', () => {
       pool: jest.fn().mockResolvedValue(config.pool),
       config: jest.fn().mockResolvedValue(config),
       byReward: jest.fn().mockResolvedValue(config),
-      rewardUsed: jest.fn().mockResolvedValue(false),
       file: jest.fn(),
       user: jest.fn().mockResolvedValue({ tier: 0 }),
       listPools: jest.fn().mockResolvedValue([config.pool]),
@@ -98,7 +99,10 @@ describe('RandomPoolService authorization and lifecycle', () => {
     twitch = {
       listChannelRewards: jest.fn().mockResolvedValue({ data: [{ id: 'reward' }] }),
     } as unknown as jest.Mocked<TwitchService>;
-    service = new RandomPoolService(repository, widgets, queue, twitch, 'default-bot');
+    rewardBindings = {
+      rewardUsed: jest.fn().mockResolvedValue(false),
+    } as unknown as jest.Mocked<RewardBindingRepository>;
+    service = new RandomPoolService(repository, widgets, queue, twitch, 'default-bot', rewardBindings);
   });
   it('protects configs and pools against other owners', async () => {
     await expect(service.getConfig('other', 'config')).rejects.toThrow('own');
@@ -189,7 +193,7 @@ describe('RandomPoolService authorization and lifecycle', () => {
     );
   });
   it('rejects reward reuse, foreign rewards and foreign item settings', async () => {
-    repository.rewardUsed.mockResolvedValueOnce(true);
+    rewardBindings.rewardUsed.mockResolvedValueOnce(true);
     await expect(service.saveConfig('owner', 'channel', input)).rejects.toThrow('bound');
     twitch.listChannelRewards.mockResolvedValueOnce({ data: [] });
     await expect(service.saveConfig('owner', 'channel', input)).rejects.toThrow('channel');

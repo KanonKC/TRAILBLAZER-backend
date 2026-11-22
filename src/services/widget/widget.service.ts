@@ -187,7 +187,11 @@ export default class WidgetService {
         return this.widgetRepository.delete(id, transactionId);
     }
 
-    async validateOverlayAccess(userId: string, key: string, transactionId?: string) {
+    /**
+     * `expectedSlug` pins the key to one widget type. An overlay key opens whatever widget it belongs to, so without
+     * it a streamer's key for one widget would also open the SSE stream of another widget type of theirs.
+     */
+    async validateOverlayAccess(userId: string, key: string, transactionId?: string, expectedSlug?: string) {
         let logger: TLogger = this.logger;
         logger = this.logger.setContext("service.widget.validateOverlayAccess", transactionId);
         logger.info({ message: "Validating overlay access", data: { userId } });
@@ -199,6 +203,10 @@ export default class WidgetService {
             }
             if (widget.owner_id !== userId) {
                 logger.warn({ message: "Unauthorized access attempt", data: { userId, widgetId: widget.id } });
+                return false;
+            }
+            if (expectedSlug && widget.widget_type_slug !== expectedSlug) {
+                logger.warn({ message: "Overlay key belongs to a different widget type", data: { userId, widgetId: widget.id, expectedSlug } });
                 return false;
             }
 

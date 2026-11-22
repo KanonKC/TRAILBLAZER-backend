@@ -230,6 +230,25 @@ describe("WidgetService", () => {
             expect(result).toBe(true);
         });
 
+        describe("with an expected widget type", () => {
+            const widgetOfType = (slug: string) => ({ id: "w_1", owner_id: "u_1", overlay_key: "key_1", enabled: true, widget_type_slug: slug } as any);
+
+            it("accepts a key that belongs to that widget type", async () => {
+                mockWidgetRepo.getByOverlayKey.mockResolvedValue(widgetOfType("reactive-reward"));
+                await expect(service.validateOverlayAccess("u_1", "key_1", transactionId, "reactive-reward")).resolves.toBe(true);
+            });
+
+            it("rejects the same owner's key for a different widget type", async () => {
+                mockWidgetRepo.getByOverlayKey.mockResolvedValue(widgetOfType("first-word"));
+                await expect(service.validateOverlayAccess("u_1", "key_1", transactionId, "reactive-reward")).resolves.toBe(false);
+            });
+
+            it("keeps accepting any widget type when none is expected", async () => {
+                mockWidgetRepo.getByOverlayKey.mockResolvedValue(widgetOfType("first-word"));
+                await expect(service.validateOverlayAccess("u_1", "key_1", transactionId)).resolves.toBe(true);
+            });
+        });
+
         it("should return false if owner mismatches", async () => {
             mockWidgetRepo.getByOverlayKey.mockResolvedValue({ id: "w_1", owner_id: "u_2", overlay_key: "key_1" } as any);
             const result = await service.validateOverlayAccess("u_1", "key_1", transactionId);

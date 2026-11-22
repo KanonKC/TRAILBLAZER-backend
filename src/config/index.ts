@@ -15,6 +15,8 @@ export default interface Configurations {
         redirectUrl: string;
         defaultBotId: string;
         paymentChannelId: string;
+        /** Shared HMAC secret for every EventSub webhook subscription we create; signed routes verify with it. */
+        eventSubSecret: string;
         eventSubHealthCheck: {
             enabled: boolean;
             cron: string;

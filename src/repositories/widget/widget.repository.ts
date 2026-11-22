@@ -7,6 +7,29 @@ import { Pagination } from "@/services/response";
 import { WidgetQuotaLimitError } from "@/services/widget/error";
 import { ForbiddenError, NotFoundError } from "@/errors";
 import { WidgetWhereInput } from "generated/prisma/models";
+import { pointsForActiveReactions } from "@/services/reactiveReward/reactiveReward.logic";
+
+const REACTIVE_REWARD_SLUG = "reactive-reward";
+
+/** Counts the Reactions that are switched on, which is what a Reactive Reward widget is charged for. */
+export const activeReactionCountInclude = {
+    reactive_reward: { select: { _count: { select: { reactions: { where: { enabled: true } } } } } },
+};
+
+/**
+ * Quota points an enabled widget uses. Most widgets cost their type's fixed `cost`;
+ * Reactive Reward costs nothing to switch on and is charged by how many Reactions are active.
+ */
+export function quotaCostOf(widget: {
+    widget_type_slug: string | null;
+    widget_type: { cost: number } | null;
+    reactive_reward?: { _count: { reactions: number } } | null;
+}): number {
+    if (widget.widget_type_slug === REACTIVE_REWARD_SLUG) {
+        return pointsForActiveReactions(widget.reactive_reward?._count.reactions ?? 0);
+    }
+    return widget.widget_type?.cost ?? 1;
+}
 
 const logger = new TLogger(Layer.REPOSITORY);
 
@@ -119,9 +142,9 @@ export default class WidgetRepository {
                 enabled: true,
                 ...(excludeIds && excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
             },
-            include: { widget_type: true },
+            include: { widget_type: true, ...activeReactionCountInclude },
         });
-        return enabledWidgets.reduce((sum, w) => sum + (w.widget_type?.cost ?? 1), 0);
+        return enabledWidgets.reduce((sum, w) => sum + quotaCostOf(w), 0);
     } catch (error) {
             logger.setContext("repository.widget.getEnabledQuotaUsed", transactionId).error({ message: "getEnabledQuotaUsed failed", error: error as Error });
             throw error;
@@ -164,7 +187,7 @@ export default class WidgetRepository {
             await prisma.$transaction(async transaction => {
                 // The same lock serializes enables of every widget type for this owner.
                 await transaction.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
-                const widget = await transaction.widget.findFirst({ where: { id, owner_id: ownerId }, include: { widget_type: true, owner: true } });
+                const widget = await transaction.widget.findFirst({ where: { id, owner_id: ownerId }, include: { widget_type: true, owner: true, ...activeReactionCountInclude } });
                 if (!widget) throw new NotFoundError("Widget not found");
                 if (enabled) {
                     if (widget.widget_type_slug) {
@@ -175,9 +198,10 @@ export default class WidgetRepository {
                     if (availability !== "active" && !(availability === "whitelist_only" && widget.owner.is_whitelisted)) {
                         throw new ForbiddenError("Widget type is unavailable for this streamer");
                     }
-                    const others = await transaction.widget.findMany({ where: { owner_id: ownerId, enabled: true, id: { not: id } }, include: { widget_type: true } });
-                    const used = others.reduce((sum, other) => sum + (other.widget_type?.cost ?? 1), 0);
-                    if (used + (currentWidgetType?.cost ?? 1) > quota) throw new WidgetQuotaLimitError();
+                    const others = await transaction.widget.findMany({ where: { owner_id: ownerId, enabled: true, id: { not: id } }, include: { widget_type: true, ...activeReactionCountInclude } });
+                    const used = others.reduce((sum, other) => sum + quotaCostOf(other), 0);
+                    const currentWidgetCost = quotaCostOf({ ...widget, widget_type: currentWidgetType });
+                    if (used + currentWidgetCost > quota) throw new WidgetQuotaLimitError();
                 }
                 await transaction.widget.update({ where: { id }, data: { enabled } });
             });

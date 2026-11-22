@@ -1,6 +1,12 @@
 import RandomPoolUploadService from "./services/randomPool/randomPoolUpload.service";
 import RandomPoolRepository from "./repositories/randomPool/randomPool.repository";
 import RandomPoolService from "./services/randomPool/randomPool.service";
+import RewardBindingRepository from "./repositories/rewardBinding/rewardBinding.repository";
+import ReactiveRewardRepository from "./repositories/reactiveReward/reactiveReward.repository";
+import ReactiveRewardService from "./services/reactiveReward/reactiveReward.service";
+import ReactiveRewardUploadService from "./services/reactiveReward/reactiveRewardUpload.service";
+import ReactiveRewardController from "./controllers/reactiveReward/reactiveReward.controller";
+import ReactiveRewardEventController from "./controllers/reactiveReward/reactiveReward.event.controller";
 import RandomPoolController from "./controllers/randomPool/randomPool.controller";
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
@@ -63,6 +69,8 @@ import SystemController from './controllers/system/system.controller';
 import TwitchController from './controllers/twitch/twitch.controller';
 import TwitchGqlController from './controllers/twitch/twitch-gql.controller';
 import TwitchChannelRedemptionAddEvent from './events/twitch/channelRedemptionAdd/channelRedemptionAdd.event';
+import { registerChannelRedemptionAddV2Route } from './events/twitch/channelRedemptionAdd/channelRedemptionAdd.route';
+import RedemptionClaimService from './services/redemptionClaim/redemptionClaim.service';
 import TwitchStreamOnlineEvent from './events/twitch/streamOnline/streamOnline.event';
 import TwitchStreamOfflineEvent from './events/twitch/streamOffline/streamOffline.event';
 import TwitchChannelFollowEvent from './events/twitch/channelFollow/channelFollow.event';
@@ -246,8 +254,22 @@ const endCreditController = new EndCreditController(endCreditService);
 const dropImageEventController = new DropImageEventController(widgetService);
 const endCreditEventController = new EndCreditEventController(widgetService);
 const randomDbdPerkController = new RandomDbdPerkController(randomDbdPerkService);
-const randomPoolService = new RandomPoolService(new RandomPoolRepository(), widgetService, overlayQueueService, twitchService, config.twitch.defaultBotId);
+const rewardBindingRepository = new RewardBindingRepository();
+const randomPoolService = new RandomPoolService(new RandomPoolRepository(), widgetService, overlayQueueService, twitchService, config.twitch.defaultBotId, rewardBindingRepository);
 const randomPoolController = new RandomPoolController(randomPoolService, new RandomPoolUploadService(uploadedFileService));
+const reactiveRewardService = new ReactiveRewardService(
+  new ReactiveRewardRepository(),
+  rewardBindingRepository,
+  widgetService,
+  overlayQueueService,
+  twitchService
+);
+const reactiveRewardEventController = new ReactiveRewardEventController(widgetService);
+const reactiveRewardController = new ReactiveRewardController(
+  reactiveRewardService,
+  new ReactiveRewardUploadService(uploadedFileService),
+  reactiveRewardEventController
+);
 const randomDBDKillerController = new RandomDBDKillerController(randomDBDKillerService);
 const randomDBDKillerEventController = new RandomDBDKillerEventController(widgetService);
 const dbdKillerMasterController = new DBDKillerMasterController(dbdKillerMasterRepository);
@@ -276,11 +298,15 @@ const twitchStreamOfflineEvent = new TwitchStreamOfflineEvent(exportVideoService
 const twitchChannelChatNotificationEvent = new TwitchChannelChatNotificationEvent(
   clipShoutoutService
 );
+const redemptionClaimService = new RedemptionClaimService();
 const twitchChannelRedemptionAddEvent = new TwitchChannelRedemptionAddEvent(
   randomDbdPerkService,
   dropImageService,
   randomDBDKillerService,
-  randomPoolService
+  randomPoolService,
+  redemptionClaimService,
+  config.twitch.eventSubSecret,
+  reactiveRewardService
 );
 const twitchChannelFollowEvent = new TwitchChannelFollowEvent(endCreditService);
 const twitchChannelSubscribeEvent = new TwitchChannelSubscribeEvent(endCreditService);
@@ -602,6 +628,10 @@ server.get(
   endCreditEventController.sse.bind(endCreditEventController)
 );
 server.get(
+  '/api/v1/events/reactive-reward/:userId',
+  reactiveRewardEventController.sse.bind(reactiveRewardEventController)
+);
+server.get(
   '/api/v1/end-credit/:userId/records',
   endCreditController.getRecords.bind(endCreditController)
 );
@@ -626,6 +656,11 @@ server.post(
   '/webhook/v1/twitch/event-sub/channel-redemption-add',
   twitchChannelRedemptionAddEvent.handle.bind(twitchChannelRedemptionAddEvent)
 );
+// Signed successor of the v1 route above; the v1 route is removed once no subscription uses it any more.
+registerChannelRedemptionAddV2Route(
+  server,
+  twitchChannelRedemptionAddEvent.handleSigned.bind(twitchChannelRedemptionAddEvent)
+);
 server.post(
   '/webhook/v1/twitch/event-sub/channel-follow',
   twitchChannelFollowEvent.handle.bind(twitchChannelFollowEvent)
@@ -645,6 +680,7 @@ server.post(
 
 tbCron.run();
 randomPoolController.register(server);
+reactiveRewardController.register(server);
 overlayQueueService.start();
 
 export { overlayQueueService };

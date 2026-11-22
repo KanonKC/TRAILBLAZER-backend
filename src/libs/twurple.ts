@@ -1,7 +1,6 @@
 import config from "@/config";
 import { ApiClient, HelixEventSubTransportOptions } from "@twurple/api";
 import { AppTokenAuthProvider, StaticAuthProvider } from "@twurple/auth";
-import crypto from "crypto";
 
 const clientId = process.env.TWITCH_CLIENT_ID!;
 const clientSecret = process.env.TWITCH_CLIENT_SECRET!;
@@ -18,6 +17,7 @@ export function createESTransport(route: string): HelixEventSubTransportOptions 
     return {
         method: "webhook",
         callback: `${config.origin}${route}`,
-        secret: crypto.randomBytes(16).toString("hex")
+        // One stored secret instead of a throwaway random one, so signed routes can verify deliveries later
+        secret: config.twitch.eventSubSecret
     }
 }

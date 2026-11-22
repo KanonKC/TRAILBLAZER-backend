@@ -126,20 +126,6 @@ export default class RandomPoolRepository {
       })
     );
   }
-  rewardUsed(rewardId: string, excludeId?: string, transactionId?: string) {
-    return this.run(transactionId, async () => {
-      const [pool, killer, perk, drop, spotify] = await Promise.all([
-        prisma.randomPoolConfig.findFirst({
-          where: { twitch_reward_id: rewardId, ...(excludeId ? { id: { not: excludeId } } : {}) },
-        }),
-        prisma.randomDBDKiller.findUnique({ where: { twitch_reward_id: rewardId } }),
-        prisma.randomDbdPerkClass.findUnique({ where: { twitch_reward_id: rewardId } }),
-        prisma.dropImage.findUnique({ where: { twitch_reward_id: rewardId } }),
-        prisma.spotifySongRequest.findUnique({ where: { twitch_reward_id: rewardId } }),
-      ]);
-      return !!(pool || killer || perk || drop || spotify);
-    });
-  }
   saveConfig(
     ownerId: string,
     twitchId: string,

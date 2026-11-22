@@ -1,9 +1,17 @@
+import config from "@/config";
 import { createESTransport, twitchAppAPI } from "@/libs/twurple";
+import { CHANNEL_REDEMPTION_ADD_V1_ROUTE, CHANNEL_REDEMPTION_ADD_V2_ROUTE } from "@/events/twitch/routePaths";
 import { TwitchEventType } from "./constant";
 
 export interface TwitchEventDefinition {
     type: TwitchEventType;
+    /** The route new subscriptions are created with. */
     route: string;
+    /**
+     * Routes this event type used before `route`. Subscriptions still pointing at one are being migrated away from:
+     * they never count as the current subscription, are kept until the current one is healthy, and are then deleted.
+     */
+    legacyRoutes?: readonly string[];
     subscribe: (twitchId: string, transport: ReturnType<typeof createESTransport>) => Promise<unknown>;
 }
 
@@ -35,7 +43,9 @@ export const TWITCH_EVENT_DEFINITIONS: TwitchEventDefinition[] = [
     },
     {
         type: TwitchEventType.CHANNEL_REDEMPTION_ADD,
-        route: "/webhook/v1/twitch/event-sub/channel-redemption-add",
+        // v2 verifies the Twitch signature. v1 is unverified and stays registered only until no subscription uses it.
+        route: CHANNEL_REDEMPTION_ADD_V2_ROUTE,
+        legacyRoutes: [CHANNEL_REDEMPTION_ADD_V1_ROUTE],
         subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelRedemptionAddEvents(twitchId, transport),
     },
     {
@@ -54,3 +64,19 @@ export const TWITCH_EVENT_DEFINITIONS: TwitchEventDefinition[] = [
         subscribe: (twitchId, transport) => twitchAppAPI.eventSub.subscribeToChannelChatNotificationEvents(twitchId, transport),
     },
 ];
+
+/** The callback URL Twitch is told to call, as stored on the subscription. */
+export function getSubscriptionCallback(subscription: { _transport: unknown }): string {
+    return (subscription._transport as { callback?: string } | undefined)?.callback ?? "";
+}
+
+/**
+ * True when this deployment's subscription of `eventType` still calls a route that has since been replaced.
+ * Subscriptions of other deployments (a different origin) are never legacy from our point of view.
+ */
+export function isLegacySubscription(subscription: { type: string; _transport: unknown }): boolean {
+    const definition = TWITCH_EVENT_DEFINITIONS.find(candidate => candidate.type === subscription.type);
+    if (!definition?.legacyRoutes) return false;
+    const callback = getSubscriptionCallback(subscription);
+    return definition.legacyRoutes.some(legacyRoute => callback === `${config.origin}${legacyRoute}`);
+}
