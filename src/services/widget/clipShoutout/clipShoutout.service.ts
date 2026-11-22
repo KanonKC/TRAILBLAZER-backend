@@ -188,6 +188,7 @@ export default class ClipShoutoutService {
                 transactionId,
             }
             await this.runImmediateEffects(bare, csConfig.delay_ms)
+            logger.info({ message: "Clip shoutout triggered, increasing widget triggered count", data: { widgetId: csConfig.widget_id } });
             this.widgetService.increaseTriggeredCount(csConfig.widget_id, transactionId)
             return
         }

@@ -195,6 +195,7 @@ export default class ExportVideoService {
                 }
             }
             await this.createHistory(userId, reqLog, transactionId)
+            logger.info({ message: "Export video succeeded, increasing widget triggered count", data: { widgetId: config.widget_id } });
             this.widgetService.increaseTriggeredCount(config.widget_id, transactionId)
         } catch (err) {
             reqLog.status = "FAILED"

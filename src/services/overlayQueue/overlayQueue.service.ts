@@ -284,6 +284,7 @@ export default class OverlayQueueService {
         this.runEffects(job)
 
         if (job.widgetId) {
+            logger.info({ message: "Overlay event dispatched, increasing widget triggered count", data: { widgetId: job.widgetId, slug: job.widgetSlug, jobId: job.id } })
             this.widgetService?.increaseTriggeredCount(job.widgetId, job.transactionId)
         }
 
