@@ -34,6 +34,9 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 }
 
 main().catch((err) => {
+  // Console transport is silent and logger ships remotely, so a fatal boot failure
+  // would otherwise be invisible in `docker compose logs`.
+  console.error("Fatal error during startup:", err);
   logger.error({ message: "Fatal error during startup", error: err });
   process.exit(1);
 });
