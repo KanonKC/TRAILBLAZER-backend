@@ -17,6 +17,30 @@ export type ReactionPosition = (typeof REACTION_POSITIONS)[number];
 
 export const MAX_REACTIONS_PER_WIDGET = 50;
 
+/** The first point switches on this many Reactions at once; every further point adds the second amount. */
+export const ACTIVE_REACTIONS_FOR_FIRST_POINT = 10;
+export const ACTIVE_REACTIONS_PER_EXTRA_POINT = 5;
+
+/**
+ * Points a streamer pays while `activeReactionCount` Reactions are enabled.
+ * Having the widget on costs nothing by itself: 0 active = 0 points, 1-10 = 1, 11-15 = 2, 16-20 = 3 ...
+ */
+export function pointsForActiveReactions(activeReactionCount: number): number {
+  if (activeReactionCount <= 0) return 0;
+  if (activeReactionCount <= ACTIVE_REACTIONS_FOR_FIRST_POINT) return 1;
+  return 1 + Math.ceil((activeReactionCount - ACTIVE_REACTIONS_FOR_FIRST_POINT) / ACTIVE_REACTIONS_PER_EXTRA_POINT);
+}
+
+/** The most Reactions that can be enabled at once with `availablePoints` to spend on this widget. */
+export function activeReactionsAllowedByPoints(availablePoints: number): number {
+  const wholePoints = Math.floor(availablePoints);
+  if (wholePoints <= 0) return 0;
+  return Math.min(
+    MAX_REACTIONS_PER_WIDGET,
+    ACTIVE_REACTIONS_FOR_FIRST_POINT + (wholePoints - 1) * ACTIVE_REACTIONS_PER_EXTRA_POINT
+  );
+}
+
 const KILOBYTES_PER_MEGABYTE = 1024;
 
 export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'];

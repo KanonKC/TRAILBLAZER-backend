@@ -144,7 +144,7 @@ const widgetTypes = [
     slug: "reactive-reward",
     display_name: "Reactive Reward",
     description: "เล่นเสียง รูปภาพ หรือวิดีโอบนโอเวอร์เลย์ OBS เมื่อผู้ชมแลก Channel Points",
-    cost: 1,
+    cost: 0, // free to switch on; charged by active Reactions instead (see pointsForActiveReactions)
     theme_color: "#a855f7",
     href: "/dashboard/widgets/reactive-reward",
     is_active: true,

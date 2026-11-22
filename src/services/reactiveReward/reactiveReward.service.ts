@@ -17,8 +17,11 @@ import { ReactionInput, reactionSchema } from './request';
 import {
   PlaybackFacts,
   ReactionMediaType,
+  MAX_REACTIONS_PER_WIDGET,
   UNKNOWN_MEDIA_LENGTH_MS,
+  activeReactionsAllowedByPoints,
   mediaFileProblem,
+  pointsForActiveReactions,
   playbackLengthMs,
   presenceKey,
   queueCeilingMs,
@@ -116,8 +119,29 @@ export default class ReactiveRewardService {
     return { ...reaction, media_url: mediaUrl, sound_url: soundUrl };
   }
 
-  private async extend(record: ReactiveRewardRecord) {
-    return { ...record, reactions: await Promise.all(record.reactions.map((reaction) => this.extendReaction(reaction))) };
+  /** What the dashboard needs to explain the price: points this widget uses and how many Reactions can be on at once. */
+  private async quotaSummary(ownerId: string, record: ReactiveRewardRecord, transactionId?: string) {
+    const quota = await this.widgets.getQuota(ownerId, transactionId);
+    const activeCount = record.reactions.filter((reaction) => reaction.enabled).length;
+    const pointsNeeded = pointsForActiveReactions(activeCount);
+    // used_quota already counts this widget while it is on, so take it out to see what the others use
+    const pointsUsedByOthers = quota.used_quota - (record.widget.enabled ? pointsNeeded : 0);
+    const pointsAvailable = Math.max(0, quota.total_quota - pointsUsedByOthers);
+    return {
+      active_count: activeCount,
+      points_needed: pointsNeeded,
+      points_available: pointsAvailable,
+      active_limit: activeReactionsAllowedByPoints(pointsAvailable),
+      max_reactions: MAX_REACTIONS_PER_WIDGET,
+    };
+  }
+
+  private async extend(ownerId: string, record: ReactiveRewardRecord, transactionId?: string) {
+    const [reactions, quota] = await Promise.all([
+      Promise.all(record.reactions.map((reaction) => this.extendReaction(reaction))),
+      this.quotaSummary(ownerId, record, transactionId),
+    ]);
+    return { ...record, reactions, quota };
   }
 
   private async ownedReaction(ownerId: string, id: string, transactionId?: string) {
@@ -155,7 +179,7 @@ export default class ReactiveRewardService {
   async get(ownerId: string, transactionId?: string) {
     const record = await this.repository.getByOwner(ownerId, transactionId);
     if (!record) throw new NotFoundError('Reactive reward not enabled');
-    return this.extend(record);
+    return this.extend(ownerId, record, transactionId);
   }
 
   async delete(ownerId: string, transactionId?: string) {
@@ -208,12 +232,14 @@ export default class ReactiveRewardService {
       transactionId
     );
 
+    const { total_quota: totalQuota } = await this.widgets.getQuota(ownerId, transactionId);
     const saved = await this.repository.saveReaction(
       ownerId,
       record.id,
       { ...data, twitch_reward_title: reward.title },
       reactionId,
-      transactionId
+      transactionId,
+      totalQuota
     );
     logger.info({ message: 'Saved reaction', data: { reactionId: saved.id } });
     // The parent widget is already known to the caller and carries the overlay key, so it is not repeated here

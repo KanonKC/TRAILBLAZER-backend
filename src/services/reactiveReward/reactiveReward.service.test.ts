@@ -114,6 +114,7 @@ describe('ReactiveRewardService', () => {
     rewardBindings = { rewardUsed: jest.fn().mockResolvedValue(false) } as unknown as jest.Mocked<RewardBindingRepository>;
     widgets = {
       authorizeWidgetType: jest.fn().mockResolvedValue(undefined),
+      getQuota: jest.fn().mockResolvedValue({ total_quota: 3, used_quota: 1, remaining_quota: 2 }),
       setInitialEnabled: jest.fn().mockResolvedValue(undefined),
       isEnabledAndAvailable: jest.fn().mockResolvedValue(true),
       delete: jest.fn().mockResolvedValue(undefined),
@@ -177,7 +178,7 @@ describe('ReactiveRewardService', () => {
     it('saves a new reaction with the reward title read from Twitch', async () => {
       const saved = await service.saveReaction(ownerId, twitchId, input);
       expect(repository.saveReaction).toHaveBeenCalledWith(
-        ownerId, 'rr-1', expect.objectContaining({ twitch_reward_id: 'reward-1', twitch_reward_title: 'Hydrate' }), undefined, undefined);
+        ownerId, 'rr-1', expect.objectContaining({ twitch_reward_id: 'reward-1', twitch_reward_title: 'Hydrate' }), undefined, undefined, 3);
       expect(saved).toMatchObject({ media_url: 'signed:media-key' });
     });
 
@@ -430,5 +431,21 @@ describe('ReactiveRewardService', () => {
       repository.reaction.mockResolvedValue(makeReaction({ sound_key: null, sound_file: null }));
       await expect(registeredHandler.resolve(job())).resolves.toMatchObject({ sound_url: null, display_ms: 5000 });
     });
+  });
+});
+
+describe('ReactiveRewardService quota summary', () => {
+  it('reports the points this widget uses and how many reactions can be active', async () => {
+    const repository = { getByOwner: jest.fn() } as any;
+    const widgets = { getQuota: jest.fn() } as any;
+    const service = new ReactiveRewardService(repository, {} as any, widgets, { register: jest.fn() } as any, {} as any);
+    // 11 active reactions on an enabled widget: 2 points. Total 3, used 2 (all by this widget), so 3 are available.
+    const reactions = Array.from({ length: 11 }, (_, index) => ({ id: `r${index}`, enabled: true, media_file: null, sound_file: null }));
+    repository.getByOwner.mockResolvedValue({ id: 'rr-1', widget_id: 'w', widget: { enabled: true }, reactions });
+    widgets.getQuota.mockResolvedValue({ total_quota: 3, used_quota: 2, remaining_quota: 1 });
+
+    const result = await service.get('owner-1');
+
+    expect(result.quota).toEqual({ active_count: 11, points_needed: 2, points_available: 3, active_limit: 20, max_reactions: 50 });
   });
 });

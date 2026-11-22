@@ -4,7 +4,12 @@ import { Prisma } from '../../../generated/prisma/client';
 import TLogger, { Layer } from '@/logging/logger';
 import { BadRequestError, NotFoundError } from '@/errors';
 import { ReactionInput } from '@/services/reactiveReward/request';
-import { MAX_REACTIONS_PER_WIDGET } from '@/services/reactiveReward/reactiveReward.logic';
+import {
+  MAX_REACTIONS_PER_WIDGET,
+  activeReactionsAllowedByPoints,
+} from '@/services/reactiveReward/reactiveReward.logic';
+import { WidgetQuotaLimitError } from '@/services/widget/error';
+import { activeReactionCountInclude, quotaCostOf } from '@/repositories/widget/widget.repository';
 
 const WIDGET_TYPE_SLUG = 'reactive-reward';
 
@@ -103,18 +108,41 @@ export default class ReactiveRewardRepository {
     reactiveRewardId: string,
     data: ReactionInput & { twitch_reward_title: string },
     reactionId?: string,
-    transactionId?: string
+    transactionId?: string,
+    totalQuota?: number
   ) {
     return this.run('saveReaction', transactionId, () =>
       prisma.$transaction(async (transaction) => {
         // Serializes the per-widget limit and the writes of one owner across processes
         await transaction.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
         const fields = { ...data, sound_key: data.sound_key || null };
+
+        /** Switching a Reaction on must fit in the points left after the owner's other widgets. */
+        const assertActiveReactionsFit = async (activeAfterSave: number) => {
+          if (totalQuota === undefined || !fields.enabled) return;
+          const otherWidgets = await transaction.widget.findMany({
+            where: { owner_id: ownerId, enabled: true, reactive_reward: { is: null } },
+            include: { widget_type: true, ...activeReactionCountInclude },
+          });
+          const pointsUsedByOthers = otherWidgets.reduce((sum, other) => sum + quotaCostOf(other), 0);
+          const allowed = activeReactionsAllowedByPoints(totalQuota - pointsUsedByOthers);
+          if (activeAfterSave > allowed)
+            throw new WidgetQuotaLimitError(
+              `Active reaction limit reached (${allowed}). Disable a reaction or get more points.`
+            );
+        };
+
         if (reactionId) {
           const existing = await transaction.reactiveRewardReaction.findFirst({
             where: { id: reactionId, reactive_reward_id: reactiveRewardId },
           });
           if (!existing) throw new NotFoundError('Reaction not found');
+          if (!existing.enabled) {
+            const activeNow = await transaction.reactiveRewardReaction.count({
+              where: { reactive_reward_id: reactiveRewardId, enabled: true },
+            });
+            await assertActiveReactionsFit(activeNow + 1);
+          }
           return transaction.reactiveRewardReaction.update({
             where: { id: reactionId },
             data: fields,
@@ -131,6 +159,10 @@ export default class ReactiveRewardRepository {
         ]);
         if (count >= MAX_REACTIONS_PER_WIDGET)
           throw new BadRequestError(`Reaction limit reached (${MAX_REACTIONS_PER_WIDGET})`);
+        const activeNow = await transaction.reactiveRewardReaction.count({
+          where: { reactive_reward_id: reactiveRewardId, enabled: true },
+        });
+        await assertActiveReactionsFit(activeNow + 1);
         return transaction.reactiveRewardReaction.create({
           data: { ...fields, reactive_reward_id: reactiveRewardId, sort_order: (last?.sort_order ?? -1) + 1 },
           include: reactionWithOwnerInclude,
